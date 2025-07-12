@@ -171,7 +171,7 @@ echo "CanRun environment variables set"
             sys.path.insert(0, str(self.project_root))
             
             from src.hardware_detector import HardwareDetector
-            from src.requirements_fetcher import RequirementsFetcher
+            from src.game_requirements_fetcher import GameRequirementsFetcher
             from src.compatibility_analyzer import CompatibilityAnalyzer
             from src.performance_predictor import PerformancePredictor
             from src.canrun_engine import CanRunEngine

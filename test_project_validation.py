@@ -192,7 +192,7 @@ def test_python_syntax():
         "src/__init__.py",
         "src/canrun_engine.py",
         "src/hardware_detector.py",
-        "src/requirements_fetcher.py", 
+        "src/game_requirements_fetcher.py",
         "src/compatibility_analyzer.py",
         "src/performance_predictor.py"
     ]

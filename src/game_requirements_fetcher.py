@@ -1,5 +1,5 @@
 """
-Requirements Fetcher Module for CanRun
+Game Requirements Fetcher Module for CanRun
 Fetches game requirements from multiple sources including Steam API, 
 PCGameBenchmark, and local cache.
 """
@@ -8,18 +8,12 @@ import json
 import logging
 import asyncio
 import aiohttp
-import requests
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Union, Optional
 from pathlib import Path
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 from abc import ABC, abstractmethod
 import re
 import time
-
-try:
-    from bs4 import BeautifulSoup
-except ImportError:
-    BeautifulSoup = None
 
 
 @dataclass
@@ -44,10 +38,11 @@ class DataSource(ABC):
 class SteamAPISource(DataSource):
     """Steam Store API source for game requirements."""
     
-    def __init__(self):
+    def __init__(self, llm_analyzer=None):
         self.base_url = "https://store.steampowered.com/api"
         self.search_url = "https://store.steampowered.com/search/suggest"
         self.logger = logging.getLogger(__name__)
+        self.llm_analyzer = llm_analyzer
     
     async def fetch(self, game_name: str) -> Optional[GameRequirements]:
         """Fetch game requirements from Steam API."""
@@ -84,17 +79,27 @@ class SteamAPISource(DataSource):
                 async with session.get(self.search_url, params=params) as response:
                     if response.status == 200:
                         text = await response.text()
-                        # Parse the search results (HTML format)
-                        if BeautifulSoup:
-                            soup = BeautifulSoup(text, 'html.parser')
-                            # Look for data-ds-appid attribute
-                            for link in soup.find_all('a', {'data-ds-appid': True}):
-                                return link['data-ds-appid']
-                        else:
-                            # Fallback regex parsing
-                            match = re.search(r'data-ds-appid="(\d+)"', text)
-                            if match:
-                                return match.group(1)
+                        # Use LLM to extract Steam app ID from HTML
+                        if self.llm_analyzer:
+                            try:
+                                prompt = f"""
+                                Extract the Steam app ID from this HTML content. Look for data-ds-appid attributes in links.
+                                Return only the numeric app ID, nothing else.
+                                
+                                HTML content:
+                                {text[:2000]}  # Limit to first 2000 chars for LLM processing
+                                """
+                                
+                                app_id = await self.llm_analyzer.analyze_text(prompt)
+                                if app_id and app_id.strip().isdigit():
+                                    return app_id.strip()
+                            except Exception as e:
+                                self.logger.debug(f"LLM parsing failed: {e}")
+                        
+                        # Fallback regex parsing if LLM fails
+                        match = re.search(r'data-ds-appid="(\d+)"', text)
+                        if match:
+                            return match.group(1)
         except Exception as e:
             self.logger.debug(f"Steam search failed: {e}")
         
@@ -280,14 +285,14 @@ class LocalCacheSource(DataSource):
             self.logger.error(f"Failed to save to cache: {e}")
 
 
-class RequirementsFetcher:
-    """Main requirements fetcher that coordinates multiple sources."""
+class GameRequirementsFetcher:
+    """Main game requirements fetcher that coordinates multiple sources."""
     
-    def __init__(self):
+    def __init__(self, llm_analyzer=None):
         self.logger = logging.getLogger(__name__)
         self.sources = [
             LocalCacheSource(),
-            SteamAPISource(),
+            SteamAPISource(llm_analyzer),
             PCGameBenchmarkSource()
         ]
     
@@ -350,8 +355,8 @@ class RequirementsFetcher:
 
 
 async def main():
-    """Test the requirements fetcher."""
-    fetcher = RequirementsFetcher()
+    """Test the game requirements fetcher."""
+    fetcher = GameRequirementsFetcher()
     
     # Test single game fetch
     print("Testing single game fetch...")

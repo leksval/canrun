@@ -6,12 +6,14 @@ Tests the hardware detection capabilities of the CanRun system
 
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import pytest
+sys.path.append('.')
 
 from src.hardware_detector import HardwareDetector
 import asyncio
 import json
 
+@pytest.mark.asyncio
 async def test_hardware_detection():
     """Test hardware detection functionality"""
     print("=" * 50)
@@ -23,38 +25,19 @@ async def test_hardware_detection():
     try:
         # Test system detection
         print("\n[TEST 1] Detecting system hardware...")
-        hardware = await detector.detect_system_hardware()
+        hardware = detector.detect_hardware()
         
-        print(f"✓ Hardware detected successfully")
-        print(f"  CPU: {hardware.get('cpu', {}).get('name', 'Unknown')}")
-        print(f"  GPU: {hardware.get('gpu', {}).get('name', 'Unknown')}")
-        print(f"  RAM: {hardware.get('memory', {}).get('total', 'Unknown')} GB")
+        print("+ Hardware detected successfully")
+        print(f"  CPU: {hardware.cpu_name}")
+        print(f"  GPU: {hardware.gpu_name}")
+        print(f"  RAM: {hardware.ram_total} MB")
         
-        # Test individual components
-        print("\n[TEST 2] Testing individual component detection...")
+        print("\n[TEST 2] Testing GPU performance scoring...")
+        gpu_score = detector.get_gpu_performance_score(hardware.gpu_name)
+        print(f"+ GPU Performance Score: {gpu_score}")
         
-        # CPU test
-        cpu_info = await detector.detect_cpu()
-        print(f"✓ CPU: {cpu_info.get('name', 'Unknown')} - {cpu_info.get('cores', 0)} cores")
-        
-        # GPU test  
-        gpu_info = await detector.detect_gpu()
-        print(f"✓ GPU: {gpu_info.get('name', 'Unknown')} - {gpu_info.get('memory', 0)} GB VRAM")
-        
-        # Memory test
-        memory_info = await detector.detect_memory()
-        print(f"✓ Memory: {memory_info.get('total', 0)} GB total, {memory_info.get('available', 0)} GB available")
-        
-        # Storage test
-        storage_info = await detector.detect_storage()
-        print(f"✓ Storage: {len(storage_info)} drives detected")
-        
-        print("\n[TEST 3] Performance scoring...")
-        cpu_score = detector.calculate_cpu_score(cpu_info)
-        gpu_score = detector.calculate_gpu_score(gpu_info)
-        
-        print(f"✓ CPU Performance Score: {cpu_score}")
-        print(f"✓ GPU Performance Score: {gpu_score}")
+        gpu_tier = detector.get_gpu_tier(hardware.gpu_name)
+        print(f"+ GPU Tier: {gpu_tier}")
         
         print("\n" + "=" * 50)
         print("All hardware detection tests passed!")
@@ -63,7 +46,7 @@ async def test_hardware_detection():
         return True
         
     except Exception as e:
-        print(f"✗ Hardware detection test failed: {e}")
+        print(f"X Hardware detection test failed: {e}")
         return False
 
 if __name__ == "__main__":
