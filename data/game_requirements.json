@@ -1,0 +1,257 @@
+{
+  "comment": "Cached game requirements from various sources",
+  "games": {
+    "Cyberpunk 2077": {
+      "minimum": {
+        "os": "Windows 10",
+        "processor": "Intel Core i5-3570K or AMD FX-8310",
+        "memory": "8 GB RAM",
+        "graphics": "NVIDIA GeForce GTX 780 or AMD Radeon RX 470",
+        "directx": "Version 12",
+        "storage": "70 GB available space"
+      },
+      "recommended": {
+        "os": "Windows 10",
+        "processor": "Intel Core i7-4790 or AMD Ryzen 3 3200G",
+        "memory": "12 GB RAM",
+        "graphics": "NVIDIA GeForce GTX 1060 or AMD Radeon R9 Fury",
+        "directx": "Version 12",
+        "storage": "70 GB available space"
+      }
+    },
+    "Elden Ring": {
+      "minimum": {
+        "os": "Windows 10",
+        "processor": "Intel Core i5-8400 or AMD Ryzen 3 3300X",
+        "memory": "12 GB RAM",
+        "graphics": "NVIDIA GeForce GTX 1060 or AMD Radeon RX 580",
+        "directx": "Version 12",
+        "storage": "60 GB available space"
+      },
+      "recommended": {
+        "os": "Windows 10",
+        "processor": "Intel Core i7-8700K or AMD Ryzen 5 3600X",
+        "memory": "16 GB RAM",
+        "graphics": "NVIDIA GeForce GTX 1070 or AMD Radeon RX Vega 56",
+        "directx": "Version 12",
+        "storage": "60 GB available space"
+      }
+    },
+    "Baldur's Gate 3": {
+      "minimum": {
+        "os": "Windows 10",
+        "processor": "Intel Core i5-4690 or AMD FX-4350",
+        "memory": "8 GB RAM",
+        "graphics": "NVIDIA GeForce GTX 970 or AMD Radeon RX 480",
+        "directx": "Version 11",
+        "storage": "150 GB available space"
+      },
+      "recommended": {
+        "os": "Windows 10",
+        "processor": "Intel Core i7-8700K or AMD Ryzen 5 3600",
+        "memory": "16 GB RAM",
+        "graphics": "NVIDIA GeForce RTX 2060 or AMD Radeon RX 6700 XT",
+        "directx": "Version 12",
+        "storage": "150 GB available space"
+      }
+    },
+    "Hogwarts Legacy": {
+      "minimum": {
+        "os": "Windows 10",
+        "processor": "Intel Core i5-6600 or AMD Ryzen 5 1400",
+        "memory": "16 GB RAM",
+        "graphics": "NVIDIA GeForce GTX 960 or AMD Radeon RX 470",
+        "directx": "Version 12",
+        "storage": "85 GB available space"
+      },
+      "recommended": {
+        "os": "Windows 10",
+        "processor": "Intel Core i7-8700K or AMD Ryzen 5 3600",
+        "memory": "16 GB RAM",
+        "graphics": "NVIDIA GeForce RTX 2070 or AMD Radeon RX 6800 XT",
+        "directx": "Version 12",
+        "storage": "85 GB available space"
+      }
+    },
+    "Call of Duty: Modern Warfare II": {
+      "minimum": {
+        "os": "Windows 10",
+        "processor": "Intel Core i3-6100 or AMD Ryzen 3 1200",
+        "memory": "8 GB RAM",
+        "graphics": "NVIDIA GeForce GTX 960 or AMD Radeon RX 470",
+        "directx": "Version 12",
+        "storage": "125 GB available space"
+      },
+      "recommended": {
+        "os": "Windows 10",
+        "processor": "Intel Core i5-6600K or AMD Ryzen 5 1600",
+        "memory": "12 GB RAM",
+        "graphics": "NVIDIA GeForce GTX 1060 or AMD Radeon RX 580",
+        "directx": "Version 12",
+        "storage": "125 GB available space"
+      }
+    },
+    "Red Dead Redemption 2": {
+      "minimum": {
+        "os": "Windows 10",
+        "processor": "Intel Core i5-2500K or AMD FX-6300",
+        "memory": "8 GB RAM",
+        "graphics": "NVIDIA GeForce GTX 770 or AMD Radeon R9 280",
+        "directx": "Version 12",
+        "storage": "150 GB available space"
+      },
+      "recommended": {
+        "os": "Windows 10",
+        "processor": "Intel Core i7-4770K or AMD Ryzen 5 1500X",
+        "memory": "12 GB RAM",
+        "graphics": "NVIDIA GeForce GTX 1060 or AMD Radeon RX 480",
+        "directx": "Version 12",
+        "storage": "150 GB available space"
+      }
+    },
+    "Starfield": {
+      "minimum": {
+        "os": "Windows 10",
+        "processor": "AMD Ryzen 5 2600X or Intel Core i7-6800K",
+        "memory": "16 GB RAM",
+        "graphics": "AMD Radeon RX 5700 or NVIDIA GeForce GTX 1070 Ti",
+        "directx": "Version 12",
+        "storage": "125 GB available space"
+      },
+      "recommended": {
+        "os": "Windows 10",
+        "processor": "AMD Ryzen 5 3600X or Intel Core i5-10600K",
+        "memory": "16 GB RAM",
+        "graphics": "AMD Radeon RX 6800 XT or NVIDIA GeForce RTX 2080",
+        "directx": "Version 12",
+        "storage": "125 GB available space"
+      }
+    },
+    "Spider-Man Remastered": {
+      "minimum": {
+        "os": "Windows 10",
+        "processor": "Intel Core i3-4160 or AMD Ryzen 3 1300X",
+        "memory": "8 GB RAM",
+        "graphics": "NVIDIA GeForce GTX 950 or AMD Radeon RX 470",
+        "directx": "Version 12",
+        "storage": "75 GB available space"
+      },
+      "recommended": {
+        "os": "Windows 10",
+        "processor": "Intel Core i5-4670 or AMD Ryzen 5 1600",
+        "memory": "16 GB RAM",
+        "graphics": "NVIDIA GeForce GTX 1060 or AMD Radeon RX 580",
+        "directx": "Version 12",
+        "storage": "75 GB available space"
+      }
+    },
+    "Forza Horizon 5": {
+      "minimum": {
+        "os": "Windows 10",
+        "processor": "Intel Core i5-4460 or AMD Ryzen 3 1200",
+        "memory": "8 GB RAM",
+        "graphics": "NVIDIA GeForce GTX 970 or AMD Radeon RX 470",
+        "directx": "Version 12",
+        "storage": "110 GB available space"
+      },
+      "recommended": {
+        "os": "Windows 10",
+        "processor": "Intel Core i5-8400 or AMD Ryzen 5 1500X",
+        "memory": "16 GB RAM",
+        "graphics": "NVIDIA GeForce GTX 1070 or AMD Radeon RX 590",
+        "directx": "Version 12",
+        "storage": "110 GB available space"
+      }
+    },
+    "Diablo IV": {
+      "minimum": {
+        "os": "Windows 10",
+        "processor": "Intel Core i5-2500K or AMD FX-8350",
+        "memory": "8 GB RAM",
+        "graphics": "NVIDIA GeForce GTX 660 or AMD Radeon R9 280",
+        "directx": "Version 12",
+        "storage": "90 GB available space"
+      },
+      "recommended": {
+        "os": "Windows 10",
+        "processor": "Intel Core i5-4670K or AMD Ryzen 3 1300X",
+        "memory": "16 GB RAM",
+        "graphics": "NVIDIA GeForce GTX 970 or AMD Radeon RX 470",
+        "directx": "Version 12",
+        "storage": "90 GB available space"
+      }
+    },
+    "Resident Evil 4": {
+      "minimum": {
+        "os": "Windows 10",
+        "processor": "AMD Ryzen 5 2600 or Intel Core i5-7500",
+        "memory": "8 GB RAM",
+        "graphics": "AMD Radeon RX 5500 XT or NVIDIA GeForce GTX 1050 Ti",
+        "directx": "Version 12",
+        "storage": "67 GB available space"
+      },
+      "recommended": {
+        "os": "Windows 10",
+        "processor": "AMD Ryzen 5 3600 or Intel Core i7-7700",
+        "memory": "16 GB RAM",
+        "graphics": "AMD Radeon RX 5700 or NVIDIA GeForce RTX 2070",
+        "directx": "Version 12",
+        "storage": "67 GB available space"
+      }
+    },
+    "The Witcher 3: Wild Hunt": {
+      "minimum": {
+        "os": "Windows 10",
+        "processor": "Intel Core i5-2500K or AMD Phenom II X4 940",
+        "memory": "6 GB RAM",
+        "graphics": "NVIDIA GeForce GTX 660 or AMD Radeon HD 7870",
+        "directx": "Version 11",
+        "storage": "35 GB available space"
+      },
+      "recommended": {
+        "os": "Windows 10",
+        "processor": "Intel Core i7-3770 or AMD FX-8350",
+        "memory": "8 GB RAM",
+        "graphics": "NVIDIA GeForce GTX 770 or AMD Radeon R9 290",
+        "directx": "Version 11",
+        "storage": "35 GB available space"
+      }
+    },
+    "Apex Legends": {
+      "minimum": {
+        "os": "Windows 10",
+        "processor": "Intel Core i3-6300 or AMD FX-4350",
+        "memory": "6 GB RAM",
+        "graphics": "NVIDIA GeForce GT 640 or AMD Radeon HD 7700",
+        "directx": "Version 11",
+        "storage": "56 GB available space"
+      },
+      "recommended": {
+        "os": "Windows 10",
+        "processor": "Intel Core i5-3570K or AMD FX-6300",
+        "memory": "8 GB RAM",
+        "graphics": "NVIDIA GeForce GTX 970 or AMD Radeon R9 290",
+        "directx": "Version 11",
+        "storage": "56 GB available space"
+      }
+    },
+    "Valorant": {
+      "minimum": {
+        "os": "Windows 10",
+        "processor": "Intel Core 2 Duo E8400 or AMD Athlon 200GE",
+        "memory": "4 GB RAM",
+        "graphics": "Intel HD 4000 or AMD Radeon R5 200",
+        "directx": "Version 11",
+        "storage": "8 GB available space"
+      },
+      "recommended": {
+        "os": "Windows 10",
+        "processor": "Intel Core i3-4150 or AMD Ryzen 3 1200",
+        "memory": "4 GB RAM",
+        "graphics": "NVIDIA GeForce GT 730 or AMD Radeon R7 240",
+        "directx": "Version 11",
+        "storage": "8 GB available space"
+      }
+    }
+  }
+}
