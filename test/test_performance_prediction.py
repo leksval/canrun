@@ -6,14 +6,19 @@ Tests the performance prediction capabilities
 
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import pytest
+# Add src directory to Python path
+current_dir = os.path.dirname(os.path.abspath(__file__))
+src_dir = os.path.join(current_dir, '..', 'src')
+sys.path.insert(0, src_dir)
 
-from src.performance_predictor import PerformancePredictor
-from src.hardware_detector import HardwareDetector
-from src.requirements_fetcher import RequirementsFetcher
+from performance_predictor import PerformancePredictor
+from hardware_detector import HardwareDetector
+from game_requirements_fetcher import GameRequirementsFetcher
 import asyncio
 import json
 
+@pytest.mark.asyncio
 async def test_performance_prediction():
     """Test performance prediction functionality"""
     print("=" * 50)
@@ -22,13 +27,13 @@ async def test_performance_prediction():
     
     # Initialize components
     detector = HardwareDetector()
-    fetcher = RequirementsFetcher()
+    fetcher = GameRequirementsFetcher()
     predictor = PerformancePredictor()
     
     try:
         print("\n[TEST 1] Detecting system hardware...")
-        hardware = await detector.detect_system_hardware()
-        print(f"✓ System detected: {hardware.get('gpu', {}).get('name', 'Unknown GPU')}")
+        hardware = detector.detect_hardware()
+        print(f"+ System detected: {hardware.gpu_name}")
         
         # Test different games and settings
         test_scenarios = [
@@ -58,13 +63,13 @@ async def test_performance_prediction():
             )
             
             # Display results
-            print(f"  ✓ Predicted FPS: {performance['fps']}")
-            print(f"  ✓ Performance Level: {performance['performance_level']}")
-            print(f"  ✓ Stability: {performance['stability']}")
-            print(f"  ✓ DLSS Boost: {performance.get('dlss_boost', 'N/A')}")
+            print(f"  OK Predicted FPS: {performance['fps']}")
+            print(f"  OK Performance Level: {performance['performance_level']}")
+            print(f"  OK Stability: {performance['stability']}")
+            print(f"  OK DLSS Boost: {performance.get('dlss_boost', 'N/A')}")
             
             if performance.get('optimization_suggestions'):
-                print(f"  ✓ Optimizations: {', '.join(performance['optimization_suggestions'])}")
+                print(f"  OK Optimizations: {', '.join(performance['optimization_suggestions'])}")
         
         print(f"\n[TEST {len(test_scenarios) + 2}] Testing DLSS performance boost...")
         
@@ -80,7 +85,7 @@ async def test_performance_prediction():
                 hardware.get('gpu', {}), 
                 dlss_scenario['dlss_mode']
             )
-            print(f"  ✓ DLSS {dlss_scenario['dlss_mode']}: {boost:.2f}x boost")
+            print(f"  OK DLSS {dlss_scenario['dlss_mode']}: {boost:.2f}x boost")
             
             # Verify boost is reasonable
             if abs(boost - dlss_scenario['expected_boost']) > 0.3:
@@ -93,7 +98,7 @@ async def test_performance_prediction():
         
         for rtx_setting in rtx_scenarios:
             impact = predictor.calculate_rtx_impact(rtx_setting)
-            print(f"  ✓ {rtx_setting}: {impact:.2f}x performance impact")
+            print(f"  OK {rtx_setting}: {impact:.2f}x performance impact")
         
         print(f"\n[TEST {len(test_scenarios) + 4}] Testing resolution scaling...")
         
@@ -104,7 +109,7 @@ async def test_performance_prediction():
         for resolution in resolutions:
             multiplier = predictor.get_resolution_multiplier(resolution)
             scaled_fps = base_fps * multiplier
-            print(f"  ✓ {resolution}: {scaled_fps:.1f} FPS (base: {base_fps})")
+            print(f"  OK {resolution}: {scaled_fps:.1f} FPS (base: {base_fps})")
         
         print("\n" + "=" * 50)
         print("All performance prediction tests passed!")
@@ -113,7 +118,7 @@ async def test_performance_prediction():
         return True
         
     except Exception as e:
-        print(f"✗ Performance prediction test failed: {e}")
+        print(f"X Performance prediction test failed: {e}")
         return False
 
 if __name__ == "__main__":

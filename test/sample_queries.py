@@ -6,7 +6,7 @@ Demonstrates how to use the CanRun system with various queries
 
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append('..')
 
 from src.canrun_engine import CanRunEngine
 import asyncio
@@ -34,15 +34,15 @@ class CanRunSampleQueries:
         
         if result:
             compatibility = result['compatibility']
-            print(f"✓ Compatibility Level: {compatibility['compatibility_level']}")
-            print(f"✓ Overall Score: {compatibility['overall_score']}/100")
+            print(f"OK Compatibility Level: {compatibility['compatibility_level']}")
+            print(f"OK Overall Score: {compatibility['overall_score']}/100")
             
             if compatibility['bottlenecks']:
                 print(f"⚠ Bottlenecks: {', '.join(compatibility['bottlenecks'])}")
             else:
-                print("✓ No bottlenecks detected")
+                print("OK No bottlenecks detected")
         else:
-            print("✗ Failed to analyze compatibility")
+            print("ERROR Failed to analyze compatibility")
     
     async def sample_performance_prediction(self):
         """Sample: Performance prediction with different settings"""
@@ -104,9 +104,9 @@ class CanRunSampleQueries:
             if result:
                 compatibility = result['compatibility']['compatibility_level']
                 fps = result['performance']['fps']
-                print(f"  ✓ {game}: {compatibility} ({fps} FPS)")
+                print(f"  OK {game}: {compatibility} ({fps} FPS)")
             else:
-                print(f"  ✗ {game}: Analysis failed")
+                print(f"  ERROR {game}: Analysis failed")
     
     async def sample_system_information(self):
         """Sample: Get system information"""

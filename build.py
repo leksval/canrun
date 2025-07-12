@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 CanRun Build Script
 Automated build, package, and distribution script for CanRun
@@ -23,6 +22,15 @@ class CanRunBuilder:
         self.build_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         self.is_windows = platform.system() == "Windows"
         
+    def validate_platform(self):
+        """Validate that we're running on Windows"""
+        if not self.is_windows:
+            print("❌ ERROR: This build script is designed for Windows systems only.")
+            print("CanRun is specifically designed for NVIDIA RTX systems with G-Assist support.")
+            print("G-Assist is currently only available on Windows.")
+            return False
+        return True
+        
     def print_header(self):
         """Print build header"""
         print("=" * 60)
@@ -32,6 +40,8 @@ class CanRunBuilder:
         print(f"Version: {self.version}")
         print(f"Build Date: {self.build_timestamp}")
         print(f"Platform: {platform.system()}")
+        if self.is_windows:
+            print("✅ Windows platform detected")
         print()
         
     def clean_build_dirs(self):
@@ -55,7 +65,7 @@ class CanRunBuilder:
         # Check if all required files exist
         required_files = [
             "src/hardware_detector.py",
-            "src/requirements_fetcher.py",
+            "src/game_requirements_fetcher.py",
             "src/compatibility_analyzer.py",
             "src/performance_predictor.py",
             "src/canrun_engine.py",
@@ -81,7 +91,7 @@ class CanRunBuilder:
             sys.path.insert(0, str(self.project_root))
             
             from src.hardware_detector import HardwareDetector
-            from src.requirements_fetcher import RequirementsFetcher
+            from src.game_requirements_fetcher import GameRequirementsFetcher
             from src.compatibility_analyzer import CompatibilityAnalyzer
             from src.performance_predictor import PerformancePredictor
             from src.canrun_engine import CanRunEngine
@@ -214,8 +224,7 @@ The plugin provides the following functions:
         print("✅ Copied core package")
         
         # Create standalone launcher
-        launcher_content = f"""#!/usr/bin/env python3
-'''
+        launcher_content = f"""'''
 CanRun Standalone Application
 Version: {self.version}
 Build Date: {self.build_timestamp}
@@ -291,8 +300,7 @@ if __name__ == "__main__":
         print("✅ Copied core package for testing")
         
         # Create test runner
-        test_runner_content = f"""#!/usr/bin/env python3
-'''
+        test_runner_content = f"""'''
 CanRun Test Runner
 Version: {self.version}
 Build Date: {self.build_timestamp}
@@ -595,6 +603,10 @@ This software is provided as-is for educational and personal use.
     def build_all(self):
         """Run the complete build process"""
         self.print_header()
+        
+        # First validate platform
+        if not self.validate_platform():
+            return False
         
         build_steps = [
             self.clean_build_dirs,

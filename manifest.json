@@ -1,0 +1,85 @@
+{
+  "manifestVersion": 1,
+  "name": "CanRun Universal Game Compatibility Checker",
+  "description": "Check game compatibility and performance predictions for your NVIDIA RTX/GTX system. Get instant answers about whether games will run, expected FPS, and optimization recommendations.",
+  "version": "1.1.0",
+  "author": "CanRun Development Team",
+  "tags": ["gaming", "compatibility", "performance", "nvidia", "rtx", "gtx", "fps", "optimization"],
+  "executable": "plugin.py",
+  "persistent": false,
+  "functions": [
+    {
+      "name": "detect_hardware",
+      "description": "Detect system hardware specifications",
+      "tags": ["hardware", "system", "specs"],
+      "properties": {}
+    },
+    {
+      "name": "check_compatibility",
+      "description": "Check game compatibility with current system",
+      "tags": ["compatibility", "gaming"],
+      "properties": {
+        "game_name": {
+          "type": "string",
+          "description": "Name of the game to check"
+        }
+      }
+    },
+    {
+      "name": "predict_performance",
+      "description": "Predict game performance for specific settings",
+      "tags": ["performance", "prediction", "fps"],
+      "properties": {
+        "game_name": {
+          "type": "string",
+          "description": "Name of the game"
+        },
+        "settings": {
+          "type": "string",
+          "description": "Graphics settings (Low, Medium, High, Ultra)"
+        },
+        "resolution": {
+          "type": "string",
+          "description": "Display resolution (1080p, 1440p, 4K)"
+        }
+      }
+    },
+    {
+      "name": "get_optimization_suggestions",
+      "description": "Get optimization recommendations for a game",
+      "tags": ["optimization", "recommendations"],
+      "properties": {
+        "game_name": {
+          "type": "string",
+          "description": "Name of the game"
+        }
+      }
+    },
+    {
+      "name": "get_intelligent_analysis",
+      "description": "Get comprehensive G-Assist LLM-powered analysis including bottleneck analysis, optimization recommendations, and deep system analysis",
+      "tags": ["analysis", "llm", "bottleneck", "optimization"],
+      "properties": {
+        "game_name": {
+          "type": "string",
+          "description": "Name of the game to analyze"
+        }
+      }
+    },
+    {
+      "name": "ask_intelligent_question",
+      "description": "Ask an intelligent question about gaming performance using G-Assist embedded LLM",
+      "tags": ["question", "llm", "performance", "gaming"],
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "The question to ask about gaming performance"
+        },
+        "game_name": {
+          "type": "string",
+          "description": "Name of the game for context"
+        }
+      }
+    }
+  ]
+}

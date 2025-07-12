@@ -6,14 +6,19 @@ Tests the game compatibility analysis capabilities
 
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import pytest
+# Add src directory to Python path
+current_dir = os.path.dirname(os.path.abspath(__file__))
+src_dir = os.path.join(current_dir, '..', 'src')
+sys.path.insert(0, src_dir)
 
-from src.compatibility_analyzer import CompatibilityAnalyzer
-from src.hardware_detector import HardwareDetector
-from src.requirements_fetcher import RequirementsFetcher
+from compatibility_analyzer import CompatibilityAnalyzer
+from hardware_detector import HardwareDetector
+from game_requirements_fetcher import GameRequirementsFetcher
 import asyncio
 import json
 
+@pytest.mark.asyncio
 async def test_compatibility_analysis():
     """Test compatibility analysis functionality"""
     print("=" * 50)
@@ -22,7 +27,7 @@ async def test_compatibility_analysis():
     
     # Initialize components
     detector = HardwareDetector()
-    fetcher = RequirementsFetcher()
+    fetcher = GameRequirementsFetcher()
     analyzer = CompatibilityAnalyzer()
     
     try:
@@ -35,8 +40,8 @@ async def test_compatibility_analysis():
         ]
         
         print("\n[TEST 1] Detecting system hardware...")
-        hardware = await detector.detect_system_hardware()
-        print(f"✓ System detected: {hardware.get('gpu', {}).get('name', 'Unknown GPU')}")
+        hardware = detector.detect_hardware()
+        print(f"+ System detected: {hardware.gpu_name}")
         
         for i, game in enumerate(test_games, 1):
             print(f"\n[TEST {i+1}] Analyzing compatibility for '{game}'...")
@@ -51,16 +56,16 @@ async def test_compatibility_analysis():
             compatibility = await analyzer.analyze_compatibility(hardware, requirements)
             
             # Display results
-            print(f"  ✓ Compatibility Level: {compatibility['compatibility_level']}")
-            print(f"  ✓ Overall Score: {compatibility['overall_score']}/100")
-            print(f"  ✓ Bottlenecks: {', '.join(compatibility['bottlenecks']) if compatibility['bottlenecks'] else 'None'}")
+            print(f"  OK Compatibility Level: {compatibility['compatibility_level']}")
+            print(f"  OK Overall Score: {compatibility['overall_score']}/100")
+            print(f"  OK Bottlenecks: {', '.join(compatibility['bottlenecks']) if compatibility['bottlenecks'] else 'None'}")
             
             # Show component analysis
             components = compatibility['component_analysis']
-            print(f"  ✓ CPU: {components['cpu']['status']} (Score: {components['cpu']['score']})")
-            print(f"  ✓ GPU: {components['gpu']['status']} (Score: {components['gpu']['score']})")
-            print(f"  ✓ Memory: {components['memory']['status']} (Score: {components['memory']['score']})")
-            print(f"  ✓ Storage: {components['storage']['status']} (Score: {components['storage']['score']})")
+            print(f"  OK CPU: {components['cpu']['status']} (Score: {components['cpu']['score']})")
+            print(f"  OK GPU: {components['gpu']['status']} (Score: {components['gpu']['score']})")
+            print(f"  OK Memory: {components['memory']['status']} (Score: {components['memory']['score']})")
+            print(f"  OK Storage: {components['storage']['status']} (Score: {components['storage']['score']})")
         
         print("\n[TEST 6] Testing edge cases...")
         
@@ -88,8 +93,8 @@ async def test_compatibility_analysis():
         }
         
         edge_compatibility = await analyzer.analyze_compatibility(minimal_hardware, test_requirements)
-        print(f"  ✓ Edge case compatibility: {edge_compatibility['compatibility_level']}")
-        print(f"  ✓ Bottlenecks identified: {len(edge_compatibility['bottlenecks'])}")
+        print(f"  OK Edge case compatibility: {edge_compatibility['compatibility_level']}")
+        print(f"  OK Bottlenecks identified: {len(edge_compatibility['bottlenecks'])}")
         
         print("\n" + "=" * 50)
         print("All compatibility analysis tests passed!")
@@ -98,7 +103,7 @@ async def test_compatibility_analysis():
         return True
         
     except Exception as e:
-        print(f"✗ Compatibility analysis test failed: {e}")
+        print(f"X Compatibility analysis test failed: {e}")
         return False
 
 if __name__ == "__main__":
