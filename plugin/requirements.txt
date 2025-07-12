@@ -1,0 +1,8 @@
+# CanRun G-Assist Plugin Requirements
+psutil>=5.9.0          # System hardware detection (CPU, memory, disk)
+GPUtil>=1.4.0          # GPU detection and monitoring
+nvidia-ml-py>=12.535.108  # NVIDIA GPU management library
+py-cpuinfo>=9.0.0      # Detailed CPU information extraction
+requests>=2.31.0       # HTTP requests for Steam API and external data
+pynvml>=11.5.0         # Enhanced NVIDIA GPU monitoring
+cpuinfo>=9.0.0         # Additional CPU architecture detection
