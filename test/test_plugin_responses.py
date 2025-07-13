@@ -271,7 +271,7 @@ def test_manifest_structure():
     # Mock manifest structure
     mock_manifest = {
         "name": "CanRun",
-        "version": "1.0.0",
+        "version": "2.0.0",
         "description": "Universal Game Compatibility Checker",
         "functions": [
             {

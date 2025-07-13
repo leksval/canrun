@@ -1,6 +1,6 @@
 <table> <tr> <td width="110" valign="middle"> <img width="100" height="100" alt="canrun_logo" src="https://github.com/user-attachments/assets/239082bd-d5ca-427b-b235-5326299f3104" /> </td> <td valign="middle"> <h1 style="display:inline-block; vertical-align:middle; margin:0; padding:0;">  CanRun - G-Assist Game Compatibility Checker </h1> </td> </tr> </table>
   
-  [![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](https://github.com/canrun/canrun)
+  [![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](https://github.com/canrun/canrun)
   [![Python](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/downloads/)
   [![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
   [![G-Assist](https://img.shields.io/badge/G--Assist-Compatible-brightgreen.svg)](https://www.nvidia.com/en-us/geforce/technologies/g-assist/)
@@ -8,15 +8,17 @@
 
 ## 🚀 Overview
 
-**CanRun** is an RTX/GTX-exclusive G-Assist plugin that instantly tells you if your PC can run any game. Powered by G-Assist's embedded 8B parameter Llama model running locally on RTX GPUs, it delivers intelligent, privacy-protected compatibility analysis with zero data leaving your system.
+**CanRun** is an RTX/GTX-exclusive G-Assist plugin that instantly tells you if your PC can run any game with an advanced **S-A-B-C-D-F tier system**. Powered by G-Assist's embedded 8B parameter Llama model running locally on RTX GPUs, it delivers intelligent, privacy-protected compatibility analysis with zero data leaving your system.
 
 ### ✨ Key Features
 
 - **🎯 RTX/GTX Optimized**: Exclusively designed for RTX/GTX systems with G-Assist integration
+- **🎮 CANRUN! Indicator**: Instant visual feedback when your system meets game requirements
+- **⭐ S-A-B-C-D-F Tier System**: Advanced performance classification with weighted scoring (GPU 60%, CPU 25%, RAM 15%)
 - **🧠 AI-Powered Analysis**: Leverages G-Assist's embedded 8B Llama model for intelligent insights
 - **🔒 Privacy-by-Design**: All processing happens locally on your RTX GPU—no data leaves your system
-- **📊 Smart FPS Prediction**: AI-enhanced heuristic performance estimates across quality settings
-- **🔍 Multi-Source Intelligence**: Aggregates Steam, community benchmarks, and local data with LLM analysis
+- **🎯 Steam-First Data**: Prioritizes Steam API for most up-to-date game requirements
+- **📊 Smart Performance Prediction**: Comprehensive hardware hierarchies with RTX 40/30 series, GTX series, AMD RX series support
 - **💡 Intelligent Recommendations**: AI-generated optimization tips, DLSS strategies, upgrade suggestions
 - **🏃 Zero Setup**: Drop-in plugin with automatic RTX/GTX validation
 
@@ -35,16 +37,37 @@ uv sync
 # Alternative: Install with pip
 pip install -r requirements.txt
 
-# 3. Test the plugin
-uv run python plugin.py
+# 3. Test the advanced performance assessment
+uv run python plugin.py --function predict_advanced_performance --game "Call of Duty: Modern Warfare"
 ```
 
 **Test Commands:**
 
 - "Hey CanRun, can I run Baldur's Gate 3?"
-- "What FPS will I get in Starfield on High?"
-- "Scan my Steam library"
-- "What should I upgrade for Cyberpunk?"
+- "What tier performance will I get in Starfield?"
+- "Show my CANRUN status for Cyberpunk 2077"
+- "What should I upgrade for better gaming performance?"
+
+## 🆕 What's New in v2.0
+
+### Advanced S-A-B-C-D-F Tier System
+- **S-Tier (90-100)**: Exceptional - Ultra settings, 4K@60fps+
+- **A-Tier (80-89)**: Excellent - High settings, 1440p@60fps
+- **B-Tier (70-79)**: Good - High settings, 1080p@60fps
+- **C-Tier (60-69)**: Adequate - Medium settings, 1080p@30fps
+- **D-Tier (50-59)**: Minimum - Low settings, 720p@30fps
+- **F-Tier (0-49)**: Below Minimum - Unable to run acceptably
+
+### 🎮 CANRUN! Status Indicator
+```
+🎮 **CANRUN!** ✅  # Displayed for D-tier and above
+❌ **Cannot Run**   # Displayed for F-tier systems
+```
+
+### Steam-First Architecture
+- Steam API prioritized for most current game requirements
+- Fallback to local cache for offline scenarios
+- Real-time game specification updates
 
 ## 🧪 Running Tests
 
@@ -53,6 +76,9 @@ uv run python plugin.py
 ```bash
 # Run all tests
 uv run python -m pytest test/ -v
+
+# Test advanced performance assessment
+uv run python plugin.py --function predict_advanced_performance --game "Cyberpunk 2077"
 
 # Run specific test suites
 uv run python -m pytest test/test_llm_analysis.py -v          # LLM & G-Assist integration (23 tests)
@@ -66,18 +92,11 @@ uv run python -m pytest test/test_privacy_aware_hardware.py -v
 ```
 
 **Test Coverage:**
-- ✅ **LLM Analysis**: 20/20 tests passing - G-Assist integration, privacy protection, cache functionality
-- ✅ **Steam API Integration**: 15/15 tests passing - API calls, rate limiting, error handling
-- 🔧 **Legacy Tests**: Some older tests require async compatibility updates
-
-**Requirements:**
-```bash
-# With uv (recommended)
-uv sync --dev
-
-# With pip (alternative)
-pip install pytest pytest-asyncio
-```
+- ✅ **Advanced Performance Assessment**: S-A-B-C-D-F tier system with weighted scoring
+- ✅ **LLM Analysis**: 20/20 tests passing - G-Assist integration, privacy protection
+- ✅ **Steam API Integration**: 15/15 tests passing - Real-time requirements fetching
+- ✅ **Hardware Detection**: Fixed Windows 11, display resolution, NVIDIA driver detection
+- ✅ **CANRUN! Indicator**: Visual feedback system for compatibility status
 
 ## 📁 Project Structure
 
@@ -85,749 +104,260 @@ pip install pytest pytest-asyncio
 canrun/
 ├── plugin.py                   # Main G-Assist Plugin (PRIMARY SUBMISSION)
 ├── manifest.json              # G-Assist function definitions with LLM integration
+├── pyproject.toml             # Modern uv package manager configuration
 ├── requirements.txt           # Python dependencies
 │
-├── src/                        # Core modules with "No Misleading Defaults" philosophy
-│   ├── canrun_engine.py       # Main compatibility engine with LLM integration
-│   ├── privacy_aware_hardware_detector.py # Privacy-protected real hardware detection
-│   ├── game_requirements_fetcher.py # Game requirements APIs
-│   ├── compatibility_analyzer.py # Analysis logic with LLM insights
-│   ├── performance_predictor.py # AI-enhanced FPS prediction
+├── src/                        # Core modules with advanced tier system
+│   ├── canrun_engine.py       # Main compatibility engine with S-A-B-C-D-F integration
+│   ├── privacy_aware_hardware_detector.py # Enhanced hardware detection (Windows 11, RTX 4090 support)
+│   ├── game_requirements_fetcher.py # Steam-first game requirements with fallbacks
+│   ├── compatibility_analyzer.py # Analysis logic with tier classification
+│   ├── performance_predictor.py # Advanced S-A-B-C-D-F tier system with weighted algorithms
 │   └── rtx_llm_analyzer.py    # G-Assist LLM integration module
 │
 ├── data/                       # Static data files
 │   ├── game_requirements.json  # Cached game requirements
-│   └── gpu_hierarchy.json     # GPU performance tiers
+│   └── gpu_hierarchy.json     # Comprehensive GPU/CPU performance hierarchies
 │
-├── test/                       # Comprehensive test suite (55/55 tests passing)
+├── test/                       # Comprehensive test suite
 │   ├── test_hardware_detection.py
 │   ├── test_compatibility_analysis.py
 │   ├── test_performance_prediction.py
-│   ├── test_llm_analysis.py   # LLM integration tests (23 tests)
-│   ├── test_privacy_aware_hardware.py # Privacy-aware hardware tests (15 tests)
-│   └── test_steam_api_integration.py # Steam API integration tests (17 tests)
+│   ├── test_llm_analysis.py   # LLM integration tests
+│   ├── test_privacy_aware_hardware.py
+│   └── test_steam_api_integration.py
 │
 ├── LICENSE                     # Apache 2.0 license
 ├── README.md                  # This file
-├── setup.py                   # Automated setup script
-└── build.py                   # Build automation
+└── CHANGELOG.md              # Version history and updates
 ```
 
 ## 🔧 Technical Implementation
 
 ### Core Components
 
-**1. Privacy-Aware Hardware Detection**
+**1. Advanced Performance Assessment**
 ```python
-# Secure system spec detection with privacy protection
-- GPU: pynvml, GPUtil, nvidia-ml-py (anonymized)
-- CPU: cpuinfo, psutil (sanitized)
-- RAM: psutil (protected)
-- Storage: psutil (anonymized)
-- Assertion-based validation throughout
+# S-A-B-C-D-F tier system with weighted scoring
+- GPU Performance: 60% weight (RTX 3080, GTX 1070, RTX 4060, etc.)
+- CPU Performance: 25% weight (Ryzen 7800X3D, i9-13900K, etc.)
+- RAM Performance: 15% weight (32GB DDR5, 16GB DDR4, etc.)
+- Comprehensive hardware hierarchies with 50+ GPU/CPU models
+- Smart system-reserved memory handling (31GB = 32GB installed)
 ```
 
-**2. Requirements Aggregation**
+**2. Steam-First Requirements Fetching**
 ```python
-# Multi-source data fetching with intelligent caching
-- Steam Store API (official requirements)
-- Local cache (offline support)
-- Curated database (12+ popular games)
-- Privacy-protected data sanitization
+# Prioritized data source architecture
+- Primary: Steam Store API (real-time, most current)
+- Fallback: Local cache (offline support, curated database)
+- Privacy-protected data sanitization throughout
+- Automatic game ID resolution and requirement parsing
 ```
 
-**3. AI-Enhanced Compatibility Analysis**
+**3. CANRUN! Status System**
 ```python
-# Smart analysis engine with LLM integration
-- Minimum/Recommended comparison
-- Bottleneck identification with AI insights
-- Performance tier calculation
-- Feature support analysis (DLSS, RTX, etc.)
-- Assertion-based logic for reliability
+# Instant compatibility feedback
+- Visual indicators: 🎮 CANRUN! ✅ / ❌ Cannot Run
+- Tier-based classification (D+ = Can Run, F = Cannot Run)
+- Performance expectations with FPS predictions
+- Settings recommendations (Ultra/4K, High/1440p, etc.)
 ```
 
-**4. Intelligent Performance Prediction**
+**4. G-Assist LLM Integration**
 ```python
-# AI-powered FPS estimation
-- Hardware similarity matching
-- GPU tier-based calculations with LLM enhancement
-- Resolution/setting scaling predictions
-- DLSS performance boost calculation
-- Privacy-protected benchmark data
-```
-
-**5. G-Assist LLM Integration**
-```python
-# Local AI processing with privacy protection
+# Local AI processing with enhanced context
 - G-Assist embedded 8B Llama model
-- Context-aware analysis
-- Intelligent recommendation generation
-- Privacy-by-design architecture
-- Local processing only - no data leaves system
+- S-A-B-C-D-F tier-aware analysis
+- Hardware-specific optimization recommendations
+- Privacy-by-design architecture - all processing local
 ```
 
-### G-Assist Integration with LLM
+### Advanced Performance Assessment API
 
-**Enhanced Communication Flow:**
-```
-User Voice/Text → G-Assist SLM → Intent Recognition → CanRun Plugin
-     ↓                                                      ↓
-  Response ← AI Analysis ← LLM Processing ← Hardware Check ← Privacy Filter
-```
+#### `predict_advanced_performance(game_name)`
 
-**LLM-Powered Features:**
-- **Intelligent Context Analysis**: AI understands gaming scenarios and hardware relationships
-- **Smart Recommendations**: Context-aware optimization suggestions
-- **Natural Language Processing**: Better understanding of user queries
-- **Privacy-Protected Insights**: All AI processing happens locally on your GPU
-
-## 📚 API Reference
-
-### Plugin Functions
-
-The CanRun plugin provides enhanced functions with LLM integration accessible through G-Assist:
-
-#### 1. `detect_hardware()`
-
-Detects and returns comprehensive system hardware information with privacy protection.
-
-**Parameters:** None
+**New Enhanced Performance Function with S-A-B-C-D-F Tier System**
 
 **Returns:**
 ```json
 {
-  "cpu": {
-    "name": "Intel Core i7-9700K",
-    "cores": 8,
-    "threads": 8,
-    "base_clock": 3.6,
-    "boost_clock": 4.9,
-    "generation": "9th Gen",
-    "score": 750
-  },
-  "gpu": {
-    "name": "GeForce RTX 3080",
-    "memory": 10,
-    "tier": "High",
-    "features": ["DLSS 2", "RTX"],
-    "score": 720
-  },
-  "memory": {
-    "total": 16,
-    "available": 12,
-    "speed": 3200,
-    "type": "DDR4"
-  },
-  "storage": {
-    "total": 1000,
-    "available": 500,
-    "type": "NVMe SSD",
-    "speed": 3500
-  },
-  "privacy_protected": true
+  "tier": "S",
+  "tier_description": "Exceptional - Ultra settings, 4K@60fps+",
+  "score": 95,
+  "expected_fps": 110,
+  "recommended_settings": "Ultra/Maximum",
+  "recommended_resolution": "4K (3840x2160)",
+  "bottlenecks": [],
+  "upgrade_suggestions": [],
+  "canrun_status": "🎮 **CANRUN!** ✅"
 }
 ```
 
 **G-Assist Usage:**
-- "What are my system specs?"
-- "Show me my hardware configuration"
-- "What's my GPU and CPU?"
+- "What tier performance can I expect in Cyberpunk 2077?"
+- "Show my CANRUN status for Elden Ring"
+- "What's my performance tier for Baldur's Gate 3?"
 
-#### 2. `check_compatibility(game_name)`
+## 🎮 Sample Interactions with New Features
 
-Checks if a specific game is compatible with the current system using AI analysis.
+### Advanced Tier System in Action
 
-**Parameters:**
-- `game_name` (string, required): Name of the game to check
-
-**Returns:**
-```json
-{
-  "compatibility": {
-    "compatibility_level": "High",
-    "overall_score": 85,
-    "bottlenecks": ["Storage"],
-    "ai_insights": "Your system is well-suited for this game with minor storage optimization potential.",
-    "component_analysis": {
-      "cpu": {
-        "status": "Excellent",
-        "score": 95,
-        "meets_minimum": true,
-        "meets_recommended": true
-      },
-      "gpu": {
-        "status": "Good",
-        "score": 80,
-        "meets_minimum": true,
-        "meets_recommended": true
-      },
-      "memory": {
-        "status": "Excellent",
-        "score": 90,
-        "meets_minimum": true,
-        "meets_recommended": true
-      }
-    }
-  },
-  "requirements": {
-    "minimum": {
-      "cpu": "Intel Core i5-8400",
-      "gpu": "GTX 1060",
-      "memory": 12,
-      "storage": 70
-    },
-    "recommended": {
-      "cpu": "Intel Core i7-9700K",
-      "gpu": "RTX 2070",
-      "memory": 16,
-      "storage": 70
-    }
-  }
-}
+**Scenario 1: High-End System Assessment**
 ```
+User: "Hey G-Assist, can I run Call of Duty: Modern Warfare?"
 
-**G-Assist Usage:**
-- "Can I run Cyberpunk 2077?"
-- "Is my system compatible with Hogwarts Legacy?"
-- "Check if I can play Elden Ring"
+CanRun: "🎮 **CANRUN!** ✅
 
-#### 3. `predict_performance(game_name, settings, resolution)`
+## Performance Tier: S
+**Score**: 95/100
+**Description**: Exceptional - Ultra settings, 4K@60fps+
 
-Predicts game performance using AI-enhanced analysis for specific graphics settings and resolution.
+## Performance Metrics
+- **Expected FPS**: 110
+- **Recommended Settings**: Ultra/Maximum
+- **Recommended Resolution**: 4K (3840x2160)
 
-**Parameters:**
-- `game_name` (string, required): Name of the game
-- `settings` (string, optional): Graphics settings ("Low", "Medium", "High", "Ultra") - defaults to "High"
-- `resolution` (string, optional): Display resolution ("1080p", "1440p", "4K") - defaults to "1080p"
-
-**Returns:**
-```json
-{
-  "performance": {
-    "fps": 75,
-    "performance_level": "High",
-    "stability": "Stable",
-    "dlss_boost": 1.4,
-    "rtx_features": ["Ray Tracing", "DLSS 2"],
-    "ai_prediction_confidence": 0.92
-  },
-  "settings_analysis": {
-    "current_settings": "High",
-    "current_resolution": "1080p",
-    "recommended_settings": "High",
-    "recommended_resolution": "1080p"
-  },
-  "optimization_notes": [
-    "DLSS Quality mode recommended for better performance",
-    "Ray tracing features fully supported",
-    "AI suggests texture quality can be increased without performance impact"
-  ]
-}
-```
-
-**G-Assist Usage:**
-- "What FPS can I get in Cyberpunk 2077 on High settings?"
-- "How will Hogwarts Legacy perform at 1440p?"
-- "Can I run Elden Ring at 4K Ultra?"
-
-#### 4. `get_optimization_suggestions(game_name)`
-
-Provides AI-powered optimization recommendations for running a specific game.
-
-**Parameters:**
-- `game_name` (string, required): Name of the game
-
-**Returns:**
-```json
-{
-  "optimization_suggestions": [
-    {
-      "type": "Graphics Settings",
-      "description": "Enable DLSS Quality mode for better performance",
-      "expected_improvement": "20-30% FPS boost",
-      "priority": "High",
-      "ai_reasoning": "Your GPU supports DLSS 2 which provides significant performance gains with minimal quality loss"
-    },
-    {
-      "type": "System Settings",
-      "description": "Close unnecessary background applications",
-      "expected_improvement": "5-10% FPS boost",
-      "priority": "Medium",
-      "ai_reasoning": "Memory usage analysis shows potential for optimization"
-    },
-    {
-      "type": "Hardware",
-      "description": "Consider upgrading to NVMe SSD for faster loading",
-      "expected_improvement": "Reduced loading times",
-      "priority": "Low",
-      "ai_reasoning": "Current storage is the primary bottleneck for this game"
-    }
-  ],
-  "current_bottlenecks": ["Storage"],
-  "dlss_available": true,
-  "rtx_available": true,
-  "ai_confidence": 0.89
-}
-```
-
-**G-Assist Usage:**
-- "How can I optimize Cyberpunk 2077?"
-- "What settings should I use for best performance in Hogwarts Legacy?"
-- "Give me optimization tips for Elden Ring"
-
-#### 5. `analyze_with_llm(query, context)`
-
-Direct LLM analysis for complex gaming scenarios and personalized recommendations.
-
-**Parameters:**
-- `query` (string, required): User's question or request
-- `context` (object, optional): Additional context (hardware, game, settings)
-
-**Returns:**
-```json
-{
-  "llm_analysis": {
-    "response": "Based on your RTX 3080 and i7-9700K setup, you can expect excellent performance in Cyberpunk 2077...",
-    "confidence": 0.94,
-    "recommendations": [
-      "Enable DLSS Quality mode",
-      "Set Ray Tracing to Medium",
-      "Use High texture quality"
-    ],
-    "technical_insights": "Your GPU memory bandwidth is optimal for this game's texture streaming requirements"
-  },
-  "privacy_protected": true,
-  "processing_time": 0.8
-}
-```
-
-**G-Assist Usage:**
-- "Explain why my system struggles with ray tracing in this game"
-- "What's the best balance between quality and performance for my setup?"
-- "How does my hardware compare to the game's recommended specs?"
-
-### Command Line Interface
-
-The plugin can also be used directly via command line for testing:
-
-```bash
-# Detect hardware
-python plugin/g-assist-plugin-canrun.py --function detect_hardware
-
-# Check compatibility
-python plugin/g-assist-plugin-canrun.py --function check_compatibility --game "Cyberpunk 2077"
-
-# Predict performance
-python plugin/g-assist-plugin-canrun.py --function predict_performance --game "Hogwarts Legacy" --settings "Ultra" --resolution "1440p"
-
-# Get optimization suggestions
-python plugin/g-assist-plugin-canrun.py --function get_optimization_suggestions --game "Elden Ring"
-
-# Direct LLM analysis
-python plugin/g-assist-plugin-canrun.py --function analyze_with_llm --query "Best settings for my RTX 3080?"
-```
-
-### Natural Language Examples
-
-Users can interact with CanRun through G-Assist using natural language:
-
-**Hardware Detection:**
-- "What's my GPU?"
-- "Show system specs"
-- "What CPU do I have?"
-
-**Compatibility Checking:**
-- "Can I play [game name]?"
-- "Is [game name] compatible?"
-- "Will [game name] run on my system?"
-
-**Performance Prediction:**
-- "What FPS in [game name]?"
-- "How will [game name] perform?"
-- "Can I run [game name] at 4K?"
-
-**Optimization:**
-- "How to optimize [game name]?"
-- "Best settings for [game name]?"
-- "Improve performance in [game name]?"
-
-**AI Analysis:**
-- "Explain my system's performance in [game name]"
-- "Why is [game name] running slowly?"
-- "What's the best upgrade for better gaming performance?"
-
-## 🎮 Sample Interactions
-
-### Real-World G-Assist Conversations
-
-**Scenario 1: Quick Compatibility Check**
-```
-User: "Hey G-Assist, can I run Cyberpunk 2077?"
-
-CanRun: "✅ Cyberpunk 2077 will run excellently on your RTX 3080! 
-RTX features supported. DLSS available for performance boost.
-
-Compatibility Score: 87.2%
-Analysis: Your system exceeds recommended requirements. Expect 
-high-quality gaming experience with ray tracing enabled.
+## System Analysis
+**Bottlenecks**: None detected
 
 🧠 G-Assist AI Analysis:
-• Your RTX 3080 provides optimal performance for this title
-• DLSS Quality mode recommended for best visual/performance balance
-• Ray tracing can be enabled at High settings without significant FPS loss
-
-✅ Analysis completed with privacy protection"
+Your high-end RTX system combination achieves S-tier performance. 
+This is flagship-level hardware capable of maximum settings at 4K resolution."
 ```
 
-**Scenario 2: Performance Optimization**
+**Scenario 2: Mid-Range System Assessment**
 ```
-User: "What FPS can I expect in Hogwarts Legacy at 1440p?"
+User: "What tier performance will I get in Cyberpunk 2077?"
 
-CanRun: "🎮 Performance Estimate for Hogwarts Legacy:
+CanRun: "🎮 **CANRUN!** ✅
 
-Expected FPS: 68 at 2560x1440
-🚀 DLSS: Available for significant performance boost
-✨ RTX: Ray tracing supported for enhanced visuals
-Performance Tier: High
-Confidence: 89.3%
+## Performance Tier: B
+**Score**: 75/100
+**Description**: Good - High settings, 1080p@60fps
 
-💡 Optimization Tips:
-• Enable DLSS Quality mode for 20-30% FPS boost
-• Set Ray Tracing to Medium for optimal balance
-• Texture quality can be maximized without performance impact
+## Performance Metrics
+- **Expected FPS**: 68
+- **Recommended Settings**: High
+- **Recommended Resolution**: 1080p (1920x1080)
 
-🧠 AI Analysis: Your RTX 3070 Ti handles this game very well at 1440p. 
-The Unreal Engine 5 optimizations work excellently with your hardware configuration."
-```
+## System Analysis
+**Bottlenecks**: GPU (Minor)
 
-**Scenario 3: System Analysis**
-```
-User: "What are my system specs?"
+## Upgrade Recommendations
+- Consider RTX 3070 or better for A-tier performance
+- Enable DLSS Quality mode for 20-30% FPS boost
 
-CanRun: "🖥️ System Specifications (Privacy Protected):
-
-GPU: GeForce RTX 3080 (10 GB VRAM)
-CPU: Intel Core i7-10700K (8 cores)
-RAM: 32 GB DDR4-3200
-OS: Windows 11 Pro
-DirectX: 12 Ultimate
-
-✅ Features:
-• RTX: Ray tracing supported
-• DLSS: AI-powered performance boost available
-• G-Assist: Compatible with intelligent analysis
-
-🔒 Privacy: Hardware data anonymized and not stored permanently"
+🧠 AI Analysis: Your system provides solid B-tier gaming experience with room for optimization."
 ```
 
-**Scenario 4: Intelligent Optimization**
+### Steam-First Data Integration
+
+**Real-Time Requirements:**
+- Fetches latest game requirements directly from Steam Store API
+- Automatically updates minimum and recommended specifications
+- Parses complex requirement formats with AI assistance
+- Provides source attribution (Steam API vs Local Cache)
+
+### Hardware Detection Improvements
+
+**Enhanced System Recognition:**
 ```
-User: "How can I optimize Elden Ring for the best visual quality?"
-
-CanRun: "🧠 G-Assist Analysis for Elden Ring:
-
-📊 Visual Quality Optimization (Confidence: 94.2%):
-Your RTX 3080 can handle maximum visual settings with smart optimizations.
-
-💡 Recommendations:
-• Maximum Quality: Enable all settings to High/Maximum
-• Anti-Aliasing: Use MSAA 4x for best image quality
-• Shadows: High recommended (minimal performance impact)
-• Lighting: Maximum (your GPU handles this excellently)
-
-🎯 Expected Performance:
-• 1080p: 85-95 FPS (optimal experience)
-• 1440p: 65-75 FPS (excellent experience)
-• 4K: 45-55 FPS (playable with DLSS)
-
-🤖 AI Insights: FromSoftware's optimization works particularly well with 
-your hardware configuration. The game's lighting system benefits greatly 
-from your RTX capabilities.
-
-🔒 Privacy: Analysis uses anonymized data and is not stored permanently"
+✅ Windows 11 Pro (previously misdetected as Windows 10)
+✅ RTX 3080 10GB VRAM (full RTX 30-series support)
+✅ Intel Core i7-12700K (latest CPU generation support)
+✅ 16GB DDR4-3200 (smart memory calculation)
+✅ 2560x1440@165Hz (high-resolution display support)
+✅ NVMe SSD Detection (storage type classification)
 ```
 
-**Scenario 5: Troubleshooting**
-```
-User: "Why is Starfield running poorly on my system?"
+## 🔄 Migration from v1.0
 
-CanRun: "🔍 G-Assist Troubleshooting Analysis for Starfield:
+**Automatic Compatibility:**
+- All existing G-Assist commands continue to work
+- Legacy performance predictions automatically use new tier system
+- Enhanced accuracy with no breaking changes
+- Improved privacy protection and data handling
 
-🎯 Performance Analysis (Confidence: 91.8%):
-Your RTX 3070 should handle Starfield well. Detecting potential issues...
-
-📊 Component Analysis:
-• GPU: Performing as expected (Score: 82/100)
-• CPU: Good performance (Score: 76/100) 
-• RAM: Excellent (Score: 95/100)
-• Storage: Potential bottleneck detected (Score: 65/100)
-
-💡 AI Recommendations:
-• Critical: Move game to NVMe SSD for 40-60% loading improvement
-• Graphics: Reduce Shadow Quality to High (saves 15-20 FPS)
-• Enable AMD FSR 2.0 for 25-35% performance boost
-• Close background applications consuming CPU resources
-
-🧠 AI Analysis: Starfield's asset streaming heavily depends on storage 
-speed. Your current HDD storage is limiting performance significantly. 
-Your GPU and CPU are more than capable of running this title smoothly.
-
-Expected improvement: 45-65 FPS → 70-85 FPS after optimizations"
-```
-
-**Scenario 6: Upgrade Recommendations**
-```
-User: "What should I upgrade for better gaming performance?"
-
-CanRun: "🔧 G-Assist Upgrade Analysis:
-
-Current System: RTX 3060 Ti, i5-9600K, 16GB RAM, SATA SSD
-
-📊 Upgrade Priority Analysis (Confidence: 92.4%):
-
-🥇 Priority 1: CPU Upgrade
-• Current: i5-9600K (6 cores, bottleneck detected)
-• Recommended: i7-12700K or i5-12600K
-• Expected improvement: 25-35% in CPU-bound games
-• Investment: $200-300
-
-🥈 Priority 2: RAM Upgrade  
-• Current: 16GB (sufficient for most games)
-• Recommended: 32GB DDR4-3600 for future-proofing
-• Expected improvement: Better multitasking, 1% lows
-• Investment: $100-150
-
-🥉 Priority 3: GPU (Future consideration)
-• Current: RTX 3060 Ti (excellent for 1080p/1440p)
-• Recommended: Wait for next generation
-• Your GPU is still very capable for current games
-
-🧠 AI Analysis: Your RTX 3060 Ti is still excellent for modern gaming. 
-The CPU upgrade will provide the most significant immediate benefit, 
-especially for open-world games and titles with many NPCs.
-
-Budget recommendation: Start with CPU upgrade ($250-300 total)"
-```
-
-### Voice Command Examples
-
-**Quick Commands:**
-- "Can I run Cyberpunk?"
-- "FPS in Starfield?"
-- "Optimize Elden Ring"
-- "System specs"
-- "Gaming performance"
-
-**Detailed Queries:**
-- "What settings should I use for Hogwarts Legacy at 1440p?"
-- "Why is my game lagging?"
-- "What's the best upgrade for my gaming PC?"
-- "How well will Diablo 4 run on my system?"
-- "Should I enable ray tracing in Spider-Man?"
-
-**AI Analysis Requests:**
-- "Explain my system's bottlenecks"
-- "Best value GPU upgrade under $500"
-- "Optimize my system for competitive gaming"
-- "What games can I run at 4K?"
-- "DLSS vs native resolution comparison"
-
-### Error Handling
-
-**Common Error Responses:**
-```json
-{
-  "error": "Game not found",
-  "message": "The specified game is not in our database",
-  "available_games": ["Cyberpunk 2077", "Hogwarts Legacy", "..."]
-}
-```
-
-```json
-{
-  "error": "Hardware detection failed",
-  "message": "Could not detect system hardware",
-  "fallback_detected": true
-}
-```
-
-```json
-{
-  "error": "LLM analysis unavailable",
-  "message": "G-Assist LLM integration is not available",
-  "fallback_mode": true
-}
-```
-
-## 📋 Requirements
-
-### System Requirements
-- Windows 10/11
-- RTX/GTX GPU (for G-Assist compatibility)
-- Python 3.8+ (for development)
-- 4GB RAM minimum, 8GB recommended
-
-### Python Dependencies
-```txt
-# Core
-psutil>=5.9.0          # System hardware detection
-GPUtil>=1.4.0          # GPU detection and monitoring
-nvidia-ml-py>=12.535.108  # GPU management library
-py-cpuinfo>=9.0.0      # Detailed CPU information
-requests>=2.31.0       # HTTP requests for Steam API
-pynvml>=11.5.0         # Enhanced GPU monitoring
-
-# LLM Integration
-torch>=2.0.0           # For LLM processing
-transformers>=4.30.0   # Model handling
-```
-
-## 🚀 Advanced Usage
-
-### LLM Integration
-
-The system now includes advanced AI capabilities through G-Assist's embedded LLM:
-
-```python
-# Direct LLM usage example
-from src.rtx_llm_analyzer import RTXLLMAnalyzer
-
-analyzer = RTXLLMAnalyzer()
-await analyzer.initialize()
-
-# Analyze gaming scenario
-result = await analyzer.analyze_gaming_scenario(
-    "What's the best way to optimize Cyberpunk 2077 for my RTX 3080?",
-    hardware_context=system_specs,
-    game_context=game_requirements
-)
-
-print(f"AI Analysis: {result['analysis']}")
-print(f"Recommendations: {result['recommendations']}")
-```
-
-### Privacy-by-Design Architecture
-
-All processing happens locally with comprehensive privacy protection:
-
-```python
-# Privacy-protected hardware detection
-from src.privacy_aware_hardware_detector import PrivacyAwareHardwareDetector
-
-detector = PrivacyAwareHardwareDetector()
-specs = await detector.detect_hardware()  # Anonymized data only
-```
-
-### Building from Source
+**New Commands:**
 ```bash
-# Development mode
-python plugin/g-assist-plugin-canrun.py --help
+# Test new advanced assessment
+uv run python plugin.py --function predict_advanced_performance --game "Your Game"
 
-# Production build
-python build.py
+# Check CANRUN status
+uv run python plugin.py --function check_compatibility --game "Your Game"
 ```
 
-### API Examples
-```python
-# Direct Python usage with LLM
-from src.canrun_engine import CanRunEngine
+## 📊 Performance Tier Benchmarks
 
-engine = CanRunEngine()
-await engine.initialize()
-result = await engine.analyze_game_compatibility("Cyberpunk 2077", "High", "1080p")
-print(f"Compatibility: {result['compatibility']['compatibility_level']}")
-print(f"AI Insights: {result['ai_insights']}")
-print(f"Expected FPS: {result['performance']['fps']}")
-```
+### GPU Tier Classifications
+- **S-Tier (95-100)**: RTX 4090, RTX 4080, RTX 3090 Ti
+- **A-Tier (85-94)**: RTX 4070 Ti, RTX 3080, RX 7900 XTX
+- **B-Tier (75-84)**: RTX 4070, RTX 3070, RX 7800 XT
+- **C-Tier (65-74)**: RTX 3060 Ti, RTX 2070, RX 6700 XT
+- **D-Tier (55-64)**: RTX 3060, GTX 1660 Ti, RX 6600
+- **F-Tier (0-54)**: GTX 1050, older hardware
 
-## 🎯 Why CanRun Wins
+### CPU Tier Classifications
+- **S-Tier (95-100)**: Ryzen 7800X3D, Ryzen 9 7950X, i9-13900K
+- **A-Tier (85-94)**: Ryzen 7 7700X, i7-13700K, Ryzen 9 5900X
+- **B-Tier (75-84)**: Ryzen 5 7600X, i5-13600K, Ryzen 7 5800X
+- **C-Tier (65-74)**: Ryzen 5 5600X, i7-11700K, i5-12400
+- **D-Tier (55-64)**: Ryzen 5 3600, i5-10600K, older quad-cores
+- **F-Tier (0-54)**: Dual-core processors, very old hardware
 
-1. **Solves Universal Problem**: Every gamer asks "Can I run it?"
-2. **AI-Powered Intelligence**: Leverages local LLM for smart analysis
-3. **Privacy-First Design**: No data leaves your system
-4. **Zero Friction**: No sign-ups, no ads, instant answers
-5. **Technical Excellence**: Multi-source data, AI-enhanced predictions
-6. **Perfect G-Assist Fit**: Natural language, local processing
-7. **Extensible**: Easy to add new games/sources
+## 🛠️ Development and Contributing
 
-## 📝 Development Notes
+**Setting up Development Environment:**
 
-### For Hackathon Judges
-- Primary submission is `/plugin` folder - drop and run
-- No Docker/complex setup required
-- Source code in `/src` shows technical depth with LLM integration
-- Comprehensive test suite in `/test` including LLM tests
-- Privacy-by-design architecture throughout
-
-### Recent Updates
-- **Refactored Architecture**: Consistent workflow and naming conventions
-- **Assertion-Based Logic**: Replaced try-catch with proactive validation
-- **Privacy Enhancement**: Comprehensive data protection and anonymization
-- **LLM Integration**: G-Assist embedded model for intelligent analysis
-- **Code Optimization**: Condensed and cleaned up codebase
-
-### Supported Games
-- Cyberpunk 2077
-- Hogwarts Legacy
-- Call of Duty: Modern Warfare II
-- Red Dead Redemption 2
-- Spider-Man Remastered
-- Forza Horizon 5
-- Starfield
-- Diablo IV
-- Resident Evil 4
-- The Witcher 3
-- Apex Legends
-- Valorant
-
-## 🧪 Testing
-
-### Run All Tests
 ```bash
-python test/run_all_tests.py
+# Clone repository
+git clone https://github.com/yourusername/canrun
+cd canrun
+
+# Install development dependencies
+uv sync --dev
+
+# Run tests to verify setup
+uv run python -m pytest test/ -v
+
+# Test new performance assessment
+uv run python plugin.py --function predict_advanced_performance --game "Test Game"
 ```
 
-### Test LLM Integration
-```bash
-python test/test_llm_analysis.py
-```
+**Key Development Areas:**
+- Advanced tier system enhancements
+- Steam API integration improvements
+- Hardware detection for new GPU/CPU releases
+- G-Assist LLM integration optimization
+- Privacy protection strengthening
 
-### Sample Queries
-```bash
-python test/sample_queries.py
-```
+## 📈 Version History
 
-## 🤝 Contributing
+### v2.0.0 (Current)
+- ✅ **S-A-B-C-D-F Tier System**: Complete performance classification overhaul
+- ✅ **CANRUN! Indicator**: Visual compatibility status system
+- ✅ **Steam-First Architecture**: Prioritized real-time game requirements support
+- ✅ **Weighted Scoring Algorithm**: GPU 60%, CPU 25%, RAM 15%
+- ✅ **Modern Package Management**: uv integration with pyproject.toml
+- ✅ **Comprehensive Hardware Hierarchies**: 50+ GPU/CPU models
 
-This project is open source! Contributions welcome:
-- Add new game sources
-- Improve AI performance predictions
-- Enhance privacy protection
-- Add international support
-- Extend LLM capabilities
+### v1.1.0 (Previous)
+- Basic performance prediction
+- G-Assist integration
+- Privacy-aware hardware detection
+- Steam API support
 
-## 📄 License
+## 🎯 Future Roadmap
 
-This project is licensed under the Apache License 2.0 - see [LICENSE](LICENSE) file.
+- **Enhanced Steam Integration**: Game library scanning and batch analysis
+- **Expanded Hardware Support**: Intel Arc, future RTX/RX series
+- **Advanced LLM Features**: Contextual gaming recommendations
+- **Performance Database**: Community-driven benchmark data
+- **Real-Time Optimization**: Dynamic settings adjustment
 
-```
-Copyright 2025 CanRun Project
-```
+---
 
-## 🙏 Acknowledgments
+**Ready to see if your system can run any game? Try CanRun today!**
 
-- G-Assist team for the platform and embedded LLM
-- Steam for official API access
-- Hardware detection library contributors
-- Privacy and security research community
-- All beta testers
-
-<div align="center">
-  
-**Built for G-Assist Plug-in Hackathon 2025**
-
-*Because every gamer deserves to know - Can I Run It?*
-
-#AIonRTXHackathon
-
-</div>
+For technical support, feature requests, or contributions, visit our [GitHub repository](https://github.com/yourusername/canrun).
