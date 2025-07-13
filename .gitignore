@@ -207,3 +207,8 @@ nvidia_cache/
 .python-version
 uv.lock
 .venv/
+
+# Windows executables (too large for GitHub)
+*.exe
+g-assist-plugin-python.exe
+g-assist-plugin-python.spec
