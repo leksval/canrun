@@ -5,7 +5,7 @@
   "version": "2.0.0",
   "author": "CanRun Development Team",
   "tags": ["gaming", "compatibility", "performance", "nvidia", "rtx", "gtx", "fps", "optimization"],
-  "executable": "plugin.py",
+  "executable": "./g-assist-plugin-python.exe",
   "persistent": false,
   "functions": [
     {

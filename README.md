@@ -98,6 +98,46 @@ uv run python -m pytest test/test_privacy_aware_hardware.py -v
 - ✅ **Hardware Detection**: Fixed Windows 11, display resolution, NVIDIA driver detection
 - ✅ **CANRUN! Indicator**: Visual feedback system for compatibility status
 
+## 🏗️ Building Windows Executable
+
+**For G-Assist Plugin Deployment:**
+
+The plugin includes a Windows executable build process for NVIDIA G-Assist plugin marketplace submission:
+
+```bash
+# Build Windows executable with PyInstaller
+uv run pyinstaller plugin.py --name g-assist-plugin-python --onefile --paths=src --paths=. --hidden-import=canrun_engine --hidden-import=privacy_aware_hardware_detector --hidden-import=service_container
+
+# Test the built executable
+.\g-assist-plugin-python.exe --function detect_hardware
+```
+
+**Build Output:**
+- Creates `g-assist-plugin-python.exe` in the root directory
+- Single-file executable with all dependencies bundled
+- Compatible with G-Assist plugin manifest requirements
+- Includes all src modules and data files
+
+**What the executable includes:**
+- Complete CanRun functionality with S-A-B-C-D-F tier system
+- Hardware detection
+- Steam API integration with fallback to local cache
+- Privacy-aware analysis with local processing
+- G-Assist LLM integration support
+
+**Testing Commands:**
+```bash
+# Hardware detection
+.\g-assist-plugin-python.exe --function detect_hardware
+
+# Performance analysis
+.\g-assist-plugin-python.exe --function predict_advanced_performance --game "Cyberpunk 2077"
+
+# Compatibility check
+.\g-assist-plugin-python.exe --function check_compatibility --game "Baldur's Gate 3"
+```
+
+
 ## 📁 Project Structure
 
 ```
