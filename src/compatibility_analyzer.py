@@ -158,7 +158,7 @@ class CompatibilityAnalyzer:
         assert hardware.is_nvidia_gpu, "RTX/GTX GPU required"
         
         # Get GPU performance score
-        gpu_score = self._get_nvidia_gpu_score(hardware.gpu_name)
+        gpu_score = self._get_nvidia_gpu_score(hardware.gpu_model)
         
         # Estimate required scores from requirements
         min_gpu_text = requirements.minimum.get('graphics', '').lower()
@@ -182,7 +182,7 @@ class CompatibilityAnalyzer:
         if hardware.supports_dlss:
             rtx_features.append("DLSS")
         
-        details = f"NVIDIA {hardware.gpu_name} ({hardware.vram_gb}GB VRAM"
+        details = f"NVIDIA {hardware.gpu_model} ({hardware.gpu_vram_gb}GB VRAM"
         if rtx_features:
             details += f", {', '.join(rtx_features)}"
         details += ")"
@@ -218,7 +218,7 @@ class CompatibilityAnalyzer:
         assert hardware.cpu_threads > 0, "CPU threads must be greater than 0"
         
         # Estimate CPU performance
-        cpu_score = self._estimate_cpu_performance(hardware.cpu_name, hardware.cpu_cores, hardware.cpu_threads)
+        cpu_score = self._estimate_cpu_performance(hardware.cpu_model, hardware.cpu_cores, hardware.cpu_threads)
         
         # Get required scores
         min_cpu_text = requirements.minimum.get('processor', '').lower()
@@ -236,7 +236,7 @@ class CompatibilityAnalyzer:
         bottleneck_factor = max(0.0, (min_score - cpu_score) / max(min_score, 1))
         
         # Generate details
-        details = f"CPU: {hardware.cpu_name} ({hardware.cpu_cores}C/{hardware.cpu_threads}T)"
+        details = f"CPU: {hardware.cpu_model} ({hardware.cpu_cores}C/{hardware.cpu_threads}T)"
         
         if meets_recommended:
             details += " - Exceeds recommended requirements"
@@ -265,22 +265,22 @@ class CompatibilityAnalyzer:
     def _analyze_ram(self, hardware: PrivacyAwareHardwareSpecs, 
                     requirements: GameRequirements) -> ComponentAnalysis:
         """Analyze RAM compatibility."""
-        assert hardware.ram_gb > 0, "RAM must be greater than 0"
+        assert hardware.ram_total_gb > 0, "RAM must be greater than 0"
         
         # Extract required RAM amounts
         min_ram = self._extract_ram_amount(requirements.minimum.get('memory', ''))
         rec_ram = self._extract_ram_amount(requirements.recommended.get('memory', ''))
         
         # Check compatibility
-        meets_minimum = hardware.ram_gb >= min_ram
-        meets_recommended = hardware.ram_gb >= rec_ram
-        
+        meets_minimum = hardware.ram_total_gb >= min_ram
+        meets_recommended = hardware.ram_total_gb >= rec_ram
+
         # Calculate metrics
-        score = min(1.0, hardware.ram_gb / max(rec_ram, 1))
-        bottleneck_factor = max(0.0, (min_ram - hardware.ram_gb) / max(min_ram, 1))
-        
+        score = min(1.0, hardware.ram_total_gb / max(rec_ram, 1))
+        bottleneck_factor = max(0.0, (min_ram - hardware.ram_total_gb) / max(min_ram, 1))
+
         # Generate details
-        details = f"RAM: {hardware.ram_gb}GB"
+        details = f"RAM: {hardware.ram_total_gb}GB"
         
         if meets_recommended:
             details += " - Sufficient for recommended settings"
@@ -336,20 +336,20 @@ class CompatibilityAnalyzer:
     def _analyze_os(self, hardware: PrivacyAwareHardwareSpecs, 
                    requirements: GameRequirements) -> ComponentAnalysis:
         """Analyze OS compatibility for NVIDIA gaming."""
-        assert hardware.os_name.strip(), "OS name cannot be empty"
+        assert hardware.os_version.strip(), "OS version cannot be empty"
         
         # Check OS compatibility
         min_os = requirements.minimum.get('os', '').lower()
         rec_os = requirements.recommended.get('os', '').lower()
         
-        is_windows = 'windows' in hardware.os_name.lower()
+        is_windows = 'windows' in hardware.os_version.lower()
         meets_minimum = is_windows and ('windows' in min_os or not min_os)
         meets_recommended = is_windows and ('windows' in rec_os or not rec_os)
         
         score = 1.0 if meets_minimum else 0.0
         bottleneck_factor = 0.0 if meets_minimum else 1.0
         
-        details = f"OS: {hardware.os_name}"
+        details = f"OS: {hardware.os_version}"
         if meets_minimum:
             details += " - Compatible with G-Assist"
         else:
@@ -432,13 +432,13 @@ class CompatibilityAnalyzer:
         else:
             return 30  # Conservative estimate for unknown NVIDIA GPUs
     
-    def _estimate_cpu_performance(self, cpu_name: str, cores: int, threads: int) -> int:
+    def _estimate_cpu_performance(self, cpu_model: str, cores: int, threads: int) -> int:
         """Estimate CPU performance score."""
-        assert cpu_name.strip(), "CPU name cannot be empty"
+        assert cpu_model.strip(), "CPU model cannot be empty"
         assert cores > 0, "CPU cores must be greater than 0"
         assert threads > 0, "CPU threads must be greater than 0"
         
-        cpu_lower = cpu_name.lower()
+        cpu_lower = cpu_model.lower()
         base_score = 50  # Default score
         
         # Intel processors

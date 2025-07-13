@@ -291,9 +291,8 @@ class GameRequirementsFetcher:
     def __init__(self, llm_analyzer=None):
         self.logger = logging.getLogger(__name__)
         self.sources = [
-            LocalCacheSource(),
-            SteamAPISource(llm_analyzer),
-            PCGameBenchmarkSource()
+            SteamAPISource(llm_analyzer),  # Primary source - most up-to-date requirements
+            LocalCacheSource(),           # Fallback for offline/cached data
         ]
     
     async def fetch_requirements(self, game_name: str) -> Optional[GameRequirements]:

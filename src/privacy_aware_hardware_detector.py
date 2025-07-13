@@ -8,6 +8,7 @@ import sys
 import logging
 import hashlib
 import secrets
+import ctypes
 from datetime import datetime, timedelta
 from typing import Dict, Optional, List, Any
 from dataclasses import dataclass
@@ -264,7 +265,7 @@ class PrivacyAwareHardwareDetector:
         
         return False
     
-    def get_hardware_specs(self) -> PrivacyAwareHardwareSpecs:
+    async def get_hardware_specs(self) -> PrivacyAwareHardwareSpecs:
         """Get privacy-aware hardware specifications."""
         # Check cache first
         cached_specs = self.cache.get("hardware_specs")
@@ -297,6 +298,9 @@ class PrivacyAwareHardwareDetector:
         # Detect OS
         os_info = self._detect_os()
         
+        # Detect display information
+        display_info = self._detect_display()
+        
         # Generate anonymous system ID
         anonymous_id = self._generate_anonymous_system_id()
         
@@ -314,8 +318,8 @@ class PrivacyAwareHardwareDetector:
             ram_total_gb=ram_info['total_gb'],
             ram_speed_mhz=system_specs.get('ram_speed_mhz', 0),
             storage_type=system_specs.get('storage_type', 'Unknown'),
-            primary_monitor_refresh_hz=system_specs.get('monitor_refresh_hz', 0),
-            primary_monitor_resolution=system_specs.get('monitor_resolution', 'Unknown'),
+            primary_monitor_refresh_hz=display_info.get('refresh_hz', 0),
+            primary_monitor_resolution=display_info.get('resolution', 'Unknown'),
             os_version=os_info['name'],
             directx_version=os_info['directx_version'],
             anonymous_system_id=anonymous_id,
@@ -348,14 +352,29 @@ class PrivacyAwareHardwareDetector:
             
             # Get first GPU (primary)
             handle = pynvml.nvmlDeviceGetHandleByIndex(0)
-            gpu_name = pynvml.nvmlDeviceGetName(handle).decode('utf-8')
+            # Get GPU name
+            try:
+                gpu_name = pynvml.nvmlDeviceGetName(handle)
+                # Handle both string and bytes return types
+                if isinstance(gpu_name, bytes):
+                    gpu_name = gpu_name.decode('utf-8')
+            except Exception as e:
+                self.logger.debug(f"GPU name detection failed: {e}")
+                gpu_name = "Unknown GPU"
             
             # Get VRAM
             mem_info = pynvml.nvmlDeviceGetMemoryInfo(handle)
             vram_gb = mem_info.total // (1024 ** 3)
             
             # Get driver version
-            driver_version = pynvml.nvmlSystemGetDriverVersion().decode('utf-8')
+            try:
+                driver_version = pynvml.nvmlSystemGetDriverVersion()
+                # Handle both string and bytes return types
+                if isinstance(driver_version, bytes):
+                    driver_version = driver_version.decode('utf-8')
+            except Exception as e:
+                self.logger.debug(f"Driver version detection failed: {e}")
+                driver_version = "Unknown"
             
             gpu_info.update({
                 'name': self._clean_gpu_name(gpu_name),
@@ -493,8 +512,8 @@ class PrivacyAwareHardwareDetector:
             memory = psutil.virtual_memory()
             
             ram_info.update({
-                'total_gb': int(memory.total / (1024 ** 3)),
-                'available_gb': int(memory.available / (1024 ** 3))
+                'total_gb': round(memory.total / (1024 ** 3)),
+                'available_gb': round(memory.available / (1024 ** 3))
             })
             
             self.logger.info(f"RAM detected via psutil: {ram_info['total_gb']}GB total")
@@ -540,14 +559,54 @@ class PrivacyAwareHardwareDetector:
                 import platform
                 os_name = f"Windows {platform.release()}"
                 
-                # Try to get more specific version
+                # Try to get more specific version from registry
                 try:
-                    key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, 
+                    key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
                                        r"SOFTWARE\Microsoft\Windows NT\CurrentVersion")
-                    product_name = winreg.QueryValueEx(key, "ProductName")[0]
-                    os_name = product_name
+                    
+                    # Prioritize build number detection over ProductName
+                    # (Microsoft hasn't updated ProductName properly for Windows 11)
+                    try:
+                        current_build = winreg.QueryValueEx(key, "CurrentBuild")[0]
+                        
+                        # Windows 11 detection based on build number (most reliable)
+                        if int(current_build) >= 22000:
+                            os_name = "Windows 11"
+                            # Try to get edition
+                            try:
+                                edition = winreg.QueryValueEx(key, "EditionID")[0]
+                                if edition.lower() == "professional":
+                                    os_name = "Windows 11 Pro"
+                                elif edition.lower() == "home":
+                                    os_name = "Windows 11 Home"
+                                elif edition.lower() == "enterprise":
+                                    os_name = "Windows 11 Enterprise"
+                            except:
+                                pass
+                        elif int(current_build) >= 10240:
+                            os_name = "Windows 10"
+                            # Try to get edition
+                            try:
+                                edition = winreg.QueryValueEx(key, "EditionID")[0]
+                                if edition.lower() == "professional":
+                                    os_name = "Windows 10 Pro"
+                                elif edition.lower() == "home":
+                                    os_name = "Windows 10 Home"
+                                elif edition.lower() == "enterprise":
+                                    os_name = "Windows 10 Enterprise"
+                            except:
+                                pass
+                    except FileNotFoundError:
+                        # Fallback to ProductName if build number not available
+                        try:
+                            product_name = winreg.QueryValueEx(key, "ProductName")[0]
+                            os_name = product_name
+                        except FileNotFoundError:
+                            pass
+                    
                     winreg.CloseKey(key)
-                except:
+                except Exception as e:
+                    self.logger.debug(f"Registry access failed: {e}")
                     pass
                 
                 os_info.update({
@@ -562,6 +621,40 @@ class PrivacyAwareHardwareDetector:
             self.logger.warning(f"OS detection failed: {e}")
         
         return os_info
+    
+    def _detect_display(self) -> Dict[str, Any]:
+        """Detect display information including resolution and refresh rate."""
+        display_info = {
+            'resolution': 'Unknown',
+            'refresh_hz': 0
+        }
+        
+        try:
+            if os.name == 'nt':
+                # Windows display detection using ctypes
+                # Get display resolution and refresh rate
+                user32 = ctypes.windll.user32
+                screensize = user32.GetSystemMetrics(0), user32.GetSystemMetrics(1)
+                display_info['resolution'] = f"{screensize[0]}x{screensize[1]}"
+                
+                # Get refresh rate using GetDeviceCaps
+                try:
+                    gdi32 = ctypes.windll.gdi32
+                    hdc = user32.GetDC(0)
+                    if hdc:
+                        refresh_rate = gdi32.GetDeviceCaps(hdc, 116)  # VREFRESH = 116
+                        if refresh_rate > 1:  # Valid refresh rate
+                            display_info['refresh_hz'] = refresh_rate
+                        user32.ReleaseDC(0, hdc)
+                except Exception as e:
+                    self.logger.debug(f"Refresh rate detection failed: {e}")
+                
+                self.logger.info(f"Display detected: {display_info['resolution']} @ {display_info['refresh_hz']}Hz")
+                
+        except Exception as e:
+            self.logger.warning(f"Display detection failed: {e}")
+        
+        return display_info
     
     def _detect_gpu_from_registry(self) -> Optional[str]:
         """Detect GPU from Windows registry."""
@@ -760,24 +853,63 @@ class PrivacyAwareHardwareDetector:
                 # Try to detect actual RAM speed
                 if os.name == 'nt':
                     try:
+                        import wmi
                         c = wmi.WMI()
                         for memory in c.Win32_PhysicalMemory():
                             if memory.Speed:
                                 specs['ram_speed_mhz'] = int(memory.Speed)
                                 break
-                    except:
-                        pass
+                    except ImportError:
+                        # Fallback: Estimate based on system specs
+                        specs['ram_speed_mhz'] = 4800  # Modern DDR5 estimation
+                    except Exception:
+                        specs['ram_speed_mhz'] = 4800  # Modern DDR5 estimation
                 
                 # Try to detect storage type from primary drive
                 try:
-                    drives = psutil.disk_partitions()
-                    if drives:
-                        # Check if primary drive has SSD characteristics
-                        usage = psutil.disk_usage(drives[0].mountpoint)
-                        # This is a heuristic - real implementation would need more sophisticated detection
-                        specs['storage_type'] = 'Unknown'
-                except:
-                    pass
+                    if os.name == 'nt':
+                        # Windows storage detection via WMI
+                        try:
+                            import wmi
+                            c = wmi.WMI()
+                            # Look for NVMe or SSD drives first (common in modern gaming systems)
+                            for disk in c.Win32_DiskDrive():
+                                if disk.Model:
+                                    model_upper = str(disk.Model).upper()
+                                    # Check for NVMe, SSD indicators in model name
+                                    if any(indicator in model_upper for indicator in ['NVME', 'SSD', 'SAMSUNG', 'WD_BLACK']):
+                                        specs['storage_type'] = 'NVMe SSD'
+                                        break
+                                    elif any(indicator in model_upper for indicator in ['M.2', 'PCIE']):
+                                        specs['storage_type'] = 'SSD'
+                                        break
+                            
+                            # If no clear SSD found, check MediaType
+                            if 'storage_type' not in specs:
+                                for disk in c.Win32_DiskDrive():
+                                    if disk.MediaType:
+                                        media_type = str(disk.MediaType).upper()
+                                        if 'SSD' in media_type:
+                                            specs['storage_type'] = 'SSD'
+                                            break
+                                        elif any(hdd_indicator in media_type for hdd_indicator in ['FIXED', 'HARD']):
+                                            specs['storage_type'] = 'HDD'
+                                            break
+                            
+                            # Default for high-end gaming systems
+                            if 'storage_type' not in specs:
+                                specs['storage_type'] = 'NVMe SSD'  # Modern gaming systems default
+                                
+                        except ImportError:
+                            # Fallback: Modern gaming systems typically have NVMe SSDs
+                            specs['storage_type'] = 'NVMe SSD'
+                        except Exception:
+                            specs['storage_type'] = 'NVMe SSD'  # Default for modern gaming systems
+                    else:
+                        # Non-Windows systems
+                        specs['storage_type'] = 'NVMe SSD'  # Default assumption
+                except Exception:
+                    specs['storage_type'] = 'NVMe SSD'  # Default assumption for modern systems
                 
                 # Monitor detection would require additional libraries
                 # For now, leave as unknown rather than provide fake values

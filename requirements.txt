@@ -1,14 +1,19 @@
-# CanRun Universal Game Compatibility Checker Requirements
-# Core dependencies for the main application
+# CanRun Universal Game Compatibility Checker v1.1.0
+# Production dependencies for G-Assist plugin
+# 
+# For development setup, use: uv sync --dev
+# For production setup, use: uv pip install -r requirements.txt
 
-# System hardware detection
+# System hardware detection (RTX/GTX focus)
 psutil>=5.9.0          # System hardware detection (CPU, memory, disk)
 GPUtil>=1.4.0          # GPU detection and monitoring
-nvidia-ml-py>=12.535.108  # NVIDIA GPU management library
+nvidia-ml-py>=12.535.108  # NVIDIA GPU management library for RTX/GTX
 py-cpuinfo>=9.0.0      # Detailed CPU information extraction
 pynvml>=11.5.0         # Enhanced NVIDIA GPU monitoring
 setuptools>=65.0.0     # Compatibility layer for distutils (required for GPUtil)
-WMI>=1.5.1             # Windows Management Instrumentation (Windows only)
+
+# Windows-specific dependencies (G-Assist requires Windows)
+WMI>=1.5.1;platform_system=="Windows"  # Windows Management Instrumentation
 
 # HTTP requests and async operations
 requests>=2.31.0       # HTTP requests for Steam API and external data
@@ -19,10 +24,16 @@ beautifulsoup4>=4.12.0 # HTML parsing for web scraping
 python-dateutil>=2.8.0  # Date/time handling utilities
 typing-extensions>=4.0.0  # Enhanced type hints support
 
-# Optional dependencies for enhanced features
+# User experience enhancements
 colorama>=0.4.6        # Cross-platform colored terminal output
 tqdm>=4.65.0          # Progress bars for long operations
 
-# Development and testing
-pytest>=7.0.0         # Testing framework
+# G-Assist integration dependencies
+torch>=2.0.0          # PyTorch for CUDA detection and GPU operations
+
+# Runtime testing (minimal for G-Assist plugin validation)
+pytest>=7.0.0         # Testing framework for plugin validation
 pytest-asyncio>=0.21.0  # Async testing support
+
+# Note: Development dependencies (black, mypy, etc.) are defined in pyproject.toml
+# Install them with: uv sync --dev

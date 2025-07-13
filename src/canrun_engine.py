@@ -114,8 +114,8 @@ class CanRunEngine:
         # Step 4: Predict performance
         performance_prediction = await self._predict_performance(
             compatibility_analysis,
-            hardware_specs.gpu_name,
-            hardware_specs.vram_gb,
+            hardware_specs.gpu_model,
+            hardware_specs.gpu_vram_gb,
             hardware_specs.supports_rtx,
             hardware_specs.supports_dlss
         )
@@ -199,8 +199,8 @@ class CanRunEngine:
                 }
             },
             'performance': {
-                'fps': performance_prediction.estimated_fps,
-                'performance_level': performance_prediction.performance_level,
+                'fps': performance_prediction.predictions[0].expected_fps if performance_prediction.predictions else 0,
+                'performance_level': performance_prediction.predictions[0].quality_preset.value if performance_prediction.predictions else 'Unknown',
                 'stability': 'stable',  # Default stability
                 'optimization_suggestions': performance_prediction.optimization_suggestions
             },
@@ -264,8 +264,8 @@ class CanRunEngine:
                 }
             },
             'performance': {
-                'fps': performance_prediction.estimated_fps,
-                'performance_level': performance_prediction.performance_level,
+                'fps': performance_prediction.predictions[0].expected_fps if performance_prediction.predictions else 0,
+                'performance_level': performance_prediction.predictions[0].quality_preset.value if performance_prediction.predictions else 'Unknown',
                 'stability': 'stable',  # Default stability
                 'optimization_suggestions': performance_prediction.optimization_suggestions
             },
@@ -302,9 +302,8 @@ class CanRunEngine:
     async def _get_hardware_specs(self) -> PrivacyAwareHardwareSpecs:
         """Get hardware specifications with session caching."""
         if self._hardware_cache is None:
-            self._hardware_cache = await asyncio.get_event_loop().run_in_executor(
-                None, self.hardware_detector.get_hardware_specs
-            )
+            # Since get_hardware_specs is now async, we await it directly
+            self._hardware_cache = await self.hardware_detector.get_hardware_specs()
             assert self._hardware_cache is not None, "Hardware detection returned None"
         
         return self._hardware_cache
@@ -332,11 +331,11 @@ class CanRunEngine:
         
         return analysis
 
-    async def _predict_performance(self, compatibility_analysis: CompatibilityAnalysis, gpu_name: str, vram_gb: int, supports_rtx: bool, supports_dlss: bool) -> PerformancePrediction:
+    async def _predict_performance(self, compatibility_analysis: CompatibilityAnalysis, gpu_model: str, gpu_vram_gb: int, supports_rtx: bool, supports_dlss: bool) -> PerformancePrediction:
         """Predict game performance based on compatibility analysis and GPU specs."""
         assert compatibility_analysis is not None, "Compatibility analysis is required"
-        assert gpu_name and isinstance(gpu_name, str), "GPU name must be a non-empty string"
-        assert isinstance(vram_gb, int), "VRAM GB must be an integer"
+        assert gpu_model and isinstance(gpu_model, str), "GPU model must be a non-empty string"
+        assert isinstance(gpu_vram_gb, int), "VRAM GB must be an integer"
         assert isinstance(supports_rtx, bool), "supports_rtx must be a boolean"
         assert isinstance(supports_dlss, bool), "supports_dlss must be a boolean"
 
@@ -345,13 +344,44 @@ class CanRunEngine:
             None,
             self.performance_predictor.predict_performance,
             compatibility_analysis,
-            gpu_name,
-            vram_gb,
+            gpu_model,
+            gpu_vram_gb,
             supports_rtx,
             supports_dlss
         )
         assert prediction is not None, "Performance prediction returned None"
         return prediction
+
+    async def _predict_advanced_performance(self, hardware_specs: Dict, game_requirements: Dict = None) -> Dict:
+        """
+        Predict game performance using the advanced tiered assessment system.
+        
+        Args:
+            hardware_specs: Hardware specifications from the detector
+            game_requirements: Optional game requirements
+            
+        Returns:
+            Dict containing advanced performance assessment with tier information
+        """
+        loop = asyncio.get_event_loop()
+        assessment = await loop.run_in_executor(
+            None,
+            self.performance_predictor.predict_advanced_performance,
+            hardware_specs,
+            game_requirements
+        )
+        
+        # Convert assessment to dict for compatibility
+        return {
+            'tier': assessment.tier.name,
+            'tier_description': assessment.tier_description,
+            'score': assessment.score,
+            'expected_fps': assessment.expected_fps,
+            'recommended_settings': assessment.recommended_settings,
+            'recommended_resolution': assessment.recommended_resolution,
+            'bottlenecks': assessment.bottlenecks,
+            'upgrade_suggestions': assessment.upgrade_suggestions
+        }
 
     def _get_cached_result(self, game_name: str) -> Optional[CanRunResult]:
         """Retrieve cached result for a game if available and not expired."""
@@ -422,8 +452,8 @@ class CanRunEngine:
         
         # Create minimal error hardware specs
         error_hardware = PrivacyAwareHardwareSpecs(
-            gpu_name="Unknown",
-            vram_gb=0,
+            gpu_model="Unknown",
+            gpu_vram_gb=0,
             cpu_name="Unknown", 
             cpu_cores=0,
             cpu_threads=0,
@@ -473,8 +503,8 @@ class CanRunEngine:
             game_name=game_name,
             resolution="1080p",
             settings="Low",
-            estimated_fps=0,
-            performance_level="error",
+            expected_fps=0,
+            quality_preset="error",
             confidence=0.0,
             limiting_factors=[f"Error: {error_message}"],
             optimization_suggestions=[]
@@ -525,8 +555,8 @@ class CanRunEngine:
                 }
             },
             'performance': {
-                'fps': performance_prediction.estimated_fps,
-                'performance_level': performance_prediction.performance_level,
+                'fps': performance_prediction.predictions[0].expected_fps if performance_prediction.predictions else 0,
+                'performance_level': performance_prediction.predictions[0].quality_preset.value if performance_prediction.predictions else 'Unknown',
                 'stability': 'stable',  # Default stability
                 'optimization_suggestions': performance_prediction.optimization_suggestions
             },
@@ -578,8 +608,8 @@ class CanRunEngine:
                 }
             },
             'performance': {
-                'fps': performance_prediction.estimated_fps,
-                'performance_level': performance_prediction.performance_level,
+                'fps': performance_prediction.predictions[0].expected_fps if performance_prediction.predictions else 0,
+                'performance_level': performance_prediction.predictions[0].quality_preset.value if performance_prediction.predictions else 'Unknown',
                 'stability': 'stable',  # Default stability
                 'optimization_suggestions': performance_prediction.optimization_suggestions
             },
@@ -601,8 +631,8 @@ class CanRunEngine:
                 'threads': hardware_specs.cpu_threads
             },
             'gpu': {
-                'name': hardware_specs.gpu_name,
-                'vram_gb': hardware_specs.vram_gb,
+                'name': hardware_specs.gpu_model,
+                'vram_gb': hardware_specs.gpu_vram_gb,
                 'supports_rtx': hardware_specs.supports_rtx,
                 'supports_dlss': hardware_specs.supports_dlss,
                 'driver_version': hardware_specs.nvidia_driver_version
@@ -664,7 +694,7 @@ class CanRunEngine:
             self.logger.error(f"Failed to get optimization suggestions: {e}")
             return [{'type': 'error', 'description': str(e)}]
 
-    async def analyze_game_compatibility(self, game_name: str, settings: str, resolution: str) -> Optional[Dict[str, Any]]:
+    async def analyze_game_compatibility(self, game_name: str, settings: str = "Medium", resolution: str = "System Default") -> Optional[Dict[str, Any]]:
         """Legacy method for backward compatibility with tests."""
         try:
             result = await self.check_game_compatibility(game_name)
@@ -672,7 +702,26 @@ class CanRunEngine:
             if not result:
                 return None
             
-            # Convert CanRunResult to dictionary format expected by tests
+            # Check if result is already a dictionary (from cache) or CanRunResult object
+            if isinstance(result, dict):
+                # Result is already in dictionary format from cache
+                return result
+            
+            # Use LLM to estimate missing values intelligently
+            llm_estimates = {}
+            if self.llm_analyzer:
+                try:
+                    # Get LLM estimates for component scores and performance metrics
+                    llm_estimates = await self.llm_analyzer.estimate_compatibility_metrics(
+                        game_name,
+                        result.hardware_specs,
+                        result.compatibility_analysis,
+                        result.performance_prediction
+                    )
+                except Exception as e:
+                    self.logger.warning(f"LLM estimation failed, using fallback: {e}")
+            
+            # Convert CanRunResult to dictionary format with LLM estimates
             return {
                 'compatibility': {
                     'compatibility_level': result.compatibility_analysis.overall_compatibility,
@@ -681,33 +730,33 @@ class CanRunEngine:
                     'component_analysis': {
                         'cpu': {
                             'status': result.compatibility_analysis.cpu_compatibility,
-                            'score': next((int(comp.score * 100) 
-                            for comp in compatibility_analysis.component_analyses 
-                            if comp.component.name.lower() == 'cpu'), 75)
+                            'score': llm_estimates.get('cpu_score', next((int(comp.score * 100)
+                            for comp in result.compatibility_analysis.component_analyses
+                            if comp.component.name.lower() == 'cpu'), 75))
                         },
                         'gpu': {
                             'status': result.compatibility_analysis.gpu_compatibility,
-                            'score': 80  # Default score
+                            'score': llm_estimates.get('gpu_score', 80)
                         },
                         'memory': {
                             'status': result.compatibility_analysis.ram_compatibility,
-                            'score': 85  # Default score
+                            'score': llm_estimates.get('memory_score', 85)
                         },
                         'storage': {
                             'status': result.compatibility_analysis.storage_compatibility,
-                            'score': 90  # Default score
+                            'score': llm_estimates.get('storage_score', 90)
                         }
                     }
                 },
                 'performance': {
-                    'fps': result.performance_prediction.estimated_fps,
-                    'performance_level': result.performance_prediction.performance_level,
-                    'stability': 'stable',  # Default stability
+                    'fps': result.performance_prediction.predictions[0].expected_fps if result.performance_prediction.predictions else 0,
+                    'performance_level': result.performance_prediction.predictions[0].quality_preset.value if result.performance_prediction.predictions else 'Unknown',
+                    'stability': llm_estimates.get('stability', 'stable'),
                     'optimization_suggestions': result.performance_prediction.optimization_suggestions
                 },
                 'optimization_suggestions': result.performance_prediction.optimization_suggestions,
                 'hardware_analysis': {
-                    'gpu_tier': 'high-end',  # Default tier
+                    'gpu_tier': llm_estimates.get('gpu_tier', 'high-end'),
                     'bottleneck_analysis': result.compatibility_analysis.bottlenecks
                 }
             }
