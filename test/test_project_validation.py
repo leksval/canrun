@@ -16,7 +16,7 @@ def test_json_data_files():
     print("="*50)
     
     json_files = [
-        "plugin/manifest.json",
+        "manifest.json",
         "data/game_requirements.json", 
         "data/gpu_hierarchy.json"
     ]
@@ -39,7 +39,7 @@ def test_manifest_structure():
     print("="*50)
     
     try:
-        with open("plugin/manifest.json", 'r', encoding='utf-8') as f:
+        with open("manifest.json", 'r', encoding='utf-8') as f:
             manifest = json.load(f)
         
         # Required fields
@@ -186,9 +186,9 @@ def test_python_syntax():
     print("="*50)
     
     python_files = [
-        "setup.py",
-        "build.py",
-        "plugin/g-assist-plugin-canrun.py",
+        "src/setup.py",
+        "src/build.py",
+        "plugin.py",
         "src/__init__.py",
         "src/canrun_engine.py",
         "src/hardware_detector.py",
@@ -222,7 +222,7 @@ def test_requirements_txt():
     print("="*50)
     
     try:
-        with open("plugin/requirements.txt", 'r', encoding='utf-8') as f:
+        with open("requirements.txt", 'r', encoding='utf-8') as f:
             requirements = f.read().strip().split('\n')
         
         valid_requirements = []
@@ -289,7 +289,7 @@ def test_command_line_args():
     print("="*50)
     
     try:
-        with open("plugin/g-assist-plugin-canrun.py", 'r', encoding='utf-8') as f:
+        with open("plugin.py", 'r', encoding='utf-8') as f:
             content = f.read()
         
         # Look for argument parsing patterns

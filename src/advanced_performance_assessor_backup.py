@@ -1,14 +1,13 @@
 """
-Performance Prediction Module for CanRun
-Advanced tiered performance predictions (S-A-B-C-D-F) for RTX/GTX gaming systems with G-Assist integration.
+Advanced Performance Assessment System for CanRun
+Implements comprehensive tiered scoring with hardware hierarchies and weighted algorithms.
 """
 
-import logging
-from typing import Dict, List, Optional, Tuple
-from dataclasses import dataclass
 from enum import Enum
-
-from compatibility_analyzer import CompatibilityAnalysis, ComponentType, CompatibilityLevel
+from dataclasses import dataclass
+from typing import Dict, Optional, Tuple
+import re
+import logging
 
 
 class PerformanceTier(Enum):
@@ -23,10 +22,9 @@ class PerformanceTier(Enum):
 
 @dataclass
 class PerformanceAssessment:
-    """Complete performance assessment result with S-A-B-C-D-F tier system"""
+    """Complete performance assessment result"""
     score: int
     tier: PerformanceTier
-    tier_description: str
     expected_fps: int
     recommended_settings: str
     recommended_resolution: str
@@ -34,25 +32,11 @@ class PerformanceAssessment:
     upgrade_suggestions: list
 
 
-@dataclass
-class PerformancePrediction:
-    """Legacy performance prediction for backward compatibility"""
-    game_name: str
-    predictions: List[Dict]
-    bottleneck_info: Dict[ComponentType, str]
-    optimization_suggestions: List[str]
-    dlss_support: bool
-    rtx_support: bool
-    overall_performance_score: float
-
-    def __post_init__(self):
-        """Validate performance prediction after initialization."""
-        assert self.game_name.strip(), "Game name cannot be empty"
-        assert 0.0 <= self.overall_performance_score <= 1.0, "Performance score must be between 0 and 1"
-
-
-class PerformancePredictor:
-    """Advanced tiered performance predictor for RTX/GTX gaming systems."""
+class AdvancedPerformanceAssessor:
+    """
+    Advanced performance assessment using tiered scoring system
+    with comprehensive hardware hierarchies and weighted algorithms.
+    """
     
     def __init__(self):
         self.logger = logging.getLogger(__name__)
@@ -77,6 +61,10 @@ class PerformancePredictor:
             "RX 7700 XT": 78, "RX 7600": 70, "RX 6900 XT": 81,
             "RX 6800 XT": 79, "RX 6800": 77, "RX 6700 XT": 73,
             "RX 6600 XT": 65, "RX 6600": 62, "RX 6500 XT": 50,
+            
+            # Older GPUs
+            "GTX 980 Ti": 42, "GTX 980": 38, "GTX 970": 35,
+            "RX 580": 46, "RX 570": 42, "RX 560": 35
         }
         
         # Comprehensive CPU hierarchy
@@ -85,56 +73,102 @@ class PerformancePredictor:
             "i9-13900K": 100, "i7-13700K": 92, "i5-13600K": 85,
             "i5-13400": 78, "i3-13100": 65,
             
+            # Intel 12th Gen
+            "i9-12900K": 95, "i7-12700K": 88, "i5-12600K": 82,
+            "i5-12400": 75, "i3-12100": 62,
+            
+            # Intel 11th Gen
+            "i9-11900K": 85, "i7-11700K": 80, "i5-11600K": 72,
+            "i5-11400": 68, "i3-11100": 55,
+            
             # AMD Ryzen 7000
             "Ryzen 9 7950X": 98, "Ryzen 9 7900X": 94, "Ryzen 7 7700X": 90,
             "Ryzen 5 7600X": 84, "Ryzen 5 7600": 80,
             
             # AMD Ryzen 5000
-            "Ryzen 9 5950X": 93, "Ryzen 9 5900X": 90, "Ryzen 7 5800X3D": 95,
+            "Ryzen 9 5950X": 93, "Ryzen 9 5900X": 90, "Ryzen 7 5800X3D": 92,
             "Ryzen 7 5800X": 86, "Ryzen 5 5600X": 80, "Ryzen 5 5600": 76,
+            
+            # AMD Ryzen 3000
+            "Ryzen 9 3900X": 78, "Ryzen 7 3700X": 72, "Ryzen 5 3600X": 68,
+            "Ryzen 5 3600": 65,
+            
+            # Older Intel
+            "i7-10700K": 75, "i5-10600K": 68, "i7-9700K": 70,
+            "i5-9600K": 62, "i7-8700K": 65, "i5-8600K": 58
         }
         
-        # Performance tier descriptions
-        self.tier_descriptions = {
-            PerformanceTier.S: "Exceptional - Ultra settings, 4K@60fps+",
-            PerformanceTier.A: "Excellent - High settings, 1440p@60fps",
-            PerformanceTier.B: "Good - High settings, 1080p@60fps",
-            PerformanceTier.C: "Adequate - Medium settings, 1080p@30fps",
-            PerformanceTier.D: "Minimum - Low settings, 720p@30fps",
-            PerformanceTier.F: "Below Minimum - Unable to run acceptably"
+        # Performance tier details
+        self.tier_details = {
+            PerformanceTier.S: {
+                "resolution": "4K (3840x2160)",
+                "settings": "Ultra/Maximum",
+                "fps_range": "60-120+ FPS",
+                "features": ["Ray Tracing", "DLSS/FSR", "HDR", "All effects enabled"]
+            },
+            PerformanceTier.A: {
+                "resolution": "1440p (2560x1440)",
+                "settings": "High/Very High",
+                "fps_range": "60-90 FPS",
+                "features": ["Most effects enabled", "Some Ray Tracing", "DLSS/FSR available"]
+            },
+            PerformanceTier.B: {
+                "resolution": "1080p (1920x1080)",
+                "settings": "High",
+                "fps_range": "60-75 FPS",
+                "features": ["Good visual quality", "Stable performance", "Most features enabled"]
+            },
+            PerformanceTier.C: {
+                "resolution": "1080p (1920x1080)",
+                "settings": "Medium",
+                "fps_range": "30-45 FPS",
+                "features": ["Acceptable visuals", "Some compromises", "Core features enabled"]
+            },
+            PerformanceTier.D: {
+                "resolution": "720p-1080p",
+                "settings": "Low/Medium",
+                "fps_range": "30 FPS",
+                "features": ["Basic visuals", "Playable experience", "Many features disabled"]
+            },
+            PerformanceTier.F: {
+                "resolution": "Below 720p",
+                "settings": "Lowest",
+                "fps_range": "Below 30 FPS",
+                "features": ["Severe compromises", "Poor experience", "Not recommended"]
+            }
         }
-        
-        self.logger.info("Performance predictor initialized for RTX/GTX gaming systems")
     
-    def assess_performance(self, hardware_specs: Dict, game_requirements: Dict = None) -> PerformanceAssessment:
+    def assess_performance(self, hardware_specs: Dict, game_requirements: Dict) -> PerformanceAssessment:
         """
-        Generate advanced tiered performance assessment using S-A-B-C-D-F tier system.
+        Perform comprehensive performance assessment
         
         Args:
-            hardware_specs: Dictionary containing hardware specifications
-            game_requirements: Optional game requirements
+            hardware_specs: User's hardware specifications
+            game_requirements: Game's system requirements
             
         Returns:
-            PerformanceAssessment with tier, score, FPS, and recommendations
+            PerformanceAssessment with detailed results
         """
-        self.logger.info("Generating advanced performance assessment")
+        # Calculate component scores
+        cpu_score = self._calculate_cpu_score(hardware_specs, game_requirements)
+        gpu_score = self._calculate_gpu_score(hardware_specs, game_requirements)
+        ram_score = self._calculate_ram_score(hardware_specs, game_requirements)
         
-        # Calculate component scores with weighted algorithm
-        gpu_score = self._calculate_gpu_score(hardware_specs, game_requirements or {})
-        cpu_score = self._calculate_cpu_score(hardware_specs, game_requirements or {})
-        ram_score = self._calculate_ram_score(hardware_specs, game_requirements or {})
+        # Weighted average (GPU is most important for gaming)
+        total_score = int(
+            gpu_score * 0.6 +  # GPU weight: 60%
+            cpu_score * 0.25 + # CPU weight: 25%
+            ram_score * 0.15   # RAM weight: 15%
+        )
         
-        # Weighted scoring: GPU 60%, CPU 25%, RAM 15%
-        overall_score = int(gpu_score * 0.60 + cpu_score * 0.25 + ram_score * 0.15)
-        
-        # Determine performance tier
-        tier = self._determine_tier(overall_score)
+        # Determine tier
+        tier = self._determine_tier(total_score)
         
         # Calculate expected FPS
         expected_fps = self._calculate_expected_fps(tier, gpu_score, cpu_score)
         
-        # Determine settings and resolution
-        recommended_settings, recommended_resolution = self._determine_recommendations(tier, overall_score)
+        # Get performance details
+        details = self.tier_details[tier]
         
         # Identify bottlenecks
         bottlenecks = self._identify_bottlenecks(cpu_score, gpu_score, ram_score)
@@ -144,67 +178,42 @@ class PerformancePredictor:
             hardware_specs, cpu_score, gpu_score, ram_score, tier
         )
         
-        assessment = PerformanceAssessment(
-            score=overall_score,
+        self.logger.info(f"Performance assessment: Score {total_score}, Tier {tier.name}")
+        
+        return PerformanceAssessment(
+            score=total_score,
             tier=tier,
-            tier_description=self.tier_descriptions[tier],
             expected_fps=expected_fps,
-            recommended_settings=recommended_settings,
-            recommended_resolution=recommended_resolution,
+            recommended_settings=details["settings"],
+            recommended_resolution=details["resolution"],
             bottlenecks=bottlenecks,
             upgrade_suggestions=upgrade_suggestions
         )
-        
-        self.logger.info(f"Performance assessment: Score {assessment.score}, Tier {assessment.tier.name}")
-        
-        return assessment
     
-    def predict_advanced_performance(self, hardware_specs: Dict, game_requirements: Dict = None) -> PerformanceAssessment:
-        """Alias for assess_performance for backward compatibility"""
-        return self.assess_performance(hardware_specs, game_requirements)
-    
-    def predict_performance(self, compatibility_analysis: CompatibilityAnalysis, 
-                          gpu_name: str, vram_gb: int, supports_rtx: bool, 
-                          supports_dlss: bool) -> PerformancePrediction:
-        """Legacy method for backward compatibility"""
-        # Convert to hardware specs format
-        hardware_specs = {
-            'gpu_model': gpu_name,
-            'gpu_vram_gb': vram_gb,
-            'ram_total_gb': 16,  # Default fallback
-            'cpu_model': 'Unknown CPU'
-        }
+    def _calculate_cpu_score(self, hardware_specs: Dict, game_requirements: Dict) -> int:
+        """Calculate CPU performance score"""
+        cpu_name = hardware_specs.get('cpu_model', '')
+        cpu_key = self._find_cpu_key(cpu_name)
         
-        # Get advanced assessment
-        assessment = self.assess_performance(hardware_specs)
+        if not cpu_key:
+            # Fallback: estimate based on cores/threads
+            cores = hardware_specs.get('cpu_cores', 4)
+            if cores >= 16:
+                return 85
+            elif cores >= 8:
+                return 75
+            elif cores >= 6:
+                return 65
+            elif cores >= 4:
+                return 55
+            else:
+                return 45
         
-        # Convert to legacy format
-        predictions = [{
-            'resolution': assessment.recommended_resolution,
-            'settings': assessment.recommended_settings,
-            'fps': assessment.expected_fps,
-            'tier': assessment.tier.name
-        }]
+        base_score = self.cpu_hierarchy.get(cpu_key, 60)
         
-        bottleneck_info = {}
-        if assessment.bottlenecks:
-            for bottleneck in assessment.bottlenecks:
-                if bottleneck == 'CPU':
-                    bottleneck_info[ComponentType.CPU] = "CPU bottleneck detected"
-                elif bottleneck == 'GPU':
-                    bottleneck_info[ComponentType.GPU] = "GPU bottleneck detected"
-                elif bottleneck == 'RAM':
-                    bottleneck_info[ComponentType.MEMORY] = "RAM bottleneck detected"
-        
-        return PerformancePrediction(
-            game_name=compatibility_analysis.game_name,
-            predictions=predictions,
-            bottleneck_info=bottleneck_info,
-            optimization_suggestions=assessment.upgrade_suggestions,
-            dlss_support=supports_dlss,
-            rtx_support=supports_rtx,
-            overall_performance_score=assessment.score / 100.0
-        )
+        # Adjust based on game requirements if available
+        # For now, return base score (can be enhanced with requirement parsing)
+        return min(100, base_score)
     
     def _calculate_gpu_score(self, hardware_specs: Dict, game_requirements: Dict) -> int:
         """Calculate GPU performance score"""
@@ -227,28 +236,14 @@ class PerformancePredictor:
             else:
                 return 35
         
-        return self.gpu_hierarchy.get(gpu_key, 50)
-    
-    def _calculate_cpu_score(self, hardware_specs: Dict, game_requirements: Dict) -> int:
-        """Calculate CPU performance score"""
-        cpu_name = hardware_specs.get('cpu_model', '')
-        cpu_key = self._find_cpu_key(cpu_name)
+        base_score = self.gpu_hierarchy.get(gpu_key, 50)
         
-        if not cpu_key:
-            # Fallback: estimate based on cores
-            cores = hardware_specs.get('cpu_cores', 4)
-            if cores >= 16:
-                return 85
-            elif cores >= 8:
-                return 75
-            elif cores >= 6:
-                return 65
-            elif cores >= 4:
-                return 55
-            else:
-                return 45
+        # Adjust for VRAM if needed
+        vram = hardware_specs.get('gpu_vram_gb', 8)
+        if vram < 6 and base_score > 70:
+            base_score -= 10  # Penalize high-end GPUs with low VRAM
         
-        return self.cpu_hierarchy.get(cpu_key, 60)
+        return min(100, base_score)
     
     def _calculate_ram_score(self, hardware_specs: Dict, game_requirements: Dict) -> int:
         """Calculate RAM performance score"""
@@ -315,21 +310,6 @@ class PerformancePredictor:
             fps -= 5
         
         return max(15, fps)
-    
-    def _determine_recommendations(self, tier: PerformanceTier, score: int) -> Tuple[str, str]:
-        """Determine recommended settings and resolution"""
-        if tier == PerformanceTier.S:
-            return "Ultra/Maximum", "4K (3840x2160)"
-        elif tier == PerformanceTier.A:
-            return "High", "1440p (2560x1440)"
-        elif tier == PerformanceTier.B:
-            return "High", "1080p (1920x1080)"
-        elif tier == PerformanceTier.C:
-            return "Medium", "1080p (1920x1080)"
-        elif tier == PerformanceTier.D:
-            return "Low", "720p (1280x720)"
-        else:
-            return "Minimum", "720p (1280x720)"
     
     def _identify_bottlenecks(self, cpu_score: int, gpu_score: int, ram_score: int) -> list:
         """Identify system bottlenecks"""
@@ -412,7 +392,7 @@ class PerformancePredictor:
             if key.upper() in gpu_upper:
                 return key
         
-        # Pattern matching for GPU naming
+        # Pattern matching for GPU naming variations
         for key in self.gpu_hierarchy:
             key_clean = key.upper().replace(' ', '')
             gpu_clean = gpu_upper.replace(' ', '')
@@ -420,3 +400,7 @@ class PerformancePredictor:
                 return key
         
         return None
+    
+    def get_tier_description(self, tier: PerformanceTier) -> Dict:
+        """Get detailed description for a performance tier"""
+        return self.tier_details.get(tier, {})

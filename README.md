@@ -29,11 +29,14 @@
 git clone https://github.com/yourusername/canrun
 cd canrun
 
-# 2. Install dependencies
+# 2. Install dependencies with uv (recommended)
+uv sync
+
+# Alternative: Install with pip
 pip install -r requirements.txt
 
 # 3. Test the plugin
-python plugin.py 
+uv run python plugin.py
 ```
 
 **Test Commands:**
@@ -69,6 +72,10 @@ uv run python -m pytest test/test_privacy_aware_hardware.py -v
 
 **Requirements:**
 ```bash
+# With uv (recommended)
+uv sync --dev
+
+# With pip (alternative)
 pip install pytest pytest-asyncio
 ```
 

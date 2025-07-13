@@ -205,3 +205,5 @@ nvidia_cache/
 
 # uv specific
 .python-version
+uv.lock
+.venv/

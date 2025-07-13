@@ -204,26 +204,32 @@ class CanRunGAssistPlugin:
 # System Hardware Specifications
 
 ## Graphics Card
-- **GPU**: {hardware_info.gpu_name}
-- **VRAM**: {hardware_info.gpu_memory_gb} GB
-- **Architecture**: {hardware_info.gpu_architecture}
+- **GPU**: {hardware_info.gpu_model}
+- **VRAM**: {hardware_info.gpu_vram_gb} GB
+- **Vendor**: {hardware_info.gpu_vendor}
+- **RTX Support**: {hardware_info.supports_rtx}
+- **DLSS Support**: {hardware_info.supports_dlss}
 
 ## Processor
-- **CPU**: {hardware_info.cpu_name}
+- **CPU**: {hardware_info.cpu_model}
 - **Cores**: {hardware_info.cpu_cores}
 - **Threads**: {hardware_info.cpu_threads}
 
 ## Memory
-- **RAM**: {hardware_info.memory_gb} GB
-- **Type**: {hardware_info.memory_type}
+- **RAM**: {hardware_info.ram_total_gb} GB
+- **Speed**: {hardware_info.ram_speed_mhz} MHz
 
 ## Storage
 - **Primary**: {hardware_info.storage_type}
-- **Available**: {hardware_info.storage_free_gb} GB free
+
+## Display
+- **Resolution**: {hardware_info.primary_monitor_resolution}
+- **Refresh Rate**: {hardware_info.primary_monitor_refresh_hz} Hz
 
 ## Operating System
-- **OS**: {hardware_info.os_name}
 - **Version**: {hardware_info.os_version}
+- **DirectX**: {hardware_info.directx_version}
+- **NVIDIA Driver**: {hardware_info.nvidia_driver_version}
 """
             
             return {
@@ -248,8 +254,10 @@ class CanRunGAssistPlugin:
                     "message": "Game name is required"
                 }
             
-            # Get compatibility analysis
-            result = await self.engine.analyze_game_compatibility(game_name)
+            # Get compatibility analysis with optional settings
+            settings = params.get('settings', 'Medium')
+            resolution = params.get('resolution', 'System Default')
+            result = await self.engine.analyze_game_compatibility(game_name, settings, resolution)
             
             if result:
                 compatibility = result.get('compatibility', {})
@@ -258,8 +266,12 @@ class CanRunGAssistPlugin:
                 response_text = f"""
 # Game Compatibility Analysis: {game_name}
 
+## Analysis Settings
+- **Graphics Quality**: {settings}
+- **Resolution**: {resolution}
+
 ## Compatibility Level
-**{compatibility.get('compatibility_level', 'Unknown')}** ({compatibility.get('overall_score', 0)}/100)
+**{compatibility.get('compatibility_level', 'Unknown')}** ({int(compatibility.get('overall_score', 0) * 100)}/100)
 
 ## Performance Prediction
 - **Expected FPS**: {performance.get('fps', 'Unknown')}
@@ -311,8 +323,8 @@ class CanRunGAssistPlugin:
                     "message": "Game name is required"
                 }
             
-            # Get performance prediction
-            result = await self.engine.predict_performance(game_name, settings, resolution)
+            # Get performance prediction using analyze_game_compatibility
+            result = await self.engine.analyze_game_compatibility(game_name, settings, resolution)
             
             if result:
                 performance = result.get('performance', {})
@@ -358,6 +370,67 @@ class CanRunGAssistPlugin:
                 "message": f"Performance prediction failed: {str(e)}"
             }
     
+    async def handle_predict_advanced_performance(self, params: dict) -> dict:
+        """Handle advanced tiered performance assessment request."""
+        try:
+            game_name = params.get('game_name', '')
+            
+            if not game_name:
+                return {
+                    "success": False,
+                    "message": "Game name is required"
+                }
+            
+            # Get hardware specifications
+            hardware_specs = await self.engine.hardware_detector.get_hardware_specs()
+            hardware_dict = hardware_specs.to_dict()
+            
+            # Get advanced performance assessment
+            assessment = await self.engine._predict_advanced_performance(hardware_dict)
+            
+            # Check if minimal requirements are met (tier D or better)
+            can_run = assessment['tier'] in ['S', 'A', 'B', 'C', 'D']
+            canrun_status = "🎮 **CANRUN!** ✅" if can_run else "❌ **Cannot Run** - Below minimum requirements"
+            
+            response_text = f"""
+# Advanced Performance Assessment: {game_name}
+
+{canrun_status}
+
+## Performance Tier: {assessment['tier']}
+**Score**: {assessment['score']}/100
+**Description**: {assessment['tier_description']}
+
+## Performance Metrics
+- **Expected FPS**: {assessment['expected_fps']}
+- **Recommended Settings**: {assessment['recommended_settings']}
+- **Recommended Resolution**: {assessment['recommended_resolution']}
+
+## System Analysis
+"""
+            
+            if assessment['bottlenecks']:
+                response_text += f"**Bottlenecks**: {', '.join(assessment['bottlenecks'])}\n"
+            else:
+                response_text += "**Bottlenecks**: None detected\n"
+            
+            if assessment['upgrade_suggestions']:
+                response_text += f"\n## Upgrade Recommendations\n"
+                for suggestion in assessment['upgrade_suggestions']:
+                    response_text += f"- {suggestion}\n"
+            
+            return {
+                "success": True,
+                "message": response_text
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Advanced performance assessment failed: {e}")
+            return {
+                "success": False,
+                "message": f"Advanced performance assessment failed: {str(e)}"
+            }
+    
     async def handle_get_optimization_suggestions(self, params: dict) -> dict:
         """Handle optimization suggestions request."""
         try:
@@ -368,8 +441,10 @@ class CanRunGAssistPlugin:
                     "message": "Game name is required"
                 }
             
-            # Get optimization suggestions
-            suggestions = await self.engine.get_optimization_suggestions(game_name)
+            # Get optimization suggestions with settings and resolution
+            settings = params.get('settings', 'High')
+            resolution = params.get('resolution', '1080p')
+            suggestions = await self.engine.get_optimization_suggestions(game_name, settings, resolution)
             
             if suggestions:
                 response_text = f"""
@@ -506,6 +581,8 @@ class CanRunGAssistPlugin:
                 return await self.handle_check_compatibility(params)
             elif func_name == "predict_performance":
                 return await self.handle_predict_performance(params)
+            elif func_name == "predict_advanced_performance":
+                return await self.handle_predict_advanced_performance(params)
             elif func_name == "get_optimization_suggestions":
                 return await self.handle_get_optimization_suggestions(params)
             elif func_name == "get_intelligent_analysis":
@@ -559,11 +636,66 @@ class CanRunGAssistPlugin:
             self.logger.info("CanRun G-Assist plugin stopped")
 
 
+async def handle_cli_command(plugin, function_name, params=None):
+    """Handle command line interface commands."""
+    if params is None:
+        params = {}
+    
+    # Create a mock command for CLI execution with correct G-Assist format
+    command = {
+        "tool_calls": [
+            {
+                "func": function_name,
+                "params": params
+            }
+        ]
+    }
+    
+    # Process the command
+    response = await plugin.process_command(command)
+    
+    # Print the response in a clean format for CLI
+    if response.get("success"):
+        # For CLI, just print the formatted message instead of JSON
+        message = response.get("message", "")
+        print(message)
+    else:
+        print(f"Error: {response.get('message', 'Unknown error')}")
+        sys.exit(1)
+
+
 def main():
     """Main entry point for G-Assist plugin."""
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='CanRun G-Assist Plugin')
+    parser.add_argument('--function', help='Function to execute (for CLI testing)')
+    parser.add_argument('--game', help='Game name parameter')
+    parser.add_argument('--settings', help='Graphics settings (Low, Medium, High, Ultra)')
+    parser.add_argument('--resolution', help='Resolution (1080p, 1440p, 4K)')
+    parser.add_argument('--query', help='Query for intelligent questions')
+    
+    args = parser.parse_args()
+    
     try:
         plugin = CanRunGAssistPlugin()
-        asyncio.run(plugin.run())
+        
+        # Handle CLI mode
+        if args.function:
+            params = {}
+            if args.game:
+                params['game_name'] = args.game
+            if args.settings:
+                params['settings'] = args.settings
+            if args.resolution:
+                params['resolution'] = args.resolution
+            if args.query:
+                params['query'] = args.query
+            
+            asyncio.run(handle_cli_command(plugin, args.function, params))
+        else:
+            # Run in G-Assist mode
+            asyncio.run(plugin.run())
     except Exception as e:
         logging.error(f"Failed to start plugin: {e}")
         sys.exit(1)
