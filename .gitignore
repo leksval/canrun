@@ -208,7 +208,11 @@ nvidia_cache/
 uv.lock
 .venv/
 
-# Windows executables (too large for GitHub)
-*.exe
-g-assist-plugin-python.exe
+# PyInstaller build files
 g-assist-plugin-python.spec
+
+# Large executables (>95MB) - GitHub has a 100MB file size limit
+# Allow optimized executables under 95MB for G-Assist plugin deployment
+# Note: If g-assist-plugin-python.exe exceeds 95MB, it will be blocked by this rule
+*.exe
+!g-assist-plugin-python.exe

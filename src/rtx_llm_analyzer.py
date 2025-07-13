@@ -12,7 +12,7 @@ from enum import Enum
 import threading
 from datetime import datetime, timedelta
 
-import torch
+from torch.cuda import is_available as cuda_is_available, get_device_properties as cuda_get_device_properties
 
 from performance_predictor import PerformancePrediction
 from privacy_aware_hardware_detector import PrivacyAwareHardwareSpecs
@@ -86,8 +86,8 @@ class GAssistLLMAnalyzer:
             rtx_compatible = False
             vram_gb = 0
             
-            if torch.cuda.is_available():
-                gpu_props = torch.cuda.get_device_properties(0)
+            if cuda_is_available():
+                gpu_props = cuda_get_device_properties(0)
                 gpu_name = gpu_props.name.lower()
                 vram_gb = gpu_props.total_memory // (1024**3)
                 
