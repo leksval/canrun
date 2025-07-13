@@ -3,20 +3,20 @@
   "games": {
     "Cyberpunk 2077": {
       "minimum": {
-        "os": "Windows 10",
-        "processor": "Intel Core i5-3570K or AMD FX-8310",
-        "memory": "8 GB RAM",
-        "graphics": "NVIDIA GeForce GTX 780 or AMD Radeon RX 470",
-        "directx": "Version 12",
-        "storage": "70 GB available space"
+        "os": "64-bit Windows 10    Processor:  Core i7-6700 or Ryzen 5 1600    Memory:  12 GB RAM    Graphics:  GeForce GTX 1060 6GB or Radeon RX 580 8GB or Arc A380    DirectX:  Version 12    Storage:  70 GB available space    Additional Notes:  SSD required. Attention: In this game you will encounter a variety of visual effects that may provide seizures or loss of consciousness in a minority of people. If you or someone you know experiences any of the above symptoms while playing, stop and seek medical attention immediately.",
+        "processor": "Core i7-6700 or Ryzen 5 1600    Memory:  12 GB RAM    Graphics:  GeForce GTX 1060 6GB or Radeon RX 580 8GB or Arc A380    DirectX:  Version 12    Storage:  70 GB available space    Additional Notes:  SSD required. Attention: In this game you will encounter a variety of visual effects that may provide seizures or loss of consciousness in a minority of people. If you or someone you know experiences any of the above symptoms while playing, stop and seek medical attention immediately.",
+        "memory": "12 GB RAM    Graphics:  GeForce GTX 1060 6GB or Radeon RX 580 8GB or Arc A380    DirectX:  Version 12    Storage:  70 GB available space    Additional Notes:  SSD required. Attention: In this game you will encounter a variety of visual effects that may provide seizures or loss of consciousness in a minority of people. If you or someone you know experiences any of the above symptoms while playing, stop and seek medical attention immediately.",
+        "graphics": "GeForce GTX 1060 6GB or Radeon RX 580 8GB or Arc A380    DirectX:  Version 12    Storage:  70 GB available space    Additional Notes:  SSD required. Attention: In this game you will encounter a variety of visual effects that may provide seizures or loss of consciousness in a minority of people. If you or someone you know experiences any of the above symptoms while playing, stop and seek medical attention immediately.",
+        "directx": "Version 12    Storage:  70 GB available space    Additional Notes:  SSD required. Attention: In this game you will encounter a variety of visual effects that may provide seizures or loss of consciousness in a minority of people. If you or someone you know experiences any of the above symptoms while playing, stop and seek medical attention immediately.",
+        "storage": "70 GB available space    Additional Notes:  SSD required. Attention: In this game you will encounter a variety of visual effects that may provide seizures or loss of consciousness in a minority of people. If you or someone you know experiences any of the above symptoms while playing, stop and seek medical attention immediately."
       },
       "recommended": {
-        "os": "Windows 10",
-        "processor": "Intel Core i7-4790 or AMD Ryzen 3 3200G",
-        "memory": "12 GB RAM",
-        "graphics": "NVIDIA GeForce GTX 1060 or AMD Radeon R9 Fury",
-        "directx": "Version 12",
-        "storage": "70 GB available space"
+        "os": "64-bit Windows 10    Processor:  Core i7-12700 or Ryzen 7 7800X3D    Memory:  16 GB RAM    Graphics:  GeForce RTX 2060 SUPER or Radeon RX 5700 XT or Arc A770    DirectX:  Version 12    Storage:  70 GB available space    Additional Notes:  SSD required.",
+        "processor": "Core i7-12700 or Ryzen 7 7800X3D    Memory:  16 GB RAM    Graphics:  GeForce RTX 2060 SUPER or Radeon RX 5700 XT or Arc A770    DirectX:  Version 12    Storage:  70 GB available space    Additional Notes:  SSD required.",
+        "memory": "16 GB RAM    Graphics:  GeForce RTX 2060 SUPER or Radeon RX 5700 XT or Arc A770    DirectX:  Version 12    Storage:  70 GB available space    Additional Notes:  SSD required.",
+        "graphics": "GeForce RTX 2060 SUPER or Radeon RX 5700 XT or Arc A770    DirectX:  Version 12    Storage:  70 GB available space    Additional Notes:  SSD required.",
+        "directx": "Version 12    Storage:  70 GB available space    Additional Notes:  SSD required.",
+        "storage": "70 GB available space    Additional Notes:  SSD required."
       }
     },
     "Elden Ring": {

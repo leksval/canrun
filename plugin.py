@@ -11,7 +11,7 @@ import logging
 import os
 from datetime import datetime
 import traceback
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, TypedDict
 
 # Add src to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
@@ -19,6 +19,12 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 from canrun_engine import CanRunEngine
 from privacy_aware_hardware_detector import PrivacyAwareHardwareDetector
 from service_container import get_container
+
+
+class Response(TypedDict, total=False):
+    """Type definition for plugin response objects."""
+    success: bool
+    message: Optional[str]
 
 
 class GAssistCommunication:
@@ -194,7 +200,7 @@ class CanRunGAssistPlugin:
         except Exception as e:
             self.logger.error(f"System validation failed: {e}")
     
-    async def handle_detect_hardware(self, params: dict) -> dict:
+    async def handle_detect_hardware(self, params: dict) -> Response:
         """Handle hardware detection request."""
         try:
             hardware_info = await self.privacy_detector.get_hardware_specs()
@@ -243,8 +249,8 @@ class CanRunGAssistPlugin:
                 "success": False,
                 "message": f"Hardware detection failed: {str(e)}"
             }
-    
-    async def handle_check_compatibility(self, params: dict) -> dict:
+
+    async def handle_check_compatibility(self, params: dict) -> Response:
         """Handle game compatibility check."""
         try:
             game_name = params.get('game_name', '')
@@ -310,7 +316,7 @@ class CanRunGAssistPlugin:
                 "message": f"Compatibility check failed: {str(e)}"
             }
     
-    async def handle_predict_performance(self, params: dict) -> dict:
+    async def handle_predict_performance(self, params: dict) -> Response:
         """Handle performance prediction request."""
         try:
             game_name = params.get('game_name', '')
@@ -370,7 +376,7 @@ class CanRunGAssistPlugin:
                 "message": f"Performance prediction failed: {str(e)}"
             }
     
-    async def handle_predict_advanced_performance(self, params: dict) -> dict:
+    async def handle_predict_advanced_performance(self, params: dict) -> Response:
         """Handle advanced tiered performance assessment request."""
         try:
             game_name = params.get('game_name', '')
@@ -431,7 +437,7 @@ class CanRunGAssistPlugin:
                 "message": f"Advanced performance assessment failed: {str(e)}"
             }
     
-    async def handle_get_optimization_suggestions(self, params: dict) -> dict:
+    async def handle_get_optimization_suggestions(self, params: dict) -> Response:
         """Handle optimization suggestions request."""
         try:
             game_name = params.get('game_name', '')
@@ -473,7 +479,7 @@ class CanRunGAssistPlugin:
                 "message": f"Optimization suggestions failed: {str(e)}"
             }
     
-    async def handle_get_intelligent_analysis(self, params: dict) -> dict:
+    async def handle_get_intelligent_analysis(self, params: dict) -> Response:
         """Handle intelligent LLM analysis request."""
         try:
             game_name = params.get('game_name', '')
@@ -516,7 +522,7 @@ class CanRunGAssistPlugin:
                 "message": f"Intelligent analysis failed: {str(e)}"
             }
     
-    async def handle_ask_intelligent_question(self, params: dict) -> dict:
+    async def handle_ask_intelligent_question(self, params: dict) -> Response:
         """Handle intelligent question request."""
         try:
             query = params.get('query', '')
@@ -581,8 +587,6 @@ class CanRunGAssistPlugin:
                 return await self.handle_check_compatibility(params)
             elif func_name == "predict_performance":
                 return await self.handle_predict_performance(params)
-            elif func_name == "predict_advanced_performance":
-                return await self.handle_predict_advanced_performance(params)
             elif func_name == "get_optimization_suggestions":
                 return await self.handle_get_optimization_suggestions(params)
             elif func_name == "get_intelligent_analysis":

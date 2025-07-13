@@ -39,6 +39,8 @@ dependencies = [
     "pynvml>=11.5.0",
     "setuptools>=65.0.0",
     "WMI>=1.5.1;platform_system=='Windows'",
+    "pywin32>=223;platform_system=='Windows'",
+    "pyinstaller>=6.11.0;platform_system=='Windows'",
     # HTTP requests and async operations
     "requests>=2.31.0",
     "aiohttp>=3.8.0",

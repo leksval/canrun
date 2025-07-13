@@ -182,18 +182,17 @@ class TestLLMAnalysis(unittest.TestCase):
         )
         
         # Mock performance prediction result
-        from performance_predictor import PerformanceSettings, PerformanceLevel, Resolution
         self.mock_performance = PerformancePrediction(
             game_name="Test Game",
             predictions=[
-                PerformanceSettings(
-                    resolution=Resolution.HD_1080P,
-                    quality_preset=PerformanceLevel.HIGH,
-                    expected_fps=75,
-                    dlss_enabled=True,
-                    rtx_enabled=True,
-                    settings_details={"quality": "High", "dlss": "Quality"}
-                )
+                {
+                    "resolution": "1080p",
+                    "quality_preset": "High",
+                    "expected_fps": 75,
+                    "dlss_enabled": True,
+                    "rtx_enabled": True,
+                    "settings_details": {"quality": "High", "dlss": "Quality"}
+                }
             ],
             bottleneck_info={ComponentType.GPU: "GPU utilization at 95%"},
             optimization_suggestions=['Enable DLSS', 'Use High settings instead of Ultra'],
