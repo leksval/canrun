@@ -2,7 +2,7 @@
   "manifestVersion": 1,
   "name": "CanRun Universal Game Compatibility Checker",
   "description": "Check game compatibility and performance predictions for your NVIDIA RTX/GTX system. Get instant answers about whether games will run, expected FPS, and optimization recommendations.",
-  "version": "1.1.0",
+  "version": "2.0.0",
   "author": "CanRun Development Team",
   "tags": ["gaming", "compatibility", "performance", "nvidia", "rtx", "gtx", "fps", "optimization"],
   "executable": "plugin.py",
