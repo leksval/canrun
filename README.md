@@ -105,18 +105,19 @@ uv run python -m pytest test/test_privacy_aware_hardware.py -v
 The plugin includes a Windows executable build process for NVIDIA G-Assist plugin marketplace submission:
 
 ```bash
-# Build Windows executable with PyInstaller (optimized)
-uv run pyinstaller plugin.py --name g-assist-plugin-python --onefile --paths=src --paths=. --hidden-import=canrun_engine --hidden-import=privacy_aware_hardware_detector --hidden-import=service_container --exclude-module=torchvision --exclude-module=torchaudio --exclude-module=torch.utils.tensorboard --exclude-module=torch.testing --exclude-module=torch.hub --exclude-module=pytest --exclude-module=sphinx --exclude-module=pygments --exclude-module=sympy --strip
+# Build Windows executable with PyInstaller (optimized with targeted PyTorch imports)
+uv run pyinstaller plugin.py --name g-assist-plugin-python --onefile --distpath=. --paths=src --paths=. --hidden-import=canrun_engine --hidden-import=privacy_aware_hardware_detector --hidden-import=service_container --exclude-module=torch --exclude-module=torch.nn --exclude-module=torch.optim --exclude-module=torch.autograd --exclude-module=torch.utils --exclude-module=torch.distributed --exclude-module=torch.jit --exclude-module=torch.onnx --exclude-module=torch.quantization --exclude-module=torch.fx --exclude-module=torch.profiler --exclude-module=torch.backends --exclude-module=torch.sparse --exclude-module=torch.special --exclude-module=torch.fft --exclude-module=torch.linalg --exclude-module=torch.multiprocessing --exclude-module=torch.overrides --exclude-module=torch.package --exclude-module=torch._dynamo --exclude-module=torch._inductor --exclude-module=torch.export --exclude-module=torch.compile --exclude-module=torch.ao --exclude-module=torch.library --exclude-module=torch.tensor --exclude-module=torch.serialization --exclude-module=torch.random --exclude-module=torch.hub --exclude-module=torch.futures --exclude-module=torchvision --exclude-module=torchaudio --exclude-module=pytest --exclude-module=sphinx --exclude-module=pygments --exclude-module=sympy --exclude-module=jinja2 --exclude-module=sqlite3 --exclude-module=tkinter --exclude-module=turtle --exclude-module=unittest --exclude-module=test --exclude-module=lib2to3 --exclude-module=xmlrpc --exclude-module=tarfile --exclude-module=gzip --exclude-module=bz2 --exclude-module=lzma --exclude-module=zoneinfo --exclude-module=calendar --exclude-module=getopt --exclude-module=optparse --exclude-module=getpass --exclude-module=curses --exclude-module=asyncore --exclude-module=asynchat --exclude-module=cmd --exclude-module=shlex --optimize=2 --strip
 
 # Test the built executable
-.\dist\g-assist-plugin-python.exe --function detect_hardware
+.\g-assist-plugin-python.exe --function detect_hardware
 ```
 
 **Build Output:**
-- Creates `g-assist-plugin-python.exe` in the root directory
+- Creates `g-assist-plugin-python.exe` in the root directory (not in dist/)
 - Single-file executable with all dependencies bundled
 - Compatible with G-Assist plugin manifest requirements
 - Includes all src modules and data files
+- Optimized with targeted PyTorch imports for reduced size
 
 **What the executable includes:**
 - Complete CanRun functionality with S-A-B-C-D-F tier system
