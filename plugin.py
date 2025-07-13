@@ -24,7 +24,7 @@ from service_container import get_container
 class Response(TypedDict, total=False):
     """Type definition for plugin response objects."""
     success: bool
-    message: Optional[str]
+    message: str
 
 
 class GAssistCommunication:
