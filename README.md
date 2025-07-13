@@ -360,4 +360,4 @@ uv run python plugin.py --function predict_advanced_performance --game "Test Gam
 
 **Ready to see if your system can run any game? Try CanRun today!**
 
-For technical support, feature requests, or contributions, visit our [GitHub repository](https://github.com/yourusername/canrun).
+For technical support, feature requests, or contributions, visit [GitHub repository](https://github.com/leksval/canrun).
