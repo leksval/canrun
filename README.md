@@ -105,11 +105,11 @@ uv run python -m pytest test/test_privacy_aware_hardware.py -v
 The plugin includes a Windows executable build process for NVIDIA G-Assist plugin marketplace submission:
 
 ```bash
-# Build Windows executable with PyInstaller
-uv run pyinstaller plugin.py --name g-assist-plugin-python --onefile --paths=src --paths=. --hidden-import=canrun_engine --hidden-import=privacy_aware_hardware_detector --hidden-import=service_container
+# Build Windows executable with PyInstaller (optimized)
+uv run pyinstaller plugin.py --name g-assist-plugin-python --onefile --paths=src --paths=. --hidden-import=canrun_engine --hidden-import=privacy_aware_hardware_detector --hidden-import=service_container --exclude-module=torchvision --exclude-module=torchaudio --exclude-module=torch.utils.tensorboard --exclude-module=torch.testing --exclude-module=torch.hub --exclude-module=pytest --exclude-module=sphinx --exclude-module=pygments --exclude-module=sympy --strip
 
 # Test the built executable
-.\g-assist-plugin-python.exe --function detect_hardware
+.\dist\g-assist-plugin-python.exe --function detect_hardware
 ```
 
 **Build Output:**
@@ -128,13 +128,13 @@ uv run pyinstaller plugin.py --name g-assist-plugin-python --onefile --paths=src
 **Testing Commands:**
 ```bash
 # Hardware detection
-.\g-assist-plugin-python.exe --function detect_hardware
+.\dist\g-assist-plugin-python.exe --function detect_hardware
 
 # Performance analysis
-.\g-assist-plugin-python.exe --function predict_advanced_performance --game "Cyberpunk 2077"
+.\dist\g-assist-plugin-python.exe --function predict_advanced_performance --game "Cyberpunk 2077"
 
 # Compatibility check
-.\g-assist-plugin-python.exe --function check_compatibility --game "Baldur's Gate 3"
+.\dist\g-assist-plugin-python.exe --function check_compatibility --game "Baldur's Gate 3"
 ```
 
 
