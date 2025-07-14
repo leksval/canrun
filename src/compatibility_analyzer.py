@@ -5,7 +5,7 @@ Compatibility analysis for RTX/GTX gaming systems with G-Assist integration.
 
 import re
 import logging
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Any
 from dataclasses import dataclass
 from enum import Enum
 
@@ -69,6 +69,49 @@ class CompatibilityAnalysis:
         assert 0.0 <= self.overall_score <= 1.0, "Overall score must be between 0 and 1"
         assert self.component_analyses, "Component analyses cannot be empty"
         assert self.summary.strip(), "Summary cannot be empty"
+
+    def get_minimum_requirements_status(self) -> Dict[str, Any]:
+        """Get clear status about minimum requirements compliance."""
+        failing_components = []
+        meeting_components = []
+        
+        for analysis in self.component_analyses:
+            if analysis.meets_minimum:
+                meeting_components.append({
+                    'component': analysis.component.value,
+                    'status': 'MEETS_MINIMUM',
+                    'details': analysis.details
+                })
+            else:
+                failing_components.append({
+                    'component': analysis.component.value,
+                    'status': 'BELOW_MINIMUM',
+                    'details': analysis.details,
+                    'upgrade_suggestion': analysis.upgrade_suggestion
+                })
+        
+        return {
+            'can_run_game': self.can_run_minimum,
+            'overall_status': 'MEETS_MINIMUM_REQUIREMENTS' if self.can_run_minimum else 'BELOW_MINIMUM_REQUIREMENTS',
+            'meeting_components': meeting_components,
+            'failing_components': failing_components,
+            'summary_message': self._get_minimum_requirements_message()
+        }
+    
+    def _get_minimum_requirements_message(self) -> str:
+        """Generate clear message about minimum requirements status."""
+        if self.can_run_minimum:
+            if self.can_run_recommended:
+                return f"✅ CANRUN: {self.game_name} will run EXCELLENTLY - System exceeds recommended requirements!"
+            else:
+                return f"✅ CANRUN: {self.game_name} will run - System meets minimum requirements!"
+        else:
+            failing_components = [c.component.value for c in self.component_analyses if not c.meets_minimum]
+            return f"❌ CANNOT RUN: {self.game_name} requires upgrades - Failing components: {', '.join(failing_components)}"
+
+    def get_runnable_status(self) -> str:
+        """Get simple runnable status message."""
+        return self._get_minimum_requirements_message()
 
 
 class CompatibilityAnalyzer:
@@ -161,8 +204,8 @@ class CompatibilityAnalyzer:
         gpu_score = self._get_nvidia_gpu_score(hardware.gpu_model)
         
         # Estimate required scores from requirements
-        min_gpu_text = requirements.minimum.get('graphics', '').lower()
-        rec_gpu_text = requirements.recommended.get('graphics', '').lower()
+        min_gpu_text = requirements.minimum_gpu.lower()
+        rec_gpu_text = requirements.recommended_gpu.lower()
         
         min_score = self._estimate_required_gpu_score(min_gpu_text)
         rec_score = self._estimate_required_gpu_score(rec_gpu_text)
@@ -221,8 +264,8 @@ class CompatibilityAnalyzer:
         cpu_score = self._estimate_cpu_performance(hardware.cpu_model, hardware.cpu_cores, hardware.cpu_threads)
         
         # Get required scores
-        min_cpu_text = requirements.minimum.get('processor', '').lower()
-        rec_cpu_text = requirements.recommended.get('processor', '').lower()
+        min_cpu_text = requirements.minimum_cpu.lower()
+        rec_cpu_text = requirements.recommended_cpu.lower()
         
         min_score = self._estimate_required_cpu_score(min_cpu_text)
         rec_score = self._estimate_required_cpu_score(rec_cpu_text)
@@ -268,8 +311,8 @@ class CompatibilityAnalyzer:
         assert hardware.ram_total_gb > 0, "RAM must be greater than 0"
         
         # Extract required RAM amounts
-        min_ram = self._extract_ram_amount(requirements.minimum.get('memory', ''))
-        rec_ram = self._extract_ram_amount(requirements.recommended.get('memory', ''))
+        min_ram = requirements.minimum_ram_gb
+        rec_ram = requirements.recommended_ram_gb
         
         # Check compatibility
         meets_minimum = hardware.ram_total_gb >= min_ram
@@ -310,8 +353,8 @@ class CompatibilityAnalyzer:
                         requirements: GameRequirements) -> ComponentAnalysis:
         """Analyze storage compatibility."""
         # Extract required storage amounts
-        min_storage = self._extract_storage_amount(requirements.minimum.get('storage', ''))
-        rec_storage = self._extract_storage_amount(requirements.recommended.get('storage', ''))
+        min_storage = requirements.minimum_storage_gb
+        rec_storage = requirements.recommended_storage_gb
         
         # For this analysis, assume adequate storage is available
         # In production, this would check actual disk space
@@ -339,8 +382,8 @@ class CompatibilityAnalyzer:
         assert hardware.os_version.strip(), "OS version cannot be empty"
         
         # Check OS compatibility
-        min_os = requirements.minimum.get('os', '').lower()
-        rec_os = requirements.recommended.get('os', '').lower()
+        min_os = requirements.minimum_os.lower()
+        rec_os = requirements.recommended_os.lower()
         
         is_windows = 'windows' in hardware.os_version.lower()
         meets_minimum = is_windows and ('windows' in min_os or not min_os)
@@ -376,8 +419,8 @@ class CompatibilityAnalyzer:
         
         # Extract version numbers
         hardware_dx_version = self._extract_directx_version(hardware.directx_version)
-        min_dx_version = self._extract_directx_version(requirements.minimum.get('directx', ''))
-        rec_dx_version = self._extract_directx_version(requirements.recommended.get('directx', ''))
+        min_dx_version = self._extract_directx_version(requirements.minimum_directx)
+        rec_dx_version = self._extract_directx_version(requirements.recommended_directx)
         
         meets_minimum = hardware_dx_version >= min_dx_version
         meets_recommended = hardware_dx_version >= rec_dx_version

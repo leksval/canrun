@@ -1,6 +1,6 @@
 <table> <tr> <td width="110" valign="middle"> <img width="100" height="100" alt="canrun_logo" src="https://github.com/user-attachments/assets/239082bd-d5ca-427b-b235-5326299f3104" /> </td> <td valign="middle"> <h1 style="display:inline-block; vertical-align:middle; margin:0; padding:0;">  CanRun - G-Assist Game Compatibility Checker </h1> </td> </tr> </table>
   
-  [![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](https://github.com/canrun/canrun)
+  [![Version](https://img.shields.io/badge/version-3.0.0-blue.svg)](https://github.com/canrun/canrun)
   [![Python](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/downloads/)
   [![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
   [![G-Assist](https://img.shields.io/badge/G--Assist-Compatible-brightgreen.svg)](https://www.nvidia.com/en-us/geforce/technologies/g-assist/)
@@ -18,6 +18,7 @@
 - **🧠 AI-Powered Analysis**: Leverages G-Assist's embedded 8B Llama model for intelligent insights
 - **🔒 Privacy-by-Design**: All processing happens locally on your RTX GPU—no data leaves your system
 - **🎯 Steam-First Data**: Prioritizes Steam API for most up-to-date game requirements
+- **🎯 Intelligent Game Matching**: Advanced fuzzy matching handles game name variations (e.g., "Diablo 4" ↔ "Diablo IV", roman numerals, abbreviations)
 - **📊 Smart Performance Prediction**: Comprehensive hardware hierarchies with RTX 40/30 series, GTX series, AMD RX series support
 - **💡 Intelligent Recommendations**: AI-generated optimization tips, DLSS strategies, upgrade suggestions
 - **🏃 Zero Setup**: Drop-in plugin with automatic RTX/GTX validation
@@ -28,7 +29,7 @@
 
 ```bash
 # 1. Clone and enter directory
-git clone https://github.com/yourusername/canrun
+git clone https://github.com/leksval/canrun
 cd canrun
 
 # 2. Install dependencies with uv (recommended)
@@ -48,34 +49,100 @@ uv run python plugin.py --function predict_advanced_performance --game "Call of 
 - "Show my CANRUN status for Cyberpunk 2077"
 - "What should I upgrade for better gaming performance?"
 
-## 🆕 What's New in v2.0
+**Test the new minimum requirements logic:**
+```bash
+# Test minimum requirements functionality
+uv run python test_minimum_requirements.py
 
-### Advanced S-A-B-C-D-F Tier System
-- **S-Tier (90-100)**: Exceptional - Ultra settings, 4K@60fps+
-- **A-Tier (80-89)**: Excellent - High settings, 1440p@60fps
-- **B-Tier (70-79)**: Good - High settings, 1080p@60fps
-- **C-Tier (60-69)**: Adequate - Medium settings, 1080p@30fps
-- **D-Tier (50-59)**: Minimum - Low settings, 720p@30fps
-- **F-Tier (0-49)**: Below Minimum - Unable to run acceptably
-
-### 🎮 CANRUN! Status Indicator
-```
-🎮 **CANRUN!** ✅  # Displayed for D-tier and above
-❌ **Cannot Run**   # Displayed for F-tier systems
+# Expected output:
+# ✅ CANRUN: Diablo IV will run EXCELLENTLY - System exceeds recommended requirements!
+# Can run game: True
+# Overall status: MEETS_MINIMUM_REQUIREMENTS
 ```
 
-### Steam-First Architecture
-- Steam API prioritized for most current game requirements
-- Fallback to local cache for offline scenarios
-- Real-time game specification updates
+## 🆕 What's New in v1.3.0
+
+### 🧠 LLM-Powered Game Intelligence
+- **Smart Game Matching**: Enhanced fuzzy matching with number-to-roman conversion (Diablo 4 ↔ Diablo IV)
+- **G-Assist LLM Integration**: 8B parameter Llama model running locally for intelligent game interpretation
+- **Fallback Analysis**: Comprehensive name variations and intelligent game matching when LLM unavailable
+
+### ✅ Enhanced CANRUN! Minimum Requirements Logic
+```
+✅ CANRUN: Diablo IV will run EXCELLENTLY - System exceeds recommended requirements!
+✅ CANRUN: Cyberpunk 2077 will run - System meets minimum requirements!
+❌ CANNOT RUN: Starfield requires upgrades - Failing components: GPU, CPU
+```
+
+### 🎯 Real Workflow Features
+- **Instant Minimum Requirements Check**: Clear boolean flags for [`can_run_minimum`](src/compatibility_analyzer.py:58) and [`can_run_recommended`](src/compatibility_analyzer.py:59)
+- **Component-Level Analysis**: Detailed breakdown of GPU, CPU, RAM, Storage, OS, DirectX compatibility
+- **Smart Steam API Integration**: Fixed malformed data parsing, enhanced error handling, intelligent game search
+- **Privacy-Aware Hardware Detection**: RTX/GTX system specs without compromising privacy
+
+### 🔧 Technical Improvements
+- **Fixed Steam API Integration**: Resolved method name mismatches, improved response parsing
+- **Enhanced Game Requirements Fetching**: Better handling of concatenated strings and malformed data
+- **Improved Cache Management**: Proper dataclass reconstruction and JSON serialization
+- **Component Analysis**: Each component now tracks `meets_minimum` and `meets_recommended` flags
+
+## 🔄 Real Workflow (LLM-Powered)
+
+### Core API Usage
+```python
+from canrun_engine import CanRunEngine
+
+# Initialize with LLM support
+engine = CanRunEngine(enable_llm=True)
+
+# Check game compatibility
+result = await engine.check_game_compatibility("Diablo 4")  # Auto-matches to "Diablo IV"
+
+# Get minimum requirements status
+min_status = result.get_minimum_requirements_status()
+print(f"Can run: {min_status['can_run_game']}")
+print(f"Status: {min_status['overall_status']}")
+print(f"Message: {min_status['summary_message']}")
+
+# Simple boolean checks
+print(f"Meets minimum: {result.can_run_game()}")
+print(f"Exceeds recommended: {result.exceeds_recommended_requirements()}")
+
+# Get runnable status message
+print(result.get_runnable_status_message())
+```
+
+### Component-Level Analysis
+```python
+# Check each component's compatibility
+for component in min_status['meeting_components']:
+    print(f"✅ {component['component']}: {component['status']}")
+
+for component in min_status['failing_components']:
+    print(f"❌ {component['component']}: {component['status']}")
+    print(f"   Upgrade: {component['upgrade_suggestion']}")
+```
+
+### LLM-Enhanced Game Matching
+- **Number-to-Roman Conversion**: "Diablo 4" → "Diablo IV", "Call of Duty 3" → "Call of Duty III"
+- **Intelligent Name Variations**: "COD MW2" → "Call of Duty: Modern Warfare 2"
+- **G-Assist Integration**: Local 8B Llama model for game requirements interpretation
+- **Fallback Analysis**: Comprehensive matching when LLM unavailable
 
 ## 🧪 Running Tests
 
-**Quick Test Commands:**
+**Primary Test Command (Recommended):**
 
 ```bash
-# Run all tests
+# Run all tests with pytest
 uv run python -m pytest test/ -v
+```
+
+**Additional Test Commands:**
+
+```bash
+# Test the new minimum requirements functionality
+uv run python test/test_minimum_requirements.py
 
 # Test advanced performance assessment
 uv run python plugin.py --function predict_advanced_performance --game "Cyberpunk 2077"
@@ -105,8 +172,8 @@ uv run python -m pytest test/test_privacy_aware_hardware.py -v
 The plugin includes a Windows executable build process for NVIDIA G-Assist plugin marketplace submission:
 
 ```bash
-# Build Windows executable with PyInstaller (optimized with targeted PyTorch imports)
-uv run pyinstaller plugin.py --name g-assist-plugin-python --onefile --distpath=. --paths=src --paths=. --hidden-import=canrun_engine --hidden-import=privacy_aware_hardware_detector --hidden-import=service_container --exclude-module=torch --exclude-module=torch.nn --exclude-module=torch.optim --exclude-module=torch.autograd --exclude-module=torch.utils --exclude-module=torch.distributed --exclude-module=torch.jit --exclude-module=torch.onnx --exclude-module=torch.quantization --exclude-module=torch.fx --exclude-module=torch.profiler --exclude-module=torch.backends --exclude-module=torch.sparse --exclude-module=torch.special --exclude-module=torch.fft --exclude-module=torch.linalg --exclude-module=torch.multiprocessing --exclude-module=torch.overrides --exclude-module=torch.package --exclude-module=torch._dynamo --exclude-module=torch._inductor --exclude-module=torch.export --exclude-module=torch.compile --exclude-module=torch.ao --exclude-module=torch.library --exclude-module=torch.tensor --exclude-module=torch.serialization --exclude-module=torch.random --exclude-module=torch.hub --exclude-module=torch.futures --exclude-module=torchvision --exclude-module=torchaudio --exclude-module=pytest --exclude-module=sphinx --exclude-module=pygments --exclude-module=sympy --exclude-module=jinja2 --exclude-module=sqlite3 --exclude-module=tkinter --exclude-module=turtle --exclude-module=unittest --exclude-module=test --exclude-module=lib2to3 --exclude-module=xmlrpc --exclude-module=tarfile --exclude-module=gzip --exclude-module=bz2 --exclude-module=lzma --exclude-module=zoneinfo --exclude-module=calendar --exclude-module=getopt --exclude-module=optparse --exclude-module=getpass --exclude-module=curses --exclude-module=asyncore --exclude-module=asynchat --exclude-module=cmd --exclude-module=shlex --optimize=2 --strip
+# Build Windows executable with PyInstaller (optimized build with data files)
+uv run pyinstaller plugin.py --name g-assist-plugin-python --onefile --distpath=. --paths=src --paths=. --add-data "data;data" --add-data "src;src" --hidden-import=canrun_engine --hidden-import=privacy_aware_hardware_detector --hidden-import=service_container --exclude-module=pytest --exclude-module=sphinx --exclude-module=pygments --exclude-module=sympy --exclude-module=jinja2 --exclude-module=sqlite3 --exclude-module=tkinter --exclude-module=turtle --exclude-module=unittest --exclude-module=test --exclude-module=lib2to3 --exclude-module=xmlrpc --exclude-module=tarfile --exclude-module=gzip --exclude-module=bz2 --exclude-module=lzma --exclude-module=zoneinfo --exclude-module=getopt --exclude-module=optparse --exclude-module=getpass --exclude-module=curses --exclude-module=asyncore --exclude-module=asynchat --exclude-module=cmd --exclude-module=shlex --optimize=2 --strip
 
 # Test the built executable
 .\g-assist-plugin-python.exe --function detect_hardware
