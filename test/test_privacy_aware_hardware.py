@@ -53,7 +53,8 @@ class TestPrivacyAwareCache(unittest.TestCase):
     
     def setUp(self):
         """Set up test cache."""
-        self.cache = PrivacyAwareCache(max_age_hours=1)
+        # Cache now standardized to 15 minutes regardless of input parameter
+        self.cache = PrivacyAwareCache()
     
     def test_cache_store_and_retrieve(self):
         """Test storing and retrieving cached data."""
@@ -87,8 +88,8 @@ class TestPrivacyAwareCache(unittest.TestCase):
         test_key = "test_key"
         test_value = {"test": "data"}
         
-        # Create cache with very short expiration
-        short_cache = PrivacyAwareCache(max_age_hours=0.001)  # ~3.6 seconds
+        # Cache is standardized to 15 minutes - test with manual cache expiry manipulation
+        short_cache = PrivacyAwareCache()
         
         # Store data
         short_cache.store(test_key, test_value)
@@ -286,8 +287,8 @@ class TestPrivacyCompliance(unittest.TestCase):
     
     def test_temporal_data_limitation(self):
         """Test temporal limitation of data storage."""
-        # Test that cache respects time limits
-        short_cache = PrivacyAwareCache(max_age_hours=0.001)  # Very short expiration
+        # Test that cache respects time limits - cache is standardized to 15 minutes
+        short_cache = PrivacyAwareCache()
         
         test_data = {'test': 'data'}
         cache_key = "test_key"

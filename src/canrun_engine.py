@@ -7,14 +7,16 @@ import logging
 import asyncio
 import json
 import os
+import re
 from typing import Dict, List, Optional, Tuple, Any
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from datetime import datetime, timedelta
 
 from privacy_aware_hardware_detector import PrivacyAwareHardwareDetector, PrivacyAwareHardwareSpecs
 from game_requirements_fetcher import GameRequirementsFetcher, GameRequirements
-from compatibility_analyzer import CompatibilityAnalyzer, CompatibilityAnalysis
-from performance_predictor import PerformancePredictor, PerformancePrediction
+from optimized_game_fuzzy_matcher import OptimizedGameFuzzyMatcher
+from compatibility_analyzer import CompatibilityAnalyzer, CompatibilityAnalysis, ComponentAnalysis, ComponentType, CompatibilityLevel
+from performance_predictor import PerformancePredictor, PerformanceAssessment, PerformanceTier
 from rtx_llm_analyzer import GAssistLLMAnalyzer, LLMAnalysisResult
 
 
@@ -26,10 +28,26 @@ class CanRunResult:
     hardware_specs: PrivacyAwareHardwareSpecs
     game_requirements: GameRequirements
     compatibility_analysis: CompatibilityAnalysis
-    performance_prediction: PerformancePrediction
+    performance_prediction: PerformanceAssessment
     llm_analysis: Optional[Dict[str, LLMAnalysisResult]]
     cache_used: bool
     analysis_time_ms: int
+    
+    def get_minimum_requirements_status(self) -> Dict[str, Any]:
+        """Get clear status about minimum requirements compliance."""
+        return self.compatibility_analysis.get_minimum_requirements_status()
+    
+    def get_runnable_status_message(self) -> str:
+        """Get simple runnable status message for CANRUN."""
+        return self.compatibility_analysis.get_runnable_status()
+    
+    def can_run_game(self) -> bool:
+        """Check if the game can run on minimum requirements."""
+        return self.compatibility_analysis.can_run_minimum
+    
+    def exceeds_recommended_requirements(self) -> bool:
+        """Check if system exceeds recommended requirements."""
+        return self.compatibility_analysis.can_run_recommended
 
 
 class CanRunEngine:
@@ -48,6 +66,7 @@ class CanRunEngine:
         # Initialize components
         self.hardware_detector = PrivacyAwareHardwareDetector()
         self.requirements_fetcher = GameRequirementsFetcher()
+        self.fuzzy_matcher = OptimizedGameFuzzyMatcher()
         self.compatibility_analyzer = CompatibilityAnalyzer()
         self.performance_predictor = PerformancePredictor()
         
@@ -111,15 +130,29 @@ class CanRunEngine:
         )
         assert compatibility_analysis is not None, "Compatibility analysis failed"
         
-        # Step 4: Predict performance
-        performance_prediction = await self._predict_performance(
-            compatibility_analysis,
-            hardware_specs.gpu_model,
-            hardware_specs.gpu_vram_gb,
-            hardware_specs.supports_rtx,
-            hardware_specs.supports_dlss
+        # Step 4: Predict performance using S-A-B-C-D-F tier system
+        hardware_dict = {
+            "gpu_model": hardware_specs.gpu_model,
+            "gpu_vram_gb": hardware_specs.gpu_vram_gb,
+            "cpu_model": hardware_specs.cpu_model,
+            "ram_total_gb": hardware_specs.ram_total_gb,
+            "supports_rtx": hardware_specs.supports_rtx,
+            "supports_dlss": hardware_specs.supports_dlss
+        }
+        
+        game_requirements_dict = {
+            "minimum_gpu": game_requirements.minimum_gpu,
+            "recommended_gpu": game_requirements.recommended_gpu,
+            "minimum_cpu": game_requirements.minimum_cpu,
+            "recommended_cpu": game_requirements.recommended_cpu,
+            "minimum_ram_gb": game_requirements.minimum_ram_gb,
+            "recommended_ram_gb": game_requirements.recommended_ram_gb
+        }
+        
+        performance_prediction = await asyncio.get_event_loop().run_in_executor(
+            None, self.performance_predictor.assess_performance, hardware_dict, game_requirements_dict
         )
-        assert performance_prediction is not None, "Performance prediction failed"
+        assert performance_prediction is not None, "Performance assessment failed"
         
         # Step 5: Perform LLM analysis if enabled
         llm_analysis = None
@@ -149,67 +182,7 @@ class CanRunEngine:
             self._save_cached_result(game_name, result)
         
         self.logger.info(f"Analysis completed for {game_name} in {analysis_time}ms")
-        # Convert to dictionary format expected by tests
-        return {
-            'compatibility': {
-                'compatibility_level': compatibility_analysis.overall_compatibility,
-                'overall_score': compatibility_analysis.overall_score,
-                'bottlenecks': compatibility_analysis.bottlenecks,
-                'component_analysis': {
-                    'cpu': {
-                        'status': next((
-                            'excellent' if comp.meets_recommended else 
-                            'adequate' if comp.meets_minimum else 'insufficient'
-                            for comp in compatibility_analysis.component_analyses 
-                            if comp.component.name.lower() == 'cpu'), 'unknown'),
-                        'score': next((int(comp.score * 100) 
-                            for comp in compatibility_analysis.component_analyses 
-                            if comp.component.name.lower() == 'cpu'), 75)
-                    },
-                    'gpu': {
-                        'status': next((
-                            'excellent' if comp.meets_recommended else
-                            'adequate' if comp.meets_minimum else 'insufficient'
-                            for comp in compatibility_analysis.component_analyses
-                            if comp.component.name.lower() == 'gpu'), 'unknown'),
-                        'score': next((int(comp.score * 100)
-                            for comp in compatibility_analysis.component_analyses
-                            if comp.component.name.lower() == 'gpu'), 80)
-                    },
-                    'memory': {
-                        'status': next((
-                            'excellent' if comp.meets_recommended else
-                            'adequate' if comp.meets_minimum else 'insufficient'
-                            for comp in compatibility_analysis.component_analyses
-                            if comp.component.name.lower() == 'ram'), 'unknown'),
-                        'score': next((int(comp.score * 100)
-                            for comp in compatibility_analysis.component_analyses
-                            if comp.component.name.lower() == 'ram'), 85)
-                    },
-                    'storage': {
-                        'status': next((
-                            'excellent' if comp.meets_recommended else
-                            'adequate' if comp.meets_minimum else 'insufficient'
-                            for comp in compatibility_analysis.component_analyses
-                            if comp.component.name.lower() == 'storage'), 'unknown'),
-                        'score': next((int(comp.score * 100)
-                            for comp in compatibility_analysis.component_analyses
-                            if comp.component.name.lower() == 'storage'), 90)
-                    }
-                }
-            },
-            'performance': {
-                'fps': performance_prediction.predictions[0].expected_fps if performance_prediction.predictions else 0,
-                'performance_level': performance_prediction.predictions[0].quality_preset.value if performance_prediction.predictions else 'Unknown',
-                'stability': 'stable',  # Default stability
-                'optimization_suggestions': performance_prediction.optimization_suggestions
-            },
-            'optimization_suggestions': performance_prediction.optimization_suggestions,
-            'hardware_analysis': {
-                'gpu_tier': 'high-end',  # Default tier
-                'bottleneck_analysis': compatibility_analysis.bottlenecks
-            }
-        }
+        return result
     
     async def get_hardware_info(self) -> PrivacyAwareHardwareSpecs:
         """Get current hardware specifications."""
@@ -232,49 +205,8 @@ class CanRunEngine:
                 self.logger.error(f"Batch check failed for {game_name}: {e}")
                 results.append(self._create_error_result(game_name, str(e)))
         
-        # Convert to dictionary format expected by tests
-        return {
-            'compatibility': {
-                'compatibility_level': compatibility_analysis.overall_compatibility,
-                'overall_score': compatibility_analysis.overall_score,
-                'bottlenecks': compatibility_analysis.bottlenecks,
-                'component_analysis': {
-                    'cpu': {
-                        'status': next((
-                            'excellent' if comp.meets_recommended else 
-                            'adequate' if comp.meets_minimum else 'insufficient'
-                            for comp in compatibility_analysis.component_analyses 
-                            if comp.component.name.lower() == 'cpu'), 'unknown'),
-                        'score': next((int(comp.score * 100) 
-                            for comp in compatibility_analysis.component_analyses 
-                            if comp.component.name.lower() == 'cpu'), 75)
-                    },
-                    'gpu': {
-                        'status': compatibility_analysis.gpu_compatibility,
-                        'score': 80  # Default score
-                    },
-                    'memory': {
-                        'status': compatibility_analysis.ram_compatibility,
-                        'score': 85  # Default score
-                    },
-                    'storage': {
-                        'status': compatibility_analysis.storage_compatibility,
-                        'score': 90  # Default score
-                    }
-                }
-            },
-            'performance': {
-                'fps': performance_prediction.predictions[0].expected_fps if performance_prediction.predictions else 0,
-                'performance_level': performance_prediction.predictions[0].quality_preset.value if performance_prediction.predictions else 'Unknown',
-                'stability': 'stable',  # Default stability
-                'optimization_suggestions': performance_prediction.optimization_suggestions
-            },
-            'optimization_suggestions': performance_prediction.optimization_suggestions,
-            'hardware_analysis': {
-                'gpu_tier': 'high-end',  # Default tier
-                'bottleneck_analysis': compatibility_analysis.bottlenecks
-            }
-        }
+        self.logger.info(f"Batch check completed for {len(game_names)} games")
+        return results
     
     def clear_cache(self) -> None:
         """Clear all cached results."""
@@ -331,26 +263,6 @@ class CanRunEngine:
         
         return analysis
 
-    async def _predict_performance(self, compatibility_analysis: CompatibilityAnalysis, gpu_model: str, gpu_vram_gb: int, supports_rtx: bool, supports_dlss: bool) -> PerformancePrediction:
-        """Predict game performance based on compatibility analysis and GPU specs."""
-        assert compatibility_analysis is not None, "Compatibility analysis is required"
-        assert gpu_model and isinstance(gpu_model, str), "GPU model must be a non-empty string"
-        assert isinstance(gpu_vram_gb, int), "VRAM GB must be an integer"
-        assert isinstance(supports_rtx, bool), "supports_rtx must be a boolean"
-        assert isinstance(supports_dlss, bool), "supports_dlss must be a boolean"
-
-        loop = asyncio.get_event_loop()
-        prediction = await loop.run_in_executor(
-            None,
-            self.performance_predictor.predict_performance,
-            compatibility_analysis,
-            gpu_model,
-            gpu_vram_gb,
-            supports_rtx,
-            supports_dlss
-        )
-        assert prediction is not None, "Performance prediction returned None"
-        return prediction
 
     async def _predict_advanced_performance(self, hardware_specs: Dict, game_requirements: Dict = None) -> Dict:
         """
@@ -384,15 +296,50 @@ class CanRunEngine:
         }
 
     def _get_cached_result(self, game_name: str) -> Optional[CanRunResult]:
-        """Retrieve cached result for a game if available and not expired."""
-        import json
-        import os
-        from datetime import datetime
+        """Retrieve cached result for a game if available and not expired using fuzzy matching."""
 
+        # First try exact match
         cache_file = os.path.join(self.cache_dir, f"{game_name}.json")
+        if os.path.isfile(cache_file):
+            return self._load_cache_file(cache_file)
+
+        # If no exact match, try fuzzy matching against all cached games
+        if not os.path.isdir(self.cache_dir):
+            return None
+            
+        cached_games = []
+        for filename in os.listdir(self.cache_dir):
+            if filename.endswith('.json'):
+                cached_game_name = filename[:-5]  # Remove .json extension
+                cache_path = os.path.join(self.cache_dir, filename)
+                
+                # Check if cache file is not expired
+                mtime = os.path.getmtime(cache_path)
+                if (datetime.now().timestamp() - mtime) <= self.cache_duration.total_seconds():
+                    cached_games.append(cached_game_name)
+        
+        if not cached_games:
+            return None
+            
+        # Use fuzzy matcher to find best match
+        match_result = self.fuzzy_matcher.find_best_match(game_name, cached_games)
+        
+        # Only use fuzzy match if confidence is high enough (80%+)
+        if match_result and len(match_result) >= 2:
+            best_match, confidence = match_result
+            if confidence >= 0.8:
+                self.logger.info(f"Fuzzy cache match: '{game_name}' -> '{best_match}' (confidence: {confidence:.2f})")
+                cache_file = os.path.join(self.cache_dir, f"{best_match}.json")
+                return self._load_cache_file(cache_file)
+        
+        return None
+    
+    def _load_cache_file(self, cache_file: str) -> Optional[CanRunResult]:
+        """Load and validate a single cache file."""
+        
         if not os.path.isfile(cache_file):
             return None
-
+            
         try:
             mtime = os.path.getmtime(cache_file)
             if (datetime.now().timestamp() - mtime) > self.cache_duration.total_seconds():
@@ -401,29 +348,103 @@ class CanRunEngine:
 
             with open(cache_file, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            # Deserialize JSON to CanRunResult dataclass
-            return CanRunResult(**data)
+            
+            # Convert dictionary data back to proper dataclass objects
+            return self._reconstruct_canrun_result(data)
         except Exception as e:
-            self.logger.warning(f"Failed to load cache for {game_name}: {e}")
+            self.logger.warning(f"Failed to load cache file {cache_file}: {e}")
             return None
 
-    def _save_cached_result(self, game_name: str, result: CanRunResult) -> None:
-        """Save analysis result to cache."""
-        import json
-        import os
-        from dataclasses import asdict
+    def _reconstruct_canrun_result(self, data: Dict[str, Any]) -> CanRunResult:
+        """Reconstruct CanRunResult from dictionary data."""
+        # Reconstruct nested dataclasses
+        hardware_specs = PrivacyAwareHardwareSpecs(**data['hardware_specs'])
+        game_requirements = GameRequirements(**data['game_requirements'])
+        
+        # Reconstruct compatibility analysis with proper ComponentAnalysis objects
+        compat_data = data['compatibility_analysis'].copy()
+        if 'component_analyses' in compat_data:
+            component_analyses = []
+            for comp_data in compat_data['component_analyses']:
+                if isinstance(comp_data, dict):
+                    # Convert dictionary back to ComponentAnalysis
+                    component_analyses.append(ComponentAnalysis(
+                        component=ComponentType(comp_data['component']),
+                        meets_minimum=comp_data['meets_minimum'],
+                        meets_recommended=comp_data['meets_recommended'],
+                        score=comp_data['score'],
+                        bottleneck_factor=comp_data['bottleneck_factor'],
+                        details=comp_data['details'],
+                        upgrade_suggestion=comp_data.get('upgrade_suggestion')
+                    ))
+                else:
+                    # Already a ComponentAnalysis object
+                    component_analyses.append(comp_data)
+            compat_data['component_analyses'] = component_analyses
+        
+        # Convert CompatibilityLevel from string if needed
+        if isinstance(compat_data.get('overall_compatibility'), str):
+            compat_data['overall_compatibility'] = CompatibilityLevel(compat_data['overall_compatibility'])
+        
+        # Convert bottlenecks from strings to ComponentType if needed
+        if 'bottlenecks' in compat_data:
+            bottlenecks = []
+            for bottleneck in compat_data['bottlenecks']:
+                if isinstance(bottleneck, str):
+                    bottlenecks.append(ComponentType(bottleneck))
+                else:
+                    bottlenecks.append(bottleneck)
+            compat_data['bottlenecks'] = bottlenecks
+        
+        compatibility_analysis = CompatibilityAnalysis(**compat_data)
+        performance_prediction = PerformanceAssessment(**data['performance_prediction'])
+        
+        # Handle LLM analysis if present
+        llm_analysis = None
+        if data.get('llm_analysis'):
+            llm_analysis = {}
+            for key, value in data['llm_analysis'].items():
+                llm_analysis[key] = LLMAnalysisResult(**value)
+        
+        return CanRunResult(
+            game_name=data['game_name'],
+            timestamp=data['timestamp'],
+            hardware_specs=hardware_specs,
+            game_requirements=game_requirements,
+            compatibility_analysis=compatibility_analysis,
+            performance_prediction=performance_prediction,
+            llm_analysis=llm_analysis,
+            cache_used=data.get('cache_used', True),
+            analysis_time_ms=data.get('analysis_time_ms', 0)
+        )
 
-        cache_file = os.path.join(self.cache_dir, f"{game_name}.json")
+    def _save_cached_result(self, game_name: str, result: CanRunResult) -> None:
+        """Save analysis result to cache using normalized game name."""
+
+        # Normalize game name for consistent caching
+        # This ensures "Diablo 4" and "Diablo IV" use the same cache file
+        normalized_name = self.fuzzy_matcher.normalize_game_name(game_name)
+        cache_file = os.path.join(self.cache_dir, f"{normalized_name}.json")
+        
+        # Ensure cache directory exists
+        os.makedirs(self.cache_dir, exist_ok=True)
+        
         try:
             # Convert dataclass to dict recursively, handling nested dataclasses
             result_dict = asdict(result)
+            
+            # Update the result to use the normalized name for consistency
+            result_dict['game_name'] = normalized_name
+            
             with open(cache_file, "w", encoding="utf-8") as f:
                 json.dump(result_dict, f, indent=2, default=str)
+                
+            self.logger.debug(f"Cached result for '{game_name}' as '{normalized_name}'")
         except Exception as e:
             self.logger.warning(f"Failed to save cache for {game_name}: {e}")
 
-    async def _perform_llm_analysis(self, compatibility_analysis: CompatibilityAnalysis, 
-                                   performance_prediction: PerformancePrediction,
+    async def _perform_llm_analysis(self, compatibility_analysis: CompatibilityAnalysis,
+                                   performance_prediction: PerformanceAssessment,
                                    hardware_specs: PrivacyAwareHardwareSpecs) -> Optional[Dict[str, LLMAnalysisResult]]:
         """Perform LLM analysis if G-Assist is available."""
         if not self.llm_analyzer:
@@ -498,16 +519,16 @@ class CanRunEngine:
             recommendations=[]
         )
         
-        # Create error performance prediction
-        error_performance = PerformancePrediction(
-            game_name=game_name,
-            resolution="1080p",
-            settings="Low",
+        # Create error performance assessment
+        error_performance = PerformanceAssessment(
+            score=0,
+            tier=PerformanceTier.F,
+            tier_description="Error occurred during analysis",
             expected_fps=0,
-            quality_preset="error",
-            confidence=0.0,
-            limiting_factors=[f"Error: {error_message}"],
-            optimization_suggestions=[]
+            recommended_settings="Unable to determine",
+            recommended_resolution="Unknown",
+            bottlenecks=[],
+            upgrade_suggestions=["Please retry the analysis"]
         )
         
         return CanRunResult(
@@ -521,6 +542,28 @@ class CanRunEngine:
             cache_used=False,
             analysis_time_ms=0
         )
+    
+    def _parse_ram_value(self, ram_str: str) -> int:
+        """Parse RAM value from string to integer GB."""
+        if not ram_str or ram_str == "Unknown":
+            return 0
+        
+        # Extract number from strings like "8 GB", "16GB", "8192 MB", etc.
+        ram_str = str(ram_str).upper()
+        
+        # Match number followed by optional space and unit
+        match = re.search(r'(\d+)\s*(GB|MB|G|M)?', ram_str)
+        if match:
+            value = int(match.group(1))
+            unit = match.group(2) or 'GB'
+            
+            # Convert MB to GB
+            if unit in ['MB', 'M']:
+                value = max(1, value // 1024)  # Convert MB to GB, minimum 1GB
+            
+            return value
+        
+        return 0
 
     async def analyze_multiple_games(self, game_names: List[str], use_cache: bool = True) -> Dict[str, Optional[CanRunResult]]:
         """Analyze multiple games and # Convert to dictionary format expected by tests
@@ -729,32 +772,40 @@ class CanRunEngine:
                     'bottlenecks': result.compatibility_analysis.bottlenecks,
                     'component_analysis': {
                         'cpu': {
-                            'status': result.compatibility_analysis.cpu_compatibility,
+                            'status': next(('Excellent' if comp.meets_recommended else 'Good' if comp.meets_minimum else 'Poor'
+                            for comp in result.compatibility_analysis.component_analyses
+                            if comp.component.name.lower() == 'cpu'), 'Unknown'),
                             'score': llm_estimates.get('cpu_score', next((int(comp.score * 100)
                             for comp in result.compatibility_analysis.component_analyses
                             if comp.component.name.lower() == 'cpu'), 75))
                         },
                         'gpu': {
-                            'status': result.compatibility_analysis.gpu_compatibility,
+                            'status': next(('Excellent' if comp.meets_recommended else 'Good' if comp.meets_minimum else 'Poor'
+                            for comp in result.compatibility_analysis.component_analyses
+                            if comp.component.name.lower() == 'gpu'), 'Unknown'),
                             'score': llm_estimates.get('gpu_score', 80)
                         },
                         'memory': {
-                            'status': result.compatibility_analysis.ram_compatibility,
+                            'status': next(('Excellent' if comp.meets_recommended else 'Good' if comp.meets_minimum else 'Poor'
+                            for comp in result.compatibility_analysis.component_analyses
+                            if comp.component.name.lower() == 'ram'), 'Unknown'),
                             'score': llm_estimates.get('memory_score', 85)
                         },
                         'storage': {
-                            'status': result.compatibility_analysis.storage_compatibility,
+                            'status': next(('Excellent' if comp.meets_recommended else 'Good' if comp.meets_minimum else 'Poor'
+                            for comp in result.compatibility_analysis.component_analyses
+                            if comp.component.name.lower() == 'storage'), 'Unknown'),
                             'score': llm_estimates.get('storage_score', 90)
                         }
                     }
                 },
                 'performance': {
-                    'fps': result.performance_prediction.predictions[0].expected_fps if result.performance_prediction.predictions else 0,
-                    'performance_level': result.performance_prediction.predictions[0].quality_preset.value if result.performance_prediction.predictions else 'Unknown',
+                    'fps': result.performance_prediction.expected_fps if hasattr(result.performance_prediction, 'expected_fps') else 0,
+                    'performance_level': result.performance_prediction.tier.value if hasattr(result.performance_prediction, 'tier') else 'Unknown',
                     'stability': llm_estimates.get('stability', 'stable'),
-                    'optimization_suggestions': result.performance_prediction.optimization_suggestions
+                    'optimization_suggestions': result.performance_prediction.upgrade_suggestions if hasattr(result.performance_prediction, 'upgrade_suggestions') else []
                 },
-                'optimization_suggestions': result.performance_prediction.optimization_suggestions,
+                'optimization_suggestions': result.performance_prediction.upgrade_suggestions if hasattr(result.performance_prediction, 'upgrade_suggestions') else [],
                 'hardware_analysis': {
                     'gpu_tier': llm_estimates.get('gpu_tier', 'high-end'),
                     'bottleneck_analysis': result.compatibility_analysis.bottlenecks
@@ -764,3 +815,26 @@ class CanRunEngine:
         except Exception as e:
             self.logger.error(f"Legacy compatibility analysis failed: {e}")
             return None
+
+    def _parse_ram_value(self, ram_str: str) -> int:
+        """Parse RAM value from string to integer GB."""
+        if not ram_str or ram_str == "Unknown":
+            return 0
+        
+        # Extract number from strings like "8 GB", "16GB", "8192 MB", etc.
+        import re
+        ram_str = str(ram_str).upper()
+        
+        # Match number followed by optional space and unit
+        match = re.search(r'(\d+)\s*(GB|MB|G|M)?', ram_str)
+        if match:
+            value = int(match.group(1))
+            unit = match.group(2) or 'GB'
+            
+            # Convert MB to GB
+            if unit in ['MB', 'M']:
+                value = max(1, value // 1024)  # Convert MB to GB, minimum 1GB
+            
+            return value
+        
+        return 0

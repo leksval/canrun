@@ -38,6 +38,17 @@ except ImportError:
     winreg = None
 
 
+def get_resource_path(relative_path):
+    """Get absolute path to resource, works for dev and for PyInstaller"""
+    if getattr(sys, 'frozen', False):
+        # Running as PyInstaller executable
+        base_path = sys._MEIPASS
+    else:
+        # Running as normal Python script
+        base_path = Path(__file__).parent.parent
+    return os.path.join(base_path, relative_path)
+
+
 @dataclass
 class HardwareSpecs:
     """Data class for storing hardware specifications."""
@@ -63,7 +74,7 @@ class HardwareDetector:
     def _load_gpu_hierarchy(self) -> Dict:
         """Load GPU hierarchy data for performance analysis."""
         try:
-            data_path = Path(__file__).parent.parent / "data" / "gpu_hierarchy.json"
+            data_path = get_resource_path("data/gpu_hierarchy.json")
             with open(data_path, 'r') as f:
                 return json.load(f)
         except Exception as e:

@@ -36,9 +36,19 @@ def main():
     # Define test scripts in order
     test_scripts = [
         ("Hardware Detection", "test_hardware_detection.py"),
+        ("Privacy Aware Hardware", "test_privacy_aware_hardware.py"),
         ("Compatibility Analysis", "test_compatibility_analysis.py"),
         ("Performance Prediction", "test_performance_prediction.py"),
-        ("CanRun Integration", "test_canrun_integration.py")
+        ("Minimum Requirements", "test_minimum_requirements.py"),
+        ("Steam API Integration", "test_steam_api_integration.py"),
+        ("LLM Analysis", "test_llm_analysis.py"),
+        ("CanRun Integration", "test_canrun_integration.py"),
+        ("Plugin Responses", "test_plugin_responses.py"),
+        ("Plugin Core", "test_plugin.py"),
+        ("Project Validation", "test_project_validation.py"),
+        ("Diablo Compatibility", "test_diablo_compatibility.py"),
+        ("Diablo Matching", "test_diablo_matching.py"),
+        ("Performance Debug", "test_performance_debug.py")
     ]
     
     results = []

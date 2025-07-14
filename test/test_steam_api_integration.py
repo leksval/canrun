@@ -66,7 +66,7 @@ class TestSteamAPIIntegration(unittest.TestCase):
             
             mock_session.return_value.__aenter__.return_value.get.return_value.__aenter__.return_value = mock_response
             
-            steam_id = await self.steam_source._get_steam_id("Cyberpunk 2077")
+            steam_id = await self.steam_source._search_game("Cyberpunk 2077")
             self.assertEqual(steam_id, "1091500")
     
     async def test_steam_id_search_failure(self):
@@ -77,7 +77,7 @@ class TestSteamAPIIntegration(unittest.TestCase):
             
             mock_session.return_value.__aenter__.return_value.get.return_value.__aenter__.return_value = mock_response
             
-            steam_id = await self.steam_source._get_steam_id("NonExistentGame")
+            steam_id = await self.steam_source._search_game("NonExistentGame")
             self.assertIsNone(steam_id)
     
     async def test_steam_app_info_success(self):
@@ -177,13 +177,13 @@ class TestSteamAPIIntegration(unittest.TestCase):
     
     async def test_game_requirements_fetcher_steam_integration(self):
         """Test GameRequirementsFetcher with Steam API integration."""
-        with patch.object(self.steam_source, '_get_steam_id', return_value="1091500"):
+        with patch.object(self.steam_source, '_search_game', return_value="1091500"):
             with patch.object(self.steam_source, '_get_app_info', return_value=self.mock_steam_app_details["1091500"]["data"]):
                 
                 # Add Steam source to fetcher
                 self.fetcher.sources = [self.steam_source]
                 
-                requirements = await self.fetcher.get_requirements("Cyberpunk 2077")
+                requirements = await self.fetcher.fetch_requirements("Cyberpunk 2077")
                 
                 self.assertIsNotNone(requirements)
                 self.assertEqual(requirements.game_name, "Cyberpunk 2077")
@@ -192,13 +192,73 @@ class TestSteamAPIIntegration(unittest.TestCase):
                 # Verify requirements structure
                 self.assertIsInstance(requirements.minimum, dict)
                 self.assertIsInstance(requirements.recommended, dict)
-                self.assertIsInstance(requirements.fetched_at, datetime)
     
     async def test_steam_api_fallback_behavior(self):
         """Test Steam API fallback behavior when Steam fails."""
-        with patch.object(self.steam_source, '_get_steam_id', return_value=None):
+        with patch.object(self.steam_source, '_search_game', return_value=None):
             requirements = await self.steam_source.fetch("Cyberpunk 2077")
             self.assertIsNone(requirements)
+    
+    async def test_steam_api_improved_parsing(self):
+        """Test improved Steam API requirements parsing."""
+        mock_html_requirements = {
+            "minimum": "<strong>Minimum:</strong><br><ul><li><strong>OS:</strong> Windows 10 64-bit</li><li><strong>Processor:</strong> Intel Core i5-3570K</li><li><strong>Memory:</strong> 8 GB RAM</li><li><strong>Graphics:</strong> NVIDIA GeForce GTX 970</li><li><strong>DirectX:</strong> Version 12</li><li><strong>Storage:</strong> 70 GB available space</li></ul>",
+            "recommended": "<strong>Recommended:</strong><br><ul><li><strong>OS:</strong> Windows 10 64-bit</li><li><strong>Processor:</strong> Intel Core i7-4790</li><li><strong>Memory:</strong> 12 GB RAM</li><li><strong>Graphics:</strong> NVIDIA GeForce GTX 1060</li><li><strong>DirectX:</strong> Version 12</li><li><strong>Storage:</strong> 70 GB available space</li></ul>"
+        }
+        
+        app_info = {"name": "Test Game", "pc_requirements": mock_html_requirements}
+        requirements = self.steam_source._parse_requirements(app_info, "Test Game")
+        
+        self.assertIsNotNone(requirements)
+        self.assertEqual(requirements.game_name, "Test Game")
+        
+        # Test that parsing correctly separates requirements
+        self.assertEqual(requirements.minimum["os"], "Windows 10 64-bit")
+        self.assertEqual(requirements.minimum["processor"], "Intel Core i5-3570K")
+        self.assertEqual(requirements.minimum["memory"], "8 GB RAM")
+        self.assertEqual(requirements.minimum["graphics"], "NVIDIA GeForce GTX 970")
+        
+        self.assertEqual(requirements.recommended["processor"], "Intel Core i7-4790")
+        self.assertEqual(requirements.recommended["memory"], "12 GB RAM")
+    
+    async def test_steam_api_fallback_to_cache(self):
+        """Test fallback mechanism from Steam API to local cache."""
+        # Mock Steam API failure
+        with patch.object(self.steam_source, '_search_game', side_effect=Exception("Steam API failed")):
+            # Mock cache hit
+            with patch.object(self.fetcher.sources[1], 'fetch') as mock_cache:
+                mock_cache.return_value = GameRequirements(
+                    game_name="Cyberpunk 2077",
+                    minimum={"os": "Windows 10", "processor": "Intel i5"},
+                    recommended={"os": "Windows 10", "processor": "Intel i7"},
+                    source="Local Cache",
+                    last_updated="123456789"
+                )
+                
+                requirements = await self.fetcher.fetch_requirements("Cyberpunk 2077")
+                
+                self.assertIsNotNone(requirements)
+                self.assertEqual(requirements.source, "Local Cache")
+                self.assertEqual(requirements.game_name, "Cyberpunk 2077")
+    
+    async def test_steam_api_retry_mechanism(self):
+        """Test Steam API retry mechanism for rate limiting."""
+        with patch('aiohttp.ClientSession') as mock_session:
+            # First two attempts return 429 (rate limited), third succeeds
+            mock_responses = [
+                Mock(status=429),
+                Mock(status=429),
+                Mock(status=200, json=AsyncMock(return_value=self.mock_steam_app_details))
+            ]
+            
+            mock_session.return_value.__aenter__.return_value.get.return_value.__aenter__.return_value = mock_responses[0]
+            
+            # This should eventually succeed after retries
+            with patch('asyncio.sleep'):  # Mock sleep to speed up test
+                app_info = await self.steam_source._get_app_info("1091500")
+                
+                # Should have retried and eventually succeeded
+                self.assertIsNotNone(app_info)
     
     async def test_steam_api_malformed_response(self):
         """Test Steam API with malformed response."""

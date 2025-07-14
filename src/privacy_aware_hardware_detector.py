@@ -115,11 +115,8 @@ class PrivacyAwareCache:
     """Privacy-focused cache for hardware detection results."""
     
     def __init__(self, cache_duration_hours: int = 24, max_age_hours: int = None):
-        # Support both parameter names for backward compatibility
-        if max_age_hours is not None:
-            cache_duration_hours = max_age_hours
-            
-        self.cache_duration = timedelta(hours=cache_duration_hours)
+        # Standardize all cache to 15-minute expiration
+        self.cache_duration = timedelta(minutes=15)
         self.cache_data = {}
         self.cache_timestamps = {}
         self.logger = logging.getLogger(__name__)
@@ -192,7 +189,8 @@ class PrivacyAwareHardwareDetector:
     
     def __init__(self, cache_duration_hours: int = 24):
         self.logger = logging.getLogger(__name__)
-        self.cache = PrivacyAwareCache(cache_duration_hours)
+        # All cache durations standardized to 15 minutes
+        self.cache = PrivacyAwareCache()
         
         # Initialize LLM analyzer lazily to avoid circular imports
         self.llm_analyzer = None
@@ -928,9 +926,9 @@ class PrivacyAwareHardwareDetector:
         """Get cache statistics."""
         return {
             'cache_entries': len(self.cache.cache_data),
-            'cache_duration_hours': self.cache.cache_duration.total_seconds() / 3600,
-            'oldest_entry_age': min(
-                [(datetime.now() - ts).total_seconds() / 3600 for ts in self.cache.cache_timestamps.values()],
+            'cache_duration_minutes': self.cache.cache_duration.total_seconds() / 60,
+            'oldest_entry_age_minutes': min(
+                [(datetime.now() - ts).total_seconds() / 60 for ts in self.cache.cache_timestamps.values()],
                 default=0
             )
         }

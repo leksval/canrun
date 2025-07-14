@@ -205,8 +205,8 @@ class TestLLMAnalysis(unittest.TestCase):
         """Test LLM analyzer initialization."""
         analyzer = GAssistLLMAnalyzer()
         self.assertIsNotNone(analyzer)
-        self.assertIsInstance(analyzer.cache_expiry_hours, int)
-        self.assertEqual(analyzer.cache_expiry_hours, 24)
+        # Test cache duration is 15 minutes
+        self.assertEqual(analyzer.cache_duration.total_seconds(), 15 * 60)
         self.assertIsInstance(analyzer.analysis_cache, dict)
     
     def test_llm_analysis_result_creation(self):
@@ -634,7 +634,8 @@ class TestPrivacyAwareLLMIntegration(unittest.TestCase):
         analyzer = GAssistLLMAnalyzer()
         
         # Verify cache expiry is configured
-        self.assertEqual(analyzer.cache_expiry_hours, 24)
+        # Verify cache duration is 15 minutes
+        self.assertEqual(analyzer.cache_duration.total_seconds(), 15 * 60)
         
         # Test cache cleanup functionality exists
         self.assertTrue(hasattr(analyzer, '_is_cache_expired'))

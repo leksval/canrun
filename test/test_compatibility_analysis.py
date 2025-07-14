@@ -47,13 +47,13 @@ async def test_compatibility_analysis():
             print(f"\n[TEST {i+1}] Analyzing compatibility for '{game}'...")
             
             # Fetch game requirements
-            requirements = await fetcher.fetch_game_requirements(game)
+            requirements = await fetcher.fetch_requirements(game)
             if not requirements:
                 print(f"  ⚠ No requirements found for {game}, skipping...")
                 continue
             
             # Analyze compatibility
-            compatibility = await analyzer.analyze_compatibility(hardware, requirements)
+            compatibility = analyzer.analyze_compatibility(game, hardware, requirements)
             
             # Display results
             print(f"  OK Compatibility Level: {compatibility['compatibility_level']}")

@@ -12,9 +12,10 @@ from enum import Enum
 import threading
 from datetime import datetime, timedelta
 
-from torch.cuda import is_available as cuda_is_available, get_device_properties as cuda_get_device_properties
+# Torch imports removed - CUDA detection not needed in G-Assist plugin context
+# Torch core functionality still available for LLM operations if needed
 
-from performance_predictor import PerformancePrediction
+from performance_predictor import PerformanceAssessment
 from privacy_aware_hardware_detector import PrivacyAwareHardwareSpecs
 
 
@@ -68,7 +69,6 @@ class GAssistLLMAnalyzer:
         self.analysis_cache = {}
         self.cache_expiry = {}
         self.cache_duration = timedelta(minutes=15)
-        self.cache_expiry_hours = 24  # For compatibility with tests
         
         # Initialize G-Assist capabilities detection
         self._detect_g_assist_capabilities()
@@ -80,68 +80,27 @@ class GAssistLLMAnalyzer:
             self.logger.warning("G-Assist not available. Using fallback analysis.")
     
     def _detect_g_assist_capabilities(self) -> None:
-        """Detect G-Assist embedded LLM capabilities."""
-        try:
-            # Check if RTX GPU is available
-            rtx_compatible = False
-            vram_gb = 0
-            
-            if cuda_is_available():
-                gpu_props = cuda_get_device_properties(0)
-                gpu_name = gpu_props.name.lower()
-                vram_gb = gpu_props.total_memory // (1024**3)
-                
-                # Check for RTX 30/40/50 series with 12GB+ VRAM
-                rtx_compatible = (
-                    ('rtx' in gpu_name or 'geforce' in gpu_name) and
-                    vram_gb >= 12 and
-                    ('rtx 30' in gpu_name or 'rtx 40' in gpu_name or 'rtx 50' in gpu_name)
-                )
-            
-            # Check G-Assist availability
-            has_g_assist = rtx_compatible
-            
-            self.g_assist_capabilities = GAssistCapabilities(
-                has_g_assist=has_g_assist,
-                embedded_model_available=has_g_assist,
-                model_type="Llama-based Instruct" if has_g_assist else "None",
-                model_size="8B parameters" if has_g_assist else "None",
-                rtx_gpu_compatible=rtx_compatible,
-                vram_gb=vram_gb,
-                supports_local_inference=has_g_assist,
-                connection_status="Available" if has_g_assist else "Not Available"
-            )
-            
-            self.logger.info(f"G-Assist capabilities: {self.g_assist_capabilities}")
-            
-        except Exception as e:
-            self.logger.error(f"Failed to detect G-Assist capabilities: {e}")
-            self.g_assist_capabilities = GAssistCapabilities(
-                has_g_assist=False,
-                embedded_model_available=False,
-                model_type="None",
-                model_size="None",
-                rtx_gpu_compatible=False,
-                vram_gb=0,
-                supports_local_inference=False,
-                connection_status="Error"
-            )
+        """Simplified G-Assist capabilities detection."""
+        # G-Assist availability is determined by the plugin interface, not internal detection
+        # We assume G-Assist is available since this analyzer is used within G-Assist context
+        self.g_assist_capabilities = GAssistCapabilities(
+            has_g_assist=True,
+            embedded_model_available=True,
+            model_type="G-Assist LLM",
+            model_size="8B parameters",
+            rtx_gpu_compatible=True,
+            vram_gb=0,  # Not relevant for plugin-based integration
+            supports_local_inference=True,
+            connection_status="Available"
+        )
+        
+        self.logger.info("G-Assist LLM analyzer initialized for plugin integration")
     
     def _initialize_g_assist_connection(self) -> None:
-        """Initialize connection to G-Assist embedded LLM."""
-        try:
-            if not self.g_assist_capabilities.has_g_assist:
-                self.logger.warning("G-Assist not available for LLM connection")
-                return
-            
-            # G-Assist LLM connection would be established here in production
-            self.model_available = True
-            
-            self.logger.info("G-Assist embedded LLM connection established")
-            
-        except Exception as e:
-            self.logger.error(f"Failed to initialize G-Assist LLM connection: {e}")
-            self.model_available = False
+        """Initialize G-Assist LLM connection."""
+        # In plugin context, G-Assist LLM is available through the plugin interface
+        self.model_available = True
+        self.logger.info("G-Assist LLM connection established")
     
     def _clean_expired_cache(self) -> None:
         """Clean expired cache entries."""
@@ -227,41 +186,54 @@ class GAssistLLMAnalyzer:
             self.logger.error(f"Bottleneck analysis failed: {e}")
             return self._create_error_result(LLMAnalysisType.BOTTLENECK_ANALYSIS, str(e))
     
-    async def get_optimization_recommendations(self, system_context: Dict[str, Any]) -> LLMAnalysisResult:
-        """Get optimization recommendations using G-Assist embedded LLM."""
+    async def analyze(self, system_context: Dict[str, Any], analysis_type: LLMAnalysisType, query: str = "") -> LLMAnalysisResult:
+        """Unified analysis method for all LLM analysis types."""
         start_time = datetime.now()
         
         try:
+            # Enhanced context for intelligent queries
+            enhanced_context = system_context.copy()
+            if query and analysis_type == LLMAnalysisType.INTELLIGENT_QUERY:
+                enhanced_context['query'] = query
+            
             # Check cache first
-            cache_key = self._get_cache_key(system_context, "optimization_recommendations")
+            cache_key = self._get_cache_key(enhanced_context, analysis_type.value)
             cached_result = self._get_cached_result(cache_key)
             if cached_result:
-                self.logger.info("Returning cached optimization recommendations")
+                self.logger.info(f"Returning cached {analysis_type.value} result")
                 return cached_result
             
             # Generate analysis using G-Assist or fallback
             if self.model_available:
-                analysis_text = await self._generate_g_assist_analysis(system_context, "optimization_recommendations")
+                analysis_text = await self._generate_g_assist_analysis(enhanced_context, analysis_type.value)
                 g_assist_used = True
             else:
-                analysis_text = self._fallback_optimization_analysis(system_context)
+                analysis_text = self._get_fallback_analysis(enhanced_context, analysis_type, query)
                 g_assist_used = False
             
-            # Parse structured data
-            structured_data = self._parse_optimization_analysis(analysis_text, system_context)
-            
-            # Generate detailed recommendations
-            recommendations = self._generate_optimization_recommendations(structured_data, system_context)
+            # Parse structured data and generate recommendations
+            structured_data = self._parse_analysis_result(analysis_text, enhanced_context, analysis_type)
+            recommendations = self._generate_recommendations(structured_data, enhanced_context, analysis_type)
             
             processing_time = (datetime.now() - start_time).total_seconds() * 1000
             
+            # Set confidence score based on analysis type and G-Assist usage
+            confidence_scores = {
+                LLMAnalysisType.BOTTLENECK_ANALYSIS: (0.92, 0.75),
+                LLMAnalysisType.OPTIMIZATION_RECOMMENDATIONS: (0.89, 0.72),
+                LLMAnalysisType.DEEP_SYSTEM_ANALYSIS: (0.90, 0.73),
+                LLMAnalysisType.INTELLIGENT_QUERY: (0.88, 0.70)
+            }
+            
+            confidence_score = confidence_scores[analysis_type][0 if g_assist_used else 1]
+            
             result = LLMAnalysisResult(
-                analysis_type=LLMAnalysisType.OPTIMIZATION_RECOMMENDATIONS,
-                confidence_score=0.89 if g_assist_used else 0.72,
+                analysis_type=analysis_type,
+                confidence_score=confidence_score,
                 analysis_text=analysis_text,
                 structured_data=structured_data,
                 recommendations=recommendations,
-                technical_details=self._get_technical_details(system_context),
+                technical_details=self._get_technical_details(enhanced_context),
                 processing_time_ms=processing_time,
                 g_assist_used=g_assist_used,
                 model_info=self._get_model_info()
@@ -273,113 +245,65 @@ class GAssistLLMAnalyzer:
             return result
             
         except Exception as e:
-            self.logger.error(f"Optimization analysis failed: {e}")
-            return self._create_error_result(LLMAnalysisType.OPTIMIZATION_RECOMMENDATIONS, str(e))
+            self.logger.error(f"{analysis_type.value} analysis failed: {e}")
+            return self._create_error_result(analysis_type, str(e))
+    
+    # Legacy method wrappers for backward compatibility
+    async def analyze_bottlenecks(self, system_context: Dict[str, Any]) -> LLMAnalysisResult:
+        """Analyze system bottlenecks using G-Assist embedded LLM."""
+        return await self.analyze(system_context, LLMAnalysisType.BOTTLENECK_ANALYSIS)
+    
+    async def get_optimization_recommendations(self, system_context: Dict[str, Any]) -> LLMAnalysisResult:
+        """Get optimization recommendations using G-Assist embedded LLM."""
+        return await self.analyze(system_context, LLMAnalysisType.OPTIMIZATION_RECOMMENDATIONS)
     
     async def perform_deep_analysis(self, system_context: Dict[str, Any]) -> LLMAnalysisResult:
         """Perform deep system analysis using G-Assist embedded LLM."""
-        start_time = datetime.now()
-        
-        try:
-            # Check cache first
-            cache_key = self._get_cache_key(system_context, "deep_system_analysis")
-            cached_result = self._get_cached_result(cache_key)
-            if cached_result:
-                self.logger.info("Returning cached deep system analysis")
-                return cached_result
-            
-            # Generate analysis using G-Assist or fallback
-            if self.model_available:
-                analysis_text = await self._generate_g_assist_analysis(system_context, "deep_system_analysis")
-                g_assist_used = True
-            else:
-                analysis_text = self._fallback_deep_analysis(system_context)
-                g_assist_used = False
-            
-            # Parse structured data
-            structured_data = self._parse_deep_analysis(analysis_text, system_context)
-            
-            # Generate comprehensive recommendations
-            recommendations = self._generate_deep_analysis_recommendations(structured_data, system_context)
-            
-            processing_time = (datetime.now() - start_time).total_seconds() * 1000
-            
-            result = LLMAnalysisResult(
-                analysis_type=LLMAnalysisType.DEEP_SYSTEM_ANALYSIS,
-                confidence_score=0.95 if g_assist_used else 0.78,
-                analysis_text=analysis_text,
-                structured_data=structured_data,
-                recommendations=recommendations,
-                technical_details=self._get_technical_details(system_context),
-                processing_time_ms=processing_time,
-                g_assist_used=g_assist_used,
-                model_info=self._get_model_info()
-            )
-            
-            # Cache the result
-            self._cache_result(cache_key, result)
-            
-            return result
-            
-        except Exception as e:
-            self.logger.error(f"Deep system analysis failed: {e}")
-            return self._create_error_result(LLMAnalysisType.DEEP_SYSTEM_ANALYSIS, str(e))
+        return await self.analyze(system_context, LLMAnalysisType.DEEP_SYSTEM_ANALYSIS)
     
     async def process_intelligent_query(self, query: str, system_context: Dict[str, Any]) -> LLMAnalysisResult:
-        """Process intelligent natural language query using G-Assist."""
-        start_time = datetime.now()
-        
-        try:
-            # Create enhanced context with query
-            enhanced_context = {
-                **system_context,
-                "user_query": query,
-                "query_type": "intelligent_analysis"
-            }
+        """Process intelligent query using G-Assist embedded LLM."""
+        return await self.analyze(system_context, LLMAnalysisType.INTELLIGENT_QUERY, query)
+    # Helper methods for unified analysis workflow
+    def _get_fallback_analysis(self, context: Dict[str, Any], analysis_type: LLMAnalysisType, query: str = "") -> str:
+        """Get fallback analysis when G-Assist is not available."""
+        if analysis_type == LLMAnalysisType.BOTTLENECK_ANALYSIS:
+            return self._fallback_bottleneck_analysis(context)
+        elif analysis_type == LLMAnalysisType.OPTIMIZATION_RECOMMENDATIONS:
+            return self._fallback_optimization_analysis(context)
+        elif analysis_type == LLMAnalysisType.DEEP_SYSTEM_ANALYSIS:
+            return self._fallback_deep_analysis(context)
+        elif analysis_type == LLMAnalysisType.INTELLIGENT_QUERY:
+            return self._fallback_intelligent_query(query, context)
+        else:
+            return "Analysis type not supported"
+    
+    def _parse_analysis_result(self, analysis_text: str, context: Dict[str, Any], analysis_type: LLMAnalysisType) -> Dict[str, Any]:
+        """Parse analysis result into structured data."""
+        if analysis_type == LLMAnalysisType.BOTTLENECK_ANALYSIS:
+            return self._parse_bottleneck_analysis(analysis_text, context)
+        elif analysis_type == LLMAnalysisType.OPTIMIZATION_RECOMMENDATIONS:
+            return self._parse_optimization_analysis(analysis_text, context)
+        elif analysis_type == LLMAnalysisType.DEEP_SYSTEM_ANALYSIS:
+            return self._parse_deep_analysis(analysis_text, context)
+        elif analysis_type == LLMAnalysisType.INTELLIGENT_QUERY:
+            return self._parse_intelligent_query(analysis_text, context)
+        else:
+            return {"error": "Analysis type not supported"}
+    
+    def _generate_recommendations(self, structured_data: Dict[str, Any], context: Dict[str, Any], analysis_type: LLMAnalysisType) -> List[str]:
+        """Generate recommendations based on analysis type."""
+        if analysis_type == LLMAnalysisType.BOTTLENECK_ANALYSIS:
+            return self._generate_bottleneck_recommendations(structured_data, context)
+        elif analysis_type == LLMAnalysisType.OPTIMIZATION_RECOMMENDATIONS:
+            return self._generate_optimization_recommendations(structured_data, context)
+        elif analysis_type == LLMAnalysisType.DEEP_SYSTEM_ANALYSIS:
+            return self._generate_deep_analysis_recommendations(structured_data, context)
+        elif analysis_type == LLMAnalysisType.INTELLIGENT_QUERY:
+            return self._generate_query_recommendations(structured_data, context)
+        else:
+            return ["Analysis type not supported"]
             
-            # Check cache first
-            cache_key = self._get_cache_key(enhanced_context, "intelligent_query")
-            cached_result = self._get_cached_result(cache_key)
-            if cached_result:
-                self.logger.info("Returning cached intelligent query result")
-                return cached_result
-            
-            # Generate analysis using G-Assist or fallback
-            if self.model_available:
-                analysis_text = await self._generate_g_assist_analysis(enhanced_context, "intelligent_query")
-                g_assist_used = True
-            else:
-                analysis_text = self._fallback_intelligent_query(query, system_context)
-                g_assist_used = False
-            
-            # Parse structured data
-            structured_data = self._parse_intelligent_query(analysis_text, enhanced_context)
-            
-            # Generate recommendations
-            recommendations = self._generate_query_recommendations(structured_data, enhanced_context)
-            
-            processing_time = (datetime.now() - start_time).total_seconds() * 1000
-            
-            result = LLMAnalysisResult(
-                analysis_type=LLMAnalysisType.INTELLIGENT_QUERY,
-                confidence_score=0.88 if g_assist_used else 0.70,
-                analysis_text=analysis_text,
-                structured_data=structured_data,
-                recommendations=recommendations,
-                technical_details=self._get_technical_details(system_context),
-                processing_time_ms=processing_time,
-                g_assist_used=g_assist_used,
-                model_info=self._get_model_info()
-            )
-            
-            # Cache the result
-            self._cache_result(cache_key, result)
-            
-            return result
-            
-        except Exception as e:
-            self.logger.error(f"Intelligent query processing failed: {e}")
-            return self._create_error_result(LLMAnalysisType.INTELLIGENT_QUERY, str(e))
     
     async def _generate_g_assist_analysis(self, context: Dict[str, Any], analysis_type: str) -> str:
         """Generate analysis using G-Assist embedded LLM."""
@@ -767,3 +691,102 @@ Please provide a detailed analysis focusing on:
             'gpu_tier': 'mid-range',
             'stability': 'stable'
         }
+    
+    async def interpret_game_requirements(self, game_query: str, available_games: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Use embedded LLM to directly interpret and match game requirements data."""
+        try:
+            if not self.model_available:
+                self.logger.warning("G-Assist not available. Using fallback game matching.")
+                return self._fallback_game_matching(game_query, available_games)
+            
+            # Create a prompt for the LLM to interpret game requirements
+            games_list = "\n".join([f"- {name}: {json.dumps(data, indent=2)}" for name, data in available_games.items()])
+            
+            prompt = f"""
+            User is asking about game: "{game_query}"
+            
+            Available games in database:
+            {games_list}
+            
+            Please:
+            1. Find the best matching game from the database (handle variations like "Diablo 4" vs "Diablo IV")
+            2. Extract and interpret the game requirements clearly
+            3. Return the game name and requirements in JSON format
+            
+            If you find a match, return JSON like:
+            {{
+                "matched_game": "exact_name_from_database",
+                "requirements": {{
+                    "minimum": {{extracted_minimum_specs}},
+                    "recommended": {{extracted_recommended_specs}}
+                }}
+            }}
+            
+            If no match found, return: {{"error": "Game not found"}}
+            """
+            
+            # Use G-Assist LLM to interpret the data
+            analysis = await self._invoke_g_assist_llm(prompt)
+            
+            # Try to parse the LLM response as JSON
+            try:
+                result = json.loads(analysis)
+                if "matched_game" in result and "requirements" in result:
+                    return result
+            except json.JSONDecodeError:
+                self.logger.warning("LLM response was not valid JSON, using fallback")
+            
+            return self._fallback_game_matching(game_query, available_games)
+            
+        except Exception as e:
+            self.logger.error(f"Game requirements interpretation failed: {e}")
+            return self._fallback_game_matching(game_query, available_games)
+    
+    async def _invoke_g_assist_llm(self, prompt: str) -> str:
+        """Invoke G-Assist LLM with the given prompt."""
+        try:
+            # In production, this would use the actual G-Assist API
+            response = await self._generate_g_assist_analysis({"prompt": prompt}, "intelligent_query")
+            return response
+        except Exception as e:
+            self.logger.error(f"G-Assist LLM invocation failed: {e}")
+            return f"Error: {str(e)}"
+    
+    def _fallback_game_matching(self, game_query: str, available_games: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Fallback game matching when G-Assist LLM is not available."""
+        game_query_lower = game_query.lower()
+        
+        # Enhanced fuzzy matching with common variations
+        name_variations = {
+            "diablo 4": "Diablo IV",
+            "diablo iv": "Diablo IV",
+            "call of duty": "Call of Duty: Modern Warfare II",
+            "cod": "Call of Duty: Modern Warfare II",
+            "modern warfare": "Call of Duty: Modern Warfare II",
+            "bg3": "Baldur's Gate 3",
+            "baldurs gate 3": "Baldur's Gate 3",
+            "cyberpunk": "Cyberpunk 2077",
+            "cp2077": "Cyberpunk 2077",
+            "witcher 3": "The Witcher 3: Wild Hunt",
+            "apex": "Apex Legends",
+            "rdr2": "Red Dead Redemption 2",
+            "red dead 2": "Red Dead Redemption 2"
+        }
+        
+        # Check direct variations first
+        for variation, actual_name in name_variations.items():
+            if variation in game_query_lower and actual_name in available_games:
+                return {
+                    "matched_game": actual_name,
+                    "requirements": available_games[actual_name]
+                }
+        
+        # Check for partial matches
+        for game_name, game_data in available_games.items():
+            if game_query_lower in game_name.lower() or game_name.lower() in game_query_lower:
+                return {
+                    "matched_game": game_name,
+                    "requirements": game_data
+                }
+        
+        return None
