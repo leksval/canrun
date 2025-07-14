@@ -33,7 +33,7 @@ requires-python = ">=3.8.1"
 dependencies = [
     # System hardware detection
     "psutil>=5.9.0",
-    "GPUtil>=1.4.0",
+    "gputil>=1.4.0",
     "nvidia-ml-py>=12.535.108",
     "py-cpuinfo>=9.0.0",
     "pynvml>=11.5.0",

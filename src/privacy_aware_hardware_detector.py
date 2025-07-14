@@ -17,11 +17,42 @@ import re
 
 # Import required dependencies (specified in requirements.txt)
 import psutil
-import GPUtil
 import cpuinfo
 import pynvml
 import winreg
 import wmi
+
+# Handle GPUtil import with distutils compatibility for PyInstaller
+try:
+    import GPUtil
+    GPUTIL_AVAILABLE = True
+except ImportError as e:
+    if "distutils" in str(e):
+        # GPUtil requires distutils which was removed in Python 3.12
+        # Create a compatibility shim for PyInstaller
+        import sys
+        import shutil
+        
+        class DistutilsSpawn:
+            @staticmethod
+            def find_executable(name):
+                return shutil.which(name)
+        
+        # Inject distutils.spawn compatibility
+        if 'distutils' not in sys.modules:
+            import types
+            distutils_module = types.ModuleType('distutils')
+            distutils_module.spawn = DistutilsSpawn()
+            sys.modules['distutils'] = distutils_module
+            sys.modules['distutils.spawn'] = DistutilsSpawn()
+        
+        try:
+            import GPUtil
+            GPUTIL_AVAILABLE = True
+        except ImportError:
+            GPUTIL_AVAILABLE = False
+    else:
+        GPUTIL_AVAILABLE = False
 
 
 
@@ -242,15 +273,16 @@ class PrivacyAwareHardwareDetector:
         except Exception:
             pass
         
-        # Try GPUtil as fallback
-        try:
-            gpus = GPUtil.getGPUs()
-            for gpu in gpus:
-                if 'NVIDIA' in gpu.name.upper():
-                    gpu_name = gpu.name.upper()
-                    return 'RTX' in gpu_name or 'GTX' in gpu_name
-        except Exception:
-            pass
+        # Try GPUtil as fallback if available
+        if GPUTIL_AVAILABLE:
+            try:
+                gpus = GPUtil.getGPUs()
+                for gpu in gpus:
+                    if 'NVIDIA' in gpu.name.upper():
+                        gpu_name = gpu.name.upper()
+                        return 'RTX' in gpu_name or 'GTX' in gpu_name
+            except Exception:
+                pass
         
         # Try registry detection as final fallback
         try:
@@ -389,29 +421,32 @@ class PrivacyAwareHardwareDetector:
         except Exception as e:
             self.logger.warning(f"NVIDIA ML detection failed: {e}")
         
-        # Fallback to GPUtil
-        try:
-            gpus = GPUtil.getGPUs()
-            assert gpus, "No GPUs found"
-            
-            gpu = gpus[0]  # Primary GPU
-            gpu_name = gpu.name
-            
-            if 'NVIDIA' in gpu_name.upper():
-                gpu_info.update({
-                    'name': self._clean_gpu_name(gpu_name),
-                    'vram_gb': int(gpu.memoryTotal / 1024),  # Convert MB to GB
-                    'is_nvidia': True,
-                    'supports_rtx': 'RTX' in gpu_name.upper(),
-                    'supports_dlss': 'RTX' in gpu_name.upper(),
-                    'driver_version': 'Unknown'
-                })
+        # Fallback to GPUtil if available
+        if GPUTIL_AVAILABLE:
+            try:
+                gpus = GPUtil.getGPUs()
+                assert gpus, "No GPUs found"
                 
-                self.logger.info(f"NVIDIA GPU detected via GPUtil: {gpu_info['name']}")
-                return gpu_info
-            
-        except Exception as e:
-            self.logger.warning(f"GPUtil detection failed: {e}")
+                gpu = gpus[0]  # Primary GPU
+                gpu_name = gpu.name
+                
+                if 'NVIDIA' in gpu_name.upper():
+                    gpu_info.update({
+                        'name': self._clean_gpu_name(gpu_name),
+                        'vram_gb': int(gpu.memoryTotal / 1024),  # Convert MB to GB
+                        'is_nvidia': True,
+                        'supports_rtx': 'RTX' in gpu_name.upper(),
+                        'supports_dlss': 'RTX' in gpu_name.upper(),
+                        'driver_version': 'Unknown'
+                    })
+                    
+                    self.logger.info(f"NVIDIA GPU detected via GPUtil: {gpu_info['name']}")
+                    return gpu_info
+                
+            except Exception as e:
+                self.logger.warning(f"GPUtil detection failed: {e}")
+        else:
+            self.logger.warning("GPUtil not available - skipping GPUtil detection")
         
         # Windows Registry fallback
         if os.name == 'nt':
