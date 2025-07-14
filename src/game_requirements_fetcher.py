@@ -71,6 +71,7 @@ class SteamAPISource(DataSource):
     def __init__(self, llm_analyzer=None):
         self.base_url = "https://store.steampowered.com/api"
         self.search_url = "https://steamcommunity.com/actions/SearchApps"
+        self.store_search_url = "https://store.steampowered.com/search/suggest"
         self.logger = logging.getLogger(__name__)
         self.llm_analyzer = llm_analyzer
     
@@ -96,7 +97,57 @@ class SteamAPISource(DataSource):
             return None
     
     async def _search_game(self, game_name: str) -> Optional[str]:
-        """Search for a game and return its Steam ID."""
+        """Search for a game and return its Steam ID using multiple search methods."""
+        self.logger.debug(f"Searching Steam for game: {game_name}")
+        
+        # Try multiple search methods in order of reliability
+        search_methods = [
+            self._search_steam_store_suggest,
+            self._search_steam_community,
+            self._search_steam_store_direct
+        ]
+        
+        for method in search_methods:
+            try:
+                steam_id = await method(game_name)
+                if steam_id:
+                    self.logger.info(f"Found Steam ID {steam_id} for '{game_name}' using {method.__name__}")
+                    return steam_id
+            except Exception as e:
+                self.logger.debug(f"Search method {method.__name__} failed: {e}")
+                continue
+        
+        self.logger.warning(f"All Steam search methods failed for '{game_name}'")
+        return None
+    
+    async def _search_steam_store_suggest(self, game_name: str) -> Optional[str]:
+        """Search using Steam Store suggest API."""
+        try:
+            async with aiohttp.ClientSession() as session:
+                params = {
+                    'term': game_name,
+                    'f': 'games',
+                    'cc': 'US',
+                    'l': 'english'
+                }
+                
+                async with session.get(self.store_search_url, params=params) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        if isinstance(data, list) and len(data) > 0:
+                            # Return the first match's app ID
+                            app_data = data[0]
+                            if 'id' in app_data:
+                                return str(app_data['id'])
+                            elif 'appid' in app_data:
+                                return str(app_data['appid'])
+        except Exception as e:
+            self.logger.debug(f"Steam store suggest search failed: {e}")
+        
+        return None
+    
+    async def _search_steam_community(self, game_name: str) -> Optional[str]:
+        """Search using Steam Community API."""
         try:
             async with aiohttp.ClientSession() as session:
                 params = {
@@ -107,14 +158,13 @@ class SteamAPISource(DataSource):
                 async with session.get(self.search_url, params=params) as response:
                     if response.status == 200:
                         try:
-                            # Try to parse as JSON first (Steam Community API)
+                            # Try to parse as JSON first
                             data = await response.json()
                             if isinstance(data, list) and len(data) > 0:
-                                # Return the first match's app ID
                                 app_data = data[0]
                                 if 'appid' in app_data:
                                     return str(app_data['appid'])
-                        except Exception as json_e:
+                        except Exception:
                             # Fallback to text parsing if JSON fails
                             text = await response.text()
                             
@@ -126,7 +176,7 @@ class SteamAPISource(DataSource):
                                     Return only the numeric app ID, nothing else.
                                     
                                     Content:
-                                    {text[:2000]}  # Limit to first 2000 chars for LLM processing
+                                    {text[:2000]}
                                     """
                                     
                                     app_id = await self.llm_analyzer.analyze_text(prompt)
@@ -135,18 +185,49 @@ class SteamAPISource(DataSource):
                                 except Exception as e:
                                     self.logger.debug(f"LLM parsing failed: {e}")
                             
-                            # Fallback regex parsing for HTML format
-                            match = re.search(r'data-ds-appid="(\d+)"', text)
-                            if match:
-                                return match.group(1)
+                            # Fallback regex parsing
+                            patterns = [
+                                r'data-ds-appid="(\d+)"',
+                                r'"appid":\s*(\d+)',
+                                r'app/(\d+)/',
+                                r'appid=(\d+)'
+                            ]
                             
-                            # Try to find JSON-like app ID patterns
-                            match = re.search(r'"appid":\s*(\d+)', text)
+                            for pattern in patterns:
+                                match = re.search(pattern, text)
+                                if match:
+                                    return match.group(1)
+                                    
+        except Exception as e:
+            self.logger.debug(f"Steam community search failed: {e}")
+        
+        return None
+    
+    async def _search_steam_store_direct(self, game_name: str) -> Optional[str]:
+        """Direct search on Steam store page."""
+        try:
+            # This is a more aggressive search method
+            search_url = f"https://store.steampowered.com/search/?term={game_name.replace(' ', '+')}"
+            
+            async with aiohttp.ClientSession() as session:
+                async with session.get(search_url) as response:
+                    if response.status == 200:
+                        text = await response.text()
+                        
+                        # Look for app IDs in the search results
+                        patterns = [
+                            r'data-ds-appid="(\d+)"',
+                            r'app/(\d+)/',
+                            r'appid=(\d+)'
+                        ]
+                        
+                        for pattern in patterns:
+                            match = re.search(pattern, text)
                             if match:
                                 return match.group(1)
                                 
         except Exception as e:
-            self.logger.debug(f"Steam search failed: {e}")
+            self.logger.debug(f"Steam store direct search failed: {e}")
         
         return None
     
@@ -453,14 +534,31 @@ class LocalCacheSource(DataSource):
             if 'games' not in self._cache:
                 self._cache['games'] = {}
             
+            # Convert GameRequirements dataclass back to the expected cache format
             self._cache['games'][requirements.game_name] = {
-                'minimum': requirements.minimum,
-                'recommended': requirements.recommended
+                'minimum': {
+                    'processor': requirements.minimum_cpu,
+                    'graphics': requirements.minimum_gpu,
+                    'memory': f"{requirements.minimum_ram_gb} GB",
+                    'storage': f"{requirements.minimum_storage_gb} GB",
+                    'directx': requirements.minimum_directx,
+                    'os': requirements.minimum_os
+                },
+                'recommended': {
+                    'processor': requirements.recommended_cpu,
+                    'graphics': requirements.recommended_gpu,
+                    'memory': f"{requirements.recommended_ram_gb} GB",
+                    'storage': f"{requirements.recommended_storage_gb} GB",
+                    'directx': requirements.recommended_directx,
+                    'os': requirements.recommended_os
+                }
             }
             
             # Save to file
             with open(self.cache_path, 'w') as f:
                 json.dump(self._cache, f, indent=2)
+            
+            self.logger.debug(f"Successfully cached requirements for {requirements.game_name}")
             
         except Exception as e:
             self.logger.error(f"Failed to save to cache: {e}")
@@ -481,108 +579,193 @@ class GameRequirementsFetcher:
     
     async def fetch_requirements(self, game_name: str) -> Optional[GameRequirements]:
         """
-        Fetch game requirements with Steam API prioritization and optimized fuzzy matching.
-        Uses the optimized fuzzy matcher as the primary LLM tool for intelligent game matching.
+        Fetch game requirements with Steam API prioritization and LLM-enhanced parsing.
+        Steam API is the primary source, with intelligent fallback to local cache.
         """
         
         try:
-            # Step 1: Gather candidates from all sources
-            steam_candidates = []
-            cache_candidates = list(self.cache_source._cache.get('games', {}).keys())
+            self.logger.info(f"Fetching requirements for '{game_name}' - Steam API priority enabled")
             
-            # Try to get Steam API candidates (if available)
+            # Step 1: Try Steam API first (primary source)
             try:
-                # For now, we'll use cache candidates as Steam isn't implemented fully
-                # In production, this would query Steam API for game search results
-                pass
+                steam_requirements = await self.steam_source.fetch(game_name)
+                if steam_requirements:
+                    self.logger.info(f"Successfully fetched '{game_name}' from Steam API")
+                    
+                    # Cache the Steam result for future use
+                    await self._cache_requirements(steam_requirements)
+                    return steam_requirements
+                else:
+                    self.logger.info(f"Steam API returned no results for '{game_name}', trying LLM-enhanced search")
+                    
+                    # Try LLM-enhanced game matching with Steam
+                    if self.llm_analyzer:
+                        enhanced_result = await self._llm_enhanced_steam_search(game_name)
+                        if enhanced_result:
+                            await self._cache_requirements(enhanced_result)
+                            return enhanced_result
+                            
             except Exception as e:
-                self.logger.debug(f"Steam API search failed: {e}")
+                self.logger.warning(f"Steam API failed for '{game_name}': {e}")
             
-            # Step 2: Use optimized fuzzy matcher with Steam prioritization
-            if steam_candidates or cache_candidates:
-                match_result = await game_fuzzy_matcher.match_with_steam_fallback(
-                    game_name, steam_candidates, cache_candidates
-                )
-                
-                if match_result:
-                    matched_name, confidence, source_type = match_result
-                    self.logger.info(f"Optimized fuzzy match: '{game_name}' -> '{matched_name}' (confidence: {confidence:.3f}, source: {source_type})")
-                    
-                    # Fetch the requirements for the matched game
-                    if source_type == "Local Cache":
-                        games = self.cache_source._cache.get('games', {})
-                        if matched_name in games:
-                            game_data = games[matched_name]
-                            minimum = game_data.get('minimum', {})
-                            recommended = game_data.get('recommended', {})
-                            
-                            # Parse storage values
-                            def parse_storage(value: str) -> int:
-                                if not value:
-                                    return 0
-                                match = re.search(r'(\d+\.?\d*)', str(value))
-                                return int(float(match.group(1))) if match else 0
-                            
-                            # Parse RAM values
-                            def parse_ram(value: str) -> int:
-                                if not value:
-                                    return 0
-                                match = re.search(r'(\d+)', str(value))
-                                return int(match.group(1)) if match else 0
-                            
-                            return GameRequirements(
-                                game_name=matched_name,
-                                minimum_cpu=minimum.get('processor', 'Unknown'),
-                                minimum_gpu=minimum.get('graphics', 'Unknown'),
-                                minimum_ram_gb=parse_ram(minimum.get('memory', '0')),
-                                minimum_vram_gb=0,
-                                minimum_storage_gb=parse_storage(minimum.get('storage', '0')),
-                                minimum_directx=minimum.get('directx', 'DirectX 11'),
-                                minimum_os=minimum.get('os', 'Windows 10'),
-                                recommended_cpu=recommended.get('processor', 'Unknown'),
-                                recommended_gpu=recommended.get('graphics', 'Unknown'),
-                                recommended_ram_gb=parse_ram(recommended.get('memory', '0')),
-                                recommended_vram_gb=0,
-                                recommended_storage_gb=parse_storage(recommended.get('storage', '0')),
-                                recommended_directx=recommended.get('directx', 'DirectX 12'),
-                                recommended_os=recommended.get('os', 'Windows 11'),
-                                source='Local Cache (Fuzzy Matched)',
-                                last_updated=str(int(time.time()))
-                            )
-                    
-                    # For Steam API results, would fetch from Steam here
-                    # elif source_type == "Steam API":
-                    #     return await self.steam_source.fetch(matched_name)
+            # Step 2: Fallback to local cache with fuzzy matching
+            self.logger.info(f"Trying local cache with fuzzy matching for '{game_name}'")
+            cache_requirements = await self.cache_source.fetch(game_name)
+            if cache_requirements:
+                self.logger.info(f"Found '{game_name}' in local cache")
+                return cache_requirements
             
-            # Step 3: Fallback to traditional source fetching if fuzzy matching fails
-            self.logger.info(f"Fuzzy matching failed for '{game_name}', trying direct source fetching")
+            # Step 3: Try LLM-enhanced cache interpretation
+            if self.llm_analyzer:
+                self.logger.info(f"Trying LLM-enhanced cache interpretation for '{game_name}'")
+                llm_result = await self._llm_enhanced_cache_search(game_name)
+                if llm_result:
+                    return llm_result
             
-            for source in self.sources:
-                try:
-                    requirements = await source.fetch(game_name)
-                    if requirements:
-                        self.logger.info(f"Found requirements for {game_name} from {requirements.source}")
-                        
-                        # Cache the result if it's from a remote source
-                        if requirements.source != 'Local Cache':
-                            await self._cache_requirements(requirements)
-                        
-                        return requirements
-                except Exception as e:
-                    self.logger.error(f"Source {source.__class__.__name__} failed: {e}")
-            
-            self.logger.warning(f"No requirements found for '{game_name}' - tried fuzzy matching and direct fetching")
+            self.logger.warning(f"No requirements found for '{game_name}' after trying all sources")
             return None
             
         except Exception as e:
             self.logger.error(f"fetch_requirements failed for '{game_name}': {e}")
             return None
     
+    async def _llm_enhanced_steam_search(self, game_name: str) -> Optional[GameRequirements]:
+        """Use LLM to enhance Steam search with intelligent game name variations."""
+        try:
+            if not self.llm_analyzer:
+                return None
+                
+            self.logger.info(f"Using LLM to enhance Steam search for '{game_name}'")
+            
+            # Use LLM to generate game name variations
+            variations = await self._generate_game_name_variations(game_name)
+            
+            # Try each variation with Steam API
+            for variation in variations:
+                try:
+                    result = await self.steam_source.fetch(variation)
+                    if result:
+                        self.logger.info(f"LLM-enhanced Steam search successful: '{game_name}' -> '{variation}'")
+                        # Update the game name to the original query
+                        result.game_name = game_name
+                        return result
+                except Exception as e:
+                    self.logger.debug(f"Steam search failed for variation '{variation}': {e}")
+                    continue
+            
+            return None
+            
+        except Exception as e:
+            self.logger.error(f"LLM-enhanced Steam search failed: {e}")
+            return None
+    
+    async def _llm_enhanced_cache_search(self, game_name: str) -> Optional[GameRequirements]:
+        """Use LLM to intelligently search and interpret cache data."""
+        try:
+            if not self.llm_analyzer:
+                return None
+                
+            self.logger.info(f"Using LLM for intelligent cache interpretation of '{game_name}'")
+            
+            # Get all available games from cache
+            available_games = self.cache_source._cache.get('games', {})
+            if not available_games:
+                return None
+            
+            # Use LLM to interpret and match game requirements
+            llm_result = await self.llm_analyzer.interpret_game_requirements(game_name, available_games)
+            
+            if llm_result and 'matched_game' in llm_result:
+                matched_name = llm_result['matched_game']
+                
+                if matched_name in available_games:
+                    game_data = available_games[matched_name]
+                    minimum = game_data.get('minimum', {})
+                    recommended = game_data.get('recommended', {})
+                    
+                    self.logger.info(f"LLM successfully matched '{game_name}' to '{matched_name}'")
+                    
+                    return GameRequirements(
+                        game_name=game_name,  # Use original query name
+                        minimum_cpu=minimum.get('processor', 'Unknown'),
+                        minimum_gpu=minimum.get('graphics', 'Unknown'),
+                        minimum_ram_gb=self._parse_ram_value(minimum.get('memory', '0')),
+                        minimum_vram_gb=0,
+                        minimum_storage_gb=self._parse_storage_value(minimum.get('storage', '0')),
+                        minimum_directx=minimum.get('directx', 'DirectX 11'),
+                        minimum_os=minimum.get('os', 'Windows 10'),
+                        recommended_cpu=recommended.get('processor', 'Unknown'),
+                        recommended_gpu=recommended.get('graphics', 'Unknown'),
+                        recommended_ram_gb=self._parse_ram_value(recommended.get('memory', '0')),
+                        recommended_vram_gb=0,
+                        recommended_storage_gb=self._parse_storage_value(recommended.get('storage', '0')),
+                        recommended_directx=recommended.get('directx', 'DirectX 12'),
+                        recommended_os=recommended.get('os', 'Windows 11'),
+                        source='Local Cache (LLM Enhanced)',
+                        last_updated=str(int(time.time()))
+                    )
+            
+            return None
+            
+        except Exception as e:
+            self.logger.error(f"LLM-enhanced cache search failed: {e}")
+            return None
+    
+    async def _generate_game_name_variations(self, game_name: str) -> List[str]:
+        """Generate intelligent game name variations using LLM."""
+        try:
+            if not self.llm_analyzer:
+                return [game_name]
+            
+            # Create prompt for LLM to generate variations
+            prompt = f"""
+            Generate alternative names and variations for the game: "{game_name}"
+            
+            Include common variations like:
+            - Roman numeral conversions (4 ↔ IV, 2 ↔ II)
+            - Subtitle variations
+            - Abbreviations and full names
+            - Common misspellings
+            - Regional name differences
+            
+            Return only the game names, one per line, maximum 5 variations.
+            """
+            
+            response = await self.llm_analyzer.analyze_text(prompt)
+            
+            # Parse response into list of variations
+            variations = [game_name]  # Always include original
+            if response:
+                lines = response.strip().split('\n')
+                for line in lines:
+                    variation = line.strip().strip('-').strip()
+                    if variation and variation != game_name:
+                        variations.append(variation)
+            
+            return variations[:6]  # Limit to 6 total variations
+            
+        except Exception as e:
+            self.logger.error(f"Failed to generate game name variations: {e}")
+            return [game_name]
+    
+    def _parse_ram_value(self, ram_str: str) -> int:
+        """Parse RAM value from string to integer GB."""
+        if not ram_str:
+            return 0
+        match = re.search(r'(\d+)', str(ram_str))
+        return int(match.group(1)) if match else 0
+    
+    def _parse_storage_value(self, storage_str: str) -> int:
+        """Parse storage value from string to integer GB."""
+        if not storage_str:
+            return 0
+        match = re.search(r'(\d+\.?\d*)', str(storage_str))
+        return int(float(match.group(1))) if match else 0
+
     async def _cache_requirements(self, requirements: GameRequirements):
         """Cache requirements locally."""
         try:
-            cache_source = LocalCacheSource()
-            cache_source.save_to_cache(requirements)
+            self.cache_source.save_to_cache(requirements)
         except Exception as e:
             self.logger.error(f"Failed to cache requirements: {e}")
     

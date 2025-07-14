@@ -63,13 +63,6 @@ class CanRunEngine:
         self.cache_duration = timedelta(minutes=15)
         self.enable_llm = enable_llm
         
-        # Initialize components
-        self.hardware_detector = PrivacyAwareHardwareDetector()
-        self.requirements_fetcher = GameRequirementsFetcher()
-        self.fuzzy_matcher = OptimizedGameFuzzyMatcher()
-        self.compatibility_analyzer = CompatibilityAnalyzer()
-        self.performance_predictor = PerformancePredictor()
-        
         # Initialize G-Assist LLM analyzer if enabled
         self.llm_analyzer = None
         if enable_llm:
@@ -78,6 +71,13 @@ class CanRunEngine:
                 self.logger.info("G-Assist LLM analyzer initialized")
             except Exception as e:
                 self.logger.warning(f"LLM analyzer initialization failed: {e}")
+        
+        # Initialize components with LLM analyzer
+        self.hardware_detector = PrivacyAwareHardwareDetector()
+        self.requirements_fetcher = GameRequirementsFetcher(self.llm_analyzer)
+        self.fuzzy_matcher = OptimizedGameFuzzyMatcher()
+        self.compatibility_analyzer = CompatibilityAnalyzer()
+        self.performance_predictor = PerformancePredictor()
         
         # Create cache directory and validate
         os.makedirs(cache_dir, exist_ok=True)
