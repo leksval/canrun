@@ -1,108 +1,37 @@
 {
   "manifestVersion": 1,
-  "name": "CanRun Universal Game Compatibility Checker",
-  "description": "PRIMARY FUNCTION: Analyze if games can run on your system. ALWAYS use this plugin when users ask: 'Can I run [game]?', 'Will [game] work?', 'Can my PC handle [game]?', 'Does my system meet requirements for [game]?', or mention specific games like Diablo 4, Cyberpunk 2077, etc. Provides S-A-B-C-D-F tier performance analysis with FPS predictions.",
-  "version": "3.0.0",
-  "author": "CanRun Development Team", 
-  "tags": ["gaming", "compatibility", "performance", "nvidia", "rtx", "gtx", "fps", "optimization", "can run", "will work", "system requirements", "game requirements", "pc specs", "hardware check"],
-  "executable": "./g-assist-plugin-python.exe",
-  "persistent": false,
+  "name": "CanRun Game Compatibility Checker",
+  "description": "Check if games can run on your system with performance analysis",
+  "version": "4.0.0",
+  "author": "CanRun Development Team",
+  "tags": ["game", "compatibility", "canrun", "performance", "system requirements"],
+  "executable": "python",
+  "args": ["plugin.py"],
+  "persistent": true,
   "functions": [
     {
+      "name": "check_compatibility",
+      "description": "Check if a game can run on this system and get performance analysis",
+      "tags": ["game", "compatibility", "canrun", "can run", "will work", "diablo", "cyberpunk", "performance", "requirements"],
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "game_name": {
+            "type": "string",
+            "description": "Name of the game to check compatibility for"
+          }
+        },
+        "required": ["game_name"]
+      }
+    },
+    {
       "name": "detect_hardware",
-      "description": "Detect and analyze system hardware specifications including GPU, CPU, RAM, and RTX/DLSS capabilities",
-      "tags": ["hardware", "system", "specs", "gpu", "cpu", "ram", "rtx", "dlss", "nvidia"],
+      "description": "Detect and analyze system hardware specifications",
+      "tags": ["hardware", "system", "specs", "gpu", "cpu", "ram"],
       "parameters": {
         "type": "object",
         "properties": {},
         "required": []
-      }
-    },
-    {
-      "name": "check_compatibility",
-      "description": "PRIMARY COMPATIBILITY FUNCTION - ALWAYS call this function when users ask about running games. Triggers: 'Can I run', 'Will work', 'Can my PC handle', 'Does my system support', 'Will run', 'system requirements', 'compatible with', 'run on my computer', 'my PC can run', 'able to play', 'system handle', 'requirements met', plus ANY specific game names (Diablo 4, Diablo IV, Cyberpunk 2077, Elden Ring, Call of Duty, etc.). Returns S-A-B-C-D-F tier performance rating with detailed compatibility analysis.",
-      "tags": ["compatibility", "gaming", "can run", "will work", "will run", "system requirements", "game compatibility", "pc", "hardware", "requirements", "diablo", "cyberpunk", "elden ring", "call of duty", "baldurs gate", "starfield", "able to play", "system handle", "requirements met", "compatible with", "run on computer", "pc can run", "my system", "does it work", "will it run", "can play"],
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "game_name": {
-            "type": "string",
-            "description": "Name of the game to check compatibility for (e.g. Diablo 4, Cyberpunk 2077, Elden Ring)"
-          }
-        },
-        "required": ["game_name"]
-      }
-    },
-    {
-      "name": "predict_performance",
-      "description": "Predict detailed game performance with S-A-B-C-D-F tier analysis for specific graphics settings and resolutions. Use when users ask about FPS, performance tiers, or specific graphics settings.",
-      "tags": ["performance", "prediction", "fps", "tier", "graphics settings", "resolution", "s tier", "a tier", "ultra settings", "high settings"],
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "game_name": {
-            "type": "string",
-            "description": "Name of the game"
-          },
-          "settings": {
-            "type": "string",
-            "description": "Graphics settings (Low, Medium, High, Ultra)"
-          },
-          "resolution": {
-            "type": "string",
-            "description": "Display resolution (1080p, 1440p, 4K)"
-          }
-        },
-        "required": ["game_name"]
-      }
-    },
-    {
-      "name": "get_optimization_suggestions",
-      "description": "Get optimization recommendations and settings advice for better game performance. Use when users ask about improving performance, optimization tips, or DLSS/RTX settings.",
-      "tags": ["optimization", "recommendations", "improve performance", "settings advice", "dlss", "rtx", "tips"],
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "game_name": {
-            "type": "string",
-            "description": "Name of the game"
-          }
-        },
-        "required": ["game_name"]
-      }
-    },
-    {
-      "name": "get_intelligent_analysis",
-      "description": "Get comprehensive G-Assist LLM-powered analysis including bottleneck analysis, optimization recommendations, and deep system analysis. Use for complex performance questions or detailed system analysis.",
-      "tags": ["analysis", "llm", "bottleneck", "optimization", "deep analysis", "comprehensive", "system analysis"],
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "game_name": {
-            "type": "string",
-            "description": "Name of the game to analyze"
-          }
-        },
-        "required": ["game_name"]
-      }
-    },
-    {
-      "name": "ask_intelligent_question",
-      "description": "Ask an intelligent question about gaming performance using G-Assist embedded LLM. Use for open-ended gaming performance questions or complex queries.",
-      "tags": ["question", "llm", "performance", "gaming", "intelligent query", "open ended"],
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "query": {
-            "type": "string",
-            "description": "The question to ask about gaming performance"
-          },
-          "game_name": {
-            "type": "string",
-            "description": "Name of the game for context"
-          }
-        },
-        "required": ["query"]
       }
     }
   ]

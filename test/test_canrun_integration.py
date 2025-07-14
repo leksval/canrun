@@ -46,9 +46,9 @@ async def test_canrun_integration():
             
             if result:
                 print(f"  OK Analysis completed successfully")
-                print(f"  OK Compatibility: {result['compatibility']['compatibility_level']}")
-                print(f"  OK Performance: {result['performance']['fps']} FPS")
-                print(f"  OK Optimization suggestions: {len(result['optimization_suggestions'])}")
+                print(f"  OK Compatibility: {result.compatibility_analysis.overall_compatibility}")
+                print(f"  OK Performance: {result.performance_prediction.expected_fps} FPS")
+                print(f"  OK Optimization suggestions: Available")
                 
                 # Verify result structure
                 required_keys = ['compatibility', 'performance', 'optimization_suggestions', 'hardware_analysis']

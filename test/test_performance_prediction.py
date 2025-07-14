@@ -12,7 +12,7 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 src_dir = os.path.join(current_dir, '..', 'src')
 sys.path.insert(0, src_dir)
 
-from performance_predictor import PerformancePredictor
+from dynamic_performance_predictor import DynamicPerformancePredictor
 from hardware_detector import HardwareDetector
 from game_requirements_fetcher import GameRequirementsFetcher
 import asyncio
@@ -28,7 +28,7 @@ async def test_performance_prediction():
     # Initialize components
     detector = HardwareDetector()
     fetcher = GameRequirementsFetcher()
-    predictor = PerformancePredictor()
+    predictor = DynamicPerformancePredictor()
     
     try:
         print("\n[TEST 1] Detecting system hardware...")
@@ -49,67 +49,91 @@ async def test_performance_prediction():
             print(f"  Settings: {scenario['resolution']}, {scenario['settings']}")
             
             # Fetch game requirements
-            requirements = await fetcher.fetch_game_requirements(scenario['game'])
+            requirements = await fetcher.fetch_requirements(scenario['game'])
             if not requirements:
                 print(f"  ⚠ No requirements found for {scenario['game']}, skipping...")
                 continue
             
-            # Predict performance
-            performance = await predictor.predict_performance(
-                hardware, 
-                requirements, 
-                scenario['resolution'], 
-                scenario['settings']
+            # Predict performance using new API
+            hardware_specs = {
+                'gpu_model': hardware.gpu_name,
+                'cpu_model': hardware.cpu_name,
+                'ram_total_gb': hardware.ram_total / 1024,  # Convert MB to GB
+                'cpu_cores': hardware.cpu_cores,
+                'cpu_threads': hardware.cpu_cores * 2,  # Estimate threads
+                'cpu_frequency': hardware.cpu_freq * 1000,  # Convert GHz to MHz
+                'gpu_vram_gb': hardware.gpu_memory / 1024  # Convert MB to GB
+            }
+            
+            # Convert requirements to dict format
+            game_requirements = {
+                'recommended': {
+                    'processor': getattr(requirements, 'recommended_cpu', ''),
+                    'graphics': getattr(requirements, 'recommended_gpu', ''),
+                    'memory': getattr(requirements, 'recommended_ram_gb', 8)
+                }
+            }
+            
+            assessment = predictor.assess_performance(
+                hardware_specs=hardware_specs,
+                game_requirements=game_requirements
             )
             
             # Display results
-            print(f"  OK Predicted FPS: {performance['fps']}")
-            print(f"  OK Performance Level: {performance['performance_level']}")
-            print(f"  OK Stability: {performance['stability']}")
-            print(f"  OK DLSS Boost: {performance.get('dlss_boost', 'N/A')}")
+            print(f"  OK Performance Score: {assessment.score}")
+            print(f"  OK Performance Tier: {assessment.tier.name}")
+            print(f"  OK Expected FPS: {assessment.expected_fps}")
+            print(f"  OK Settings: {assessment.recommended_settings}")
+            print(f"  OK Resolution: {assessment.recommended_resolution}")
             
-            if performance.get('optimization_suggestions'):
-                print(f"  OK Optimizations: {', '.join(performance['optimization_suggestions'])}")
+            if assessment.bottlenecks:
+                print(f"  OK Bottlenecks: {', '.join(assessment.bottlenecks)}")
+            if assessment.upgrade_suggestions:
+                print(f"  OK Upgrades: {', '.join(assessment.upgrade_suggestions[:2])}")
         
-        print(f"\n[TEST {len(test_scenarios) + 2}] Testing DLSS performance boost...")
+        print(f"\n[TEST {len(test_scenarios) + 2}] Testing tier system...")
         
-        # Test DLSS scenarios
-        dlss_scenarios = [
-            {"dlss_mode": "Quality", "expected_boost": 1.3},
-            {"dlss_mode": "Balanced", "expected_boost": 1.5},
-            {"dlss_mode": "Performance", "expected_boost": 1.8},
+        # Test different hardware tiers
+        tier_scenarios = [
+            {"gpu": "RTX 4090", "cpu": "Ryzen 7 7800X3D", "ram": 32, "expected_tier": "S"},
+            {"gpu": "RTX 3080", "cpu": "Intel i7-10700K", "ram": 16, "expected_tier": "A"},
+            {"gpu": "RTX 3060", "cpu": "Intel i5-10400", "ram": 16, "expected_tier": "B"},
+            {"gpu": "GTX 1660", "cpu": "Intel i3-9100", "ram": 8, "expected_tier": "C"},
         ]
         
-        for dlss_scenario in dlss_scenarios:
-            boost = predictor.calculate_dlss_boost(
-                hardware.get('gpu', {}), 
-                dlss_scenario['dlss_mode']
-            )
-            print(f"  OK DLSS {dlss_scenario['dlss_mode']}: {boost:.2f}x boost")
+        for tier_scenario in tier_scenarios:
+            test_specs = {
+                'gpu_model': tier_scenario['gpu'],
+                'cpu_model': tier_scenario['cpu'],
+                'ram_total_gb': tier_scenario['ram'],
+                'cpu_cores': 8,
+                'cpu_threads': 16,
+                'cpu_frequency': 3000,
+                'gpu_vram_gb': 8
+            }
             
-            # Verify boost is reasonable
-            if abs(boost - dlss_scenario['expected_boost']) > 0.3:
-                print(f"  ⚠ DLSS boost seems unusual: {boost}")
+            assessment = predictor.assess_performance(hardware_specs=test_specs)
+            print(f"  OK {tier_scenario['gpu']} + {tier_scenario['cpu']}: Tier {assessment.tier.name} (Score: {assessment.score})")
         
-        print(f"\n[TEST {len(test_scenarios) + 3}] Testing RTX performance impact...")
+        print(f"\n[TEST {len(test_scenarios) + 3}] Testing upgrade suggestions...")
         
-        # Test RTX scenarios
-        rtx_scenarios = ["RTX Low", "RTX Medium", "RTX High", "RTX Ultra"]
+        # Test low-end system for upgrade suggestions
+        low_end_specs = {
+            'gpu_model': 'GTX 1050',
+            'cpu_model': 'Intel i3-8100',
+            'ram_total_gb': 8,
+            'cpu_cores': 4,
+            'cpu_threads': 4,
+            'cpu_frequency': 2800,
+            'gpu_vram_gb': 2
+        }
         
-        for rtx_setting in rtx_scenarios:
-            impact = predictor.calculate_rtx_impact(rtx_setting)
-            print(f"  OK {rtx_setting}: {impact:.2f}x performance impact")
-        
-        print(f"\n[TEST {len(test_scenarios) + 4}] Testing resolution scaling...")
-        
-        # Test resolution scaling
-        resolutions = ["1080p", "1440p", "4K"]
-        base_fps = 60
-        
-        for resolution in resolutions:
-            multiplier = predictor.get_resolution_multiplier(resolution)
-            scaled_fps = base_fps * multiplier
-            print(f"  OK {resolution}: {scaled_fps:.1f} FPS (base: {base_fps})")
+        assessment = predictor.assess_performance(hardware_specs=low_end_specs)
+        print(f"  OK Low-end system tier: {assessment.tier.name}")
+        if assessment.upgrade_suggestions:
+            print(f"  OK Upgrade suggestions: {', '.join(assessment.upgrade_suggestions[:3])}")
+        if assessment.bottlenecks:
+            print(f"  OK Bottlenecks identified: {', '.join(assessment.bottlenecks)}")
         
         print("\n" + "=" * 50)
         print("All performance prediction tests passed!")

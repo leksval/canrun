@@ -312,7 +312,7 @@ def test_command_line_args():
 
 def run_all_validation_tests():
     """Run all validation tests"""
-    print("🔍 CanRun Project Validation Tests")
+    print("CanRun Project Validation Tests")
     print("="*50)
     
     tests = [

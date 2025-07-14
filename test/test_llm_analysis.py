@@ -16,7 +16,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'plugin'))
 from rtx_llm_analyzer import GAssistLLMAnalyzer, LLMAnalysisResult
 from privacy_aware_hardware_detector import PrivacyAwareHardwareSpecs
 from compatibility_analyzer import CompatibilityAnalysis
-from performance_predictor import PerformancePrediction
+from dynamic_performance_predictor import PerformanceAssessment
 from canrun_engine import CanRunEngine
 
 # Mock the plugin import since it has naming issues
@@ -181,24 +181,17 @@ class TestLLMAnalysis(unittest.TestCase):
             recommendations=["Enable DLSS for better performance"]
         )
         
-        # Mock performance prediction result
-        self.mock_performance = PerformancePrediction(
-            game_name="Test Game",
-            predictions=[
-                {
-                    "resolution": "1080p",
-                    "quality_preset": "High",
-                    "expected_fps": 75,
-                    "dlss_enabled": True,
-                    "rtx_enabled": True,
-                    "settings_details": {"quality": "High", "dlss": "Quality"}
-                }
-            ],
-            bottleneck_info={ComponentType.GPU: "GPU utilization at 95%"},
-            optimization_suggestions=['Enable DLSS', 'Use High settings instead of Ultra'],
-            dlss_support=True,
-            rtx_support=True,
-            overall_performance_score=0.85
+        # Mock performance assessment result using new dynamic predictor
+        from dynamic_performance_predictor import PerformanceTier
+        self.mock_performance = PerformanceAssessment(
+            score=85,
+            tier=PerformanceTier.A,
+            tier_description="Excellent - High settings, 1440p@60fps",
+            expected_fps=75,
+            recommended_settings="High",
+            recommended_resolution="1440p (2560x1440)",
+            bottlenecks=["GPU"],
+            upgrade_suggestions=['Enable DLSS', 'Use High settings instead of Ultra']
         )
     
     def test_llm_analyzer_initialization(self):

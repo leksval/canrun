@@ -4,8 +4,12 @@
 import json
 import asyncio
 from pathlib import Path
-from src.game_requirements_fetcher import GameRequirementsFetcher, LocalCacheSource
-from src.rtx_llm_analyzer import GAssistLLMAnalyzer
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+
+from game_requirements_fetcher import GameRequirementsFetcher, LocalCacheSource
+from rtx_llm_analyzer import GAssistLLMAnalyzer
 
 async def test_diablo_matching():
     """Test the Diablo 4 matching logic."""
