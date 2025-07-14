@@ -23,10 +23,29 @@ def get_resource_path(relative_path):
     if getattr(sys, 'frozen', False):
         # Running as PyInstaller executable
         base_path = sys._MEIPASS
+        # Debug: Print the base path and check if data exists
+        print(f"PyInstaller base path: {base_path}")
+        data_path = os.path.join(base_path, relative_path)
+        print(f"Looking for data at: {data_path}")
+        print(f"Data file exists: {os.path.exists(data_path)}")
+        if os.path.exists(data_path):
+            print(f"✅ Found data file: {data_path}")
+        else:
+            print(f"❌ Data file not found: {data_path}")
+            # List contents of base path for debugging
+            try:
+                contents = os.listdir(base_path)
+                print(f"Contents of {base_path}: {contents}")
+                if 'data' in contents:
+                    data_contents = os.listdir(os.path.join(base_path, 'data'))
+                    print(f"Contents of data directory: {data_contents}")
+            except Exception as e:
+                print(f"Error listing contents: {e}")
+        return data_path
     else:
         # Running as normal Python script
         base_path = Path(__file__).parent.parent
-    return os.path.join(base_path, relative_path)
+        return os.path.join(base_path, relative_path)
 
 
 # Create a global instance for use throughout the module
@@ -638,8 +657,8 @@ class GameRequirementsFetcher:
     
     async def fetch_requirements(self, game_name: str) -> Optional[GameRequirements]:
         """
-        Fetch game requirements with local cache prioritization.
-        Local cache is the primary source, with fallback to Steam API.
+        Fetch game requirements with local cache prioritization and LLM enhancement.
+        Local cache is the primary source, with LLM-enhanced search and Steam API fallback.
         """
         
         try:
@@ -651,7 +670,15 @@ class GameRequirementsFetcher:
                 self.logger.info(f"Found '{game_name}' in local cache")
                 return cache_requirements
                 
-            # Special handling for Diablo 4 <-> Diablo IV mapping
+            # Step 2: Use LLM to intelligently search local cache data
+            if self.llm_analyzer:
+                self.logger.info(f"Using LLM to interpret local cache data for '{game_name}'")
+                llm_cache_result = await self._llm_enhanced_cache_search(game_name)
+                if llm_cache_result:
+                    self.logger.info(f"LLM successfully found '{game_name}' in local cache")
+                    return llm_cache_result
+            
+            # Step 3: Special handling for Diablo 4 <-> Diablo IV mapping (fallback)
             if game_name.lower() == "diablo 4":
                 diablo_iv = await self.cache_source.fetch("Diablo IV")
                 if diablo_iv:
@@ -663,7 +690,7 @@ class GameRequirementsFetcher:
                     self.logger.info(f"Mapped 'Diablo IV' to 'Diablo 4' in cache")
                     return diablo_4
             
-            # Step 2: Fallback to Steam API if not in cache
+            # Step 4: Fallback to Steam API if not in cache
             self.logger.info(f"Not found in cache, trying Steam API for '{game_name}'")
             try:
                 steam_requirements = await self.steam_source.fetch(game_name)
@@ -674,7 +701,7 @@ class GameRequirementsFetcher:
             except Exception as e:
                 self.logger.warning(f"Steam API failed for '{game_name}': {e}")
             
-            # Step 3: If all else fails, return a clear message instead of using LLM
+            # Step 5: If all else fails, return None for clear error handling
             self.logger.warning(f"No requirements found for '{game_name}' after trying all sources")
             return None
             
