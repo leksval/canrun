@@ -3,11 +3,11 @@
 CanRun G-Assist Plugin - Official NVIDIA G-Assist Integration
 Privacy-focused game compatibility analysis for RTX/GTX systems with Steam API integration.
 
-This plugin uses the official NVIDIA RISE library for G-Assist integration.
-It supports both interactive RISE mode and command-line interface for testing.
+This plugin uses the official NVIDIA G-Assist pipe communication protocol.
+It communicates with G-Assist through Windows named pipes using stdin/stdout.
 
 Usage:
-    Interactive RISE Mode (G-Assist):
+    G-Assist Mode (Production):
         python plugin.py
         
     Command Line Interface (Testing):
@@ -15,16 +15,11 @@ Usage:
         python plugin.py --function detect_hardware
         python plugin.py --help
 
-Dependencies:
-    - rise: Official NVIDIA G-Assist Python bindings (REQUIRED)
-    - asyncio: For Steam API integration
-    - argparse: For command-line argument parsing
-    - All CanRun engine modules
-
-RISE Integration:
-    The plugin registers with G-Assist using rise.register_rise_client() and
-    processes commands through rise.send_rise_command(). It provides intelligent
-    game compatibility analysis with Steam API integration.
+Communication Protocol:
+    Input: JSON commands via stdin from G-Assist
+    Output: JSON responses via stdout to G-Assist
+    Format: {"tool_calls": [{"func": "function_name", "params": {...}}]}
+    Response: {"success": true/false, "message": "response"}<<END>>
 """
 
 import json
@@ -36,6 +31,7 @@ import argparse
 import re
 from typing import Optional, Dict, Any
 from pathlib import Path
+from ctypes import byref, windll, wintypes
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent / "src"))
@@ -44,11 +40,10 @@ from src.canrun_engine import CanRunEngine
 from src.privacy_aware_hardware_detector import PrivacyAwareHardwareDetector
 from src.dynamic_performance_predictor import DynamicPerformancePredictor, PerformanceTier
 
-# Import RISE library for G-Assist integration
-import rise
-
-# Type definitions
-Response = Dict[str, Any]
+# Windows pipe communication constants
+STD_INPUT_HANDLE = -10
+STD_OUTPUT_HANDLE = -11
+BUFFER_SIZE = 4096
 
 # Configure logging with detailed format
 LOG_FILE = os.path.join(os.environ.get('USERPROFILE', '.'), 'canrun-plugin.log')
@@ -94,24 +89,28 @@ def initialize_plugin() -> dict:
         logging.error(f"❌ Plugin initialization failed: {e}")
         return {"success": False, "message": f"Plugin initialization failed: {str(e)}"}
 
-def check_compatibility(game_name: str) -> str:
+def check_compatibility(params: Dict[str, Any]) -> Dict[str, Any]:
     """
     Check if a game can run on this system with performance analysis.
     
     Args:
-        game_name (str): Name of the game to check compatibility for
+        params (Dict[str, Any]): Parameters containing game_name
     
     Returns:
-        str: Formatted compatibility analysis message
+        Dict[str, Any]: G-Assist response format
     """
     try:
+        game_name = params.get("game_name", "")
+        if not game_name:
+            return {"success": False, "message": "Game name is required"}
+            
         logging.info(f"🎮 Checking compatibility for: {game_name}")
         
         # Initialize plugin if not already done
         if canrun_engine is None:
             init_result = initialize_plugin()
             if not init_result["success"]:
-                return f"❌ Plugin initialization failed: {init_result['message']}"
+                return {"success": False, "message": f"Plugin initialization failed: {init_result['message']}"}
         
         # Run async compatibility check in sync context
         loop = asyncio.new_event_loop()
@@ -169,52 +168,86 @@ def check_compatibility(game_name: str) -> str:
             # Create compatibility verdict
             compatibility_verdict = "EXCELLENT" if result.exceeds_recommended_requirements() else "GOOD" if result.can_run_game() else "INSUFFICIENT"
             
-            # Create comprehensive response message
-            response_lines = [
-                f"🎮 CanRun Analysis: {result.game_name}",
-                f"",
-                f"🏆 Performance Tier: {performance_tier} ({tier_score}/100)",
-                f"🎯 Compatibility: {compatibility_verdict}",
-                f"⚡ Expected FPS: {expected_fps}" if expected_fps > 0 else "",
-                f"",
-                f"💻 Your System:",
-                f"   GPU: {result.hardware_specs.gpu_model} ({result.hardware_specs.gpu_vram_gb} GB VRAM)",
-                f"   CPU: {result.hardware_specs.cpu_model} ({result.hardware_specs.cpu_cores} cores)",
-                f"   RAM: {result.hardware_specs.ram_total_gb} GB",
-                f"   RTX Support: {'✅' if result.hardware_specs.supports_rtx else '❌'}",
-                f"   DLSS Support: {'✅' if result.hardware_specs.supports_dlss else '❌'}",
-                f"",
-                f"📋 Game Requirements:",
-                f"   CPU: {result.game_requirements.recommended_cpu}",
-                f"   GPU: {result.game_requirements.recommended_gpu}",
-                f"   RAM: {result.game_requirements.recommended_ram_gb} GB",
-                f"",
-                f"🔍 Data Source: {result.game_requirements.source}"
-            ]
+            # ✅ Extract LLM Analysis
+            llm_insights = ""
+            if result.llm_analysis:
+                try:
+                    llm_analysis = result.llm_analysis.get('analysis')
+                    if llm_analysis and hasattr(llm_analysis, 'analysis_text'):
+                        llm_insights = f"\n\n🧠 G-Assist AI Analysis:\n{llm_analysis.analysis_text}"
+                    elif llm_analysis and hasattr(llm_analysis, 'recommendations'):
+                        llm_insights = f"\n\n🧠 G-Assist Recommendations:\n• {'; '.join(llm_analysis.recommendations[:3])}"
+                except Exception as e:
+                    logging.debug(f"LLM analysis extraction failed: {e}")
             
-            # Filter out empty lines
-            response_lines = [line for line in response_lines if line.strip()]
-            response_message = "\n".join(response_lines)
+            # ✅ Extract Component Analysis
+            component_breakdown = ""
+            if hasattr(result.compatibility_analysis, 'component_analyses'):
+                component_breakdown = "\n\n📊 Component Analysis:"
+                for comp in result.compatibility_analysis.component_analyses:
+                    try:
+                        status = "✅" if comp.meets_recommended else "⚠️" if comp.meets_minimum else "❌"
+                        score = int(comp.score * 100) if hasattr(comp, 'score') else 0
+                        component_breakdown += f"\n   {status} {comp.component.value}: {score}/100"
+                        if hasattr(comp, 'upgrade_suggestion') and comp.upgrade_suggestion:
+                            component_breakdown += f" - {comp.upgrade_suggestion}"
+                    except Exception as e:
+                        logging.debug(f"Component analysis extraction failed for {comp}: {e}")
+            
+            # ✅ Extract Bottlenecks and Recommendations
+            optimization_tips = ""
+            if performance_assessment:
+                if hasattr(performance_assessment, 'bottlenecks') and performance_assessment.bottlenecks:
+                    optimization_tips += f"\n\n⚠️ Bottlenecks: {', '.join(performance_assessment.bottlenecks)}"
+                if hasattr(performance_assessment, 'upgrade_suggestions') and performance_assessment.upgrade_suggestions:
+                    optimization_tips += f"\n💡 Recommendations: {'; '.join(performance_assessment.upgrade_suggestions[:3])}"
+            
+            # ✅ Add Compatibility Analysis Recommendations
+            if hasattr(result.compatibility_analysis, 'recommendations') and result.compatibility_analysis.recommendations:
+                if not optimization_tips:
+                    optimization_tips = "\n"
+                optimization_tips += f"\n🔧 System Optimizations: {'; '.join(result.compatibility_analysis.recommendations[:2])}"
+            
+            # Create concise G-Assist response (like Twitch plugin format)
+            if compatibility_verdict == "EXCELLENT":
+                verdict_emoji = "✅"
+                verdict_text = "YES! Your system can run this game excellently"
+            elif compatibility_verdict == "GOOD":
+                verdict_emoji = "✅"
+                verdict_text = "YES! Your system can run this game well"
+            else:
+                verdict_emoji = "❌"
+                verdict_text = "Your system may struggle with this game"
+            
+            # Simple, direct response like Twitch plugin
+            response_message = f"""{verdict_emoji} {result.game_name} - {verdict_text}
+Performance: {performance_tier} tier ({tier_score}/100)
+Expected FPS: {expected_fps}
+GPU: {result.hardware_specs.gpu_model}
+Recommendation: {"Ultra settings at 4K" if tier_score >= 90 else "High settings at 1440p" if tier_score >= 70 else "Medium settings at 1080p"}"""
             
             logging.info(f"✅ Compatibility check successful for {game_name}")
-            return response_message
+            return {"success": True, "message": response_message}
             
         else:
             error_msg = f"❌ Could not analyze compatibility for {game_name}. Steam API may be unavailable or game not found."
             logging.error(error_msg)
-            return error_msg
+            return {"success": False, "message": error_msg}
             
     except Exception as e:
         error_msg = f"❌ Compatibility check failed for {game_name}: {str(e)}"
         logging.error(error_msg)
-        return error_msg
+        return {"success": False, "message": error_msg}
 
-def detect_hardware() -> str:
+def detect_hardware(params: Dict[str, Any]) -> Dict[str, Any]:
     """
     Detect and analyze system hardware specifications.
     
+    Args:
+        params (Dict[str, Any]): Parameters (unused for hardware detection)
+    
     Returns:
-        str: Formatted hardware specifications message
+        Dict[str, Any]: G-Assist response format
     """
     try:
         logging.info("🔍 Detecting hardware specifications...")
@@ -223,7 +256,7 @@ def detect_hardware() -> str:
         if privacy_detector is None:
             init_result = initialize_plugin()
             if not init_result["success"]:
-                return f"❌ Plugin initialization failed: {init_result['message']}"
+                return {"success": False, "message": f"Plugin initialization failed: {init_result['message']}"}
         
         # Run async hardware detection in sync context
         loop = asyncio.new_event_loop()
@@ -234,33 +267,21 @@ def detect_hardware() -> str:
         finally:
             loop.close()
         
-        # Format hardware info for G-Assist
-        hardware_summary = f"""💻 System Hardware Specifications:
-
-🎮 Graphics Card: {hardware_info.gpu_model} ({hardware_info.gpu_vram_gb} GB VRAM)
-   RTX Support: {'✅' if hardware_info.supports_rtx else '❌'}
-   DLSS Support: {'✅' if hardware_info.supports_dlss else '❌'}
-
-🧠 Processor: {hardware_info.cpu_model} ({hardware_info.cpu_cores} cores, {hardware_info.cpu_threads} threads)
-
-💾 Memory: {hardware_info.ram_total_gb} GB RAM ({hardware_info.ram_speed_mhz} MHz)
-
-💽 Storage: {hardware_info.storage_type}
-
-🖥️  Display: {hardware_info.primary_monitor_resolution} @ {hardware_info.primary_monitor_refresh_hz} Hz
-
-🔧 System Info:
-   OS: {hardware_info.os_version}
-   DirectX: {hardware_info.directx_version}
-   NVIDIA Driver: {hardware_info.nvidia_driver_version}"""
+        # Format hardware info for G-Assist (concise like Twitch plugin)
+        hardware_summary = f"""💻 Your Gaming System:
+GPU: {hardware_info.gpu_model} ({hardware_info.gpu_vram_gb} GB VRAM)
+CPU: {hardware_info.cpu_model} ({hardware_info.cpu_cores} cores)
+RAM: {hardware_info.ram_total_gb} GB
+RTX Features: {'✅ Supported' if hardware_info.supports_rtx else '❌ Not Available'}
+Gaming Performance: {'Excellent' if hardware_info.gpu_vram_gb >= 16 else 'Good' if hardware_info.gpu_vram_gb >= 8 else 'Basic'}"""
         
         logging.info("✅ Hardware detection successful")
-        return hardware_summary
+        return {"success": True, "message": hardware_summary}
         
     except Exception as e:
         error_msg = f"❌ Hardware detection failed: {str(e)}"
         logging.error(error_msg)
-        return error_msg
+        return {"success": False, "message": error_msg}
 
 def _get_cpu_frequency_from_hardware(hardware_specs):
     """Extract CPU frequency from hardware specs, with intelligent fallback."""
@@ -292,104 +313,53 @@ def _get_cpu_frequency_from_hardware(hardware_specs):
         logging.warning(f"Failed to determine CPU frequency: {e}")
         return 2800  # Safe fallback
 
-def process_user_query(user_input: str) -> str:
+def read_command() -> Optional[Dict[str, Any]]:
     """
-    Process user queries and determine the appropriate action.
+    Read command from stdin using standard Python input.
+    
+    Returns:
+        Optional[Dict[str, Any]]: Parsed command dictionary or None if failed
+    """
+    try:
+        # Read from stdin
+        line = sys.stdin.readline().strip()
+        if not line:
+            return None
+            
+        logging.info(f'Received command: {line}')
+        return json.loads(line)
+        
+    except json.JSONDecodeError as e:
+        logging.error(f'Invalid JSON received: {e}')
+        return None
+    except Exception as e:
+        logging.error(f'Error in read_command: {e}')
+        return None
+
+def write_response(response: Dict[str, Any]) -> None:
+    """
+    Write response to stdout pipe using Windows API.
     
     Args:
-        user_input (str): User's input query
+        response: Dictionary containing 'success' and optional 'message'
+    """
+    try:
+        pipe = windll.kernel32.GetStdHandle(STD_OUTPUT_HANDLE)
+        # Add <<END>> marker for message termination
+        message = json.dumps(response) + '<<END>>'
+        message_bytes = message.encode('utf-8')
         
-    Returns:
-        str: Response message
-    """
-    user_input_lower = user_input.lower()
-    
-    # Check for hardware detection queries
-    hardware_keywords = ['hardware', 'specs', 'system', 'gpu', 'cpu', 'ram', 'my computer', 'my system']
-    if any(keyword in user_input_lower for keyword in hardware_keywords):
-        return detect_hardware()
-    
-    # Check for game compatibility queries
-    compatibility_keywords = ['can run', 'canrun', 'compatibility', 'will work', 'run on', 'play']
-    game_keywords = ['game', 'diablo', 'cyberpunk', 'witcher', 'gta', 'call of duty', 'battlefield', 'assassin']
-    
-    if any(keyword in user_input_lower for keyword in compatibility_keywords) or any(keyword in user_input_lower for keyword in game_keywords):
-        # Try to extract game name from the query
-        game_name = extract_game_name(user_input)
-        if game_name:
-            return check_compatibility(game_name)
-        else:
-            return """🎮 CanRun Game Compatibility Checker
-
-I can help you check if games can run on your system! Try asking:
-• "Can I run Diablo 4?"
-• "Will Cyberpunk 2077 work on my system?"
-• "Check compatibility for The Witcher 3"
-
-Or ask about your hardware:
-• "What are my system specs?"
-• "Show me my hardware"
-
-What game would you like me to check?"""
-    
-    # Default response for unclear queries
-    return """🎮 CanRun Game Compatibility Checker
-
-I'm your AI assistant for game compatibility analysis! I can help you:
-
-🎯 Check Game Compatibility:
-   • "Can I run [game name]?"
-   • "Will [game] work on my system?"
-   • "Check compatibility for [game]"
-
-💻 Analyze Your Hardware:
-   • "What are my system specs?"
-   • "Show me my hardware"
-   • "Detect my system"
-
-I use Steam API integration and advanced performance prediction to give you accurate S-A-B-C-D-F tier ratings with expected FPS.
-
-What would you like me to help you with?"""
-
-def extract_game_name(user_input: str) -> Optional[str]:
-    """
-    Extract game name from user input using pattern matching.
-    
-    Args:
-        user_input (str): User's input query
-        
-    Returns:
-        Optional[str]: Extracted game name or None
-    """
-    # Common game name patterns
-    patterns = [
-        r'(?:can (?:i )?run|will|check|compatibility (?:for )?|canrun)\s+([^?]+?)(?:\?|$)',
-        r'([a-zA-Z0-9\s:]+?)(?:\s+(?:compatibility|can run|will work))',
-        r'(?:game|title)\s+([^?]+?)(?:\?|$)',
-    ]
-    
-    for pattern in patterns:
-        match = re.search(pattern, user_input, re.IGNORECASE)
-        if match:
-            game_name = match.group(1).strip()
-            # Clean up common words
-            game_name = re.sub(r'\b(?:the|game|on my system|work|run)\b', '', game_name, flags=re.IGNORECASE).strip()
-            if len(game_name) > 2:  # Minimum reasonable game name length
-                return game_name
-    
-    # Fallback: look for known game names
-    known_games = [
-        'diablo 4', 'diablo iv', 'cyberpunk 2077', 'the witcher 3', 'gta 5', 'gta v',
-        'call of duty', 'battlefield', 'assassin\'s creed', 'red dead redemption',
-        'elden ring', 'hogwarts legacy', 'starfield', 'baldur\'s gate 3'
-    ]
-    
-    user_input_lower = user_input.lower()
-    for game in known_games:
-        if game in user_input_lower:
-            return game.title()
-    
-    return None
+        bytes_written = wintypes.DWORD()
+        windll.kernel32.WriteFile(
+            pipe,
+            message_bytes,
+            len(message_bytes),
+            byref(bytes_written),
+            None
+        )
+        logging.info(f'Sent response: {json.dumps(response)}')
+    except Exception as e:
+        logging.error(f'Error writing response: {e}')
 
 def run_command_line_interface():
     """
@@ -436,78 +406,90 @@ Functions:
         if not args.game:
             result = {"success": False, "message": "Game name is required for compatibility check"}
         else:
-            message = check_compatibility(args.game)
-            result = {"success": True, "message": message}
+            result = check_compatibility({"game_name": args.game})
     elif args.function == 'detect_hardware':
-        message = detect_hardware()
-        result = {"success": True, "message": message}
+        result = detect_hardware({})
     else:
         result = {"success": False, "message": f"Unknown function: {args.function}"}
     
     # Output result as JSON
     print(json.dumps(result, indent=2))
 
-def run_rise_interface():
+def run_g_assist_interface():
     """
-    Run the plugin in RISE interface mode for G-Assist integration.
-    Uses the official NVIDIA RISE library for communication.
+    Run the plugin in G-Assist interface mode.
+    Uses Windows named pipes for communication with G-Assist.
     """
     # Initialize plugin
     init_result = initialize_plugin()
     if not init_result["success"]:
-        print(f"❌ Plugin initialization failed: {init_result['message']}")
+        logging.error(f"❌ Plugin initialization failed: {init_result['message']}")
+        write_response({"success": False, "message": f"Plugin initialization failed: {init_result['message']}"})
         sys.exit(1)
     
-    print("🚀 CanRun G-Assist Plugin starting...")
-    print("🎮 Ready for game compatibility analysis!")
-    
-    # Register with G-Assist
-    rise.register_rise_client()
+    logging.info("🚀 CanRun G-Assist Plugin starting...")
+    logging.info("🎮 Ready for game compatibility analysis!")
     
     # Main interaction loop
     while True:
         try:
-            # Get user input (this would come from G-Assist in real usage)
-            user_prompt = input("Enter your query (or 'quit' to exit): ").strip()
-            
-            if user_prompt.lower() in ['quit', 'exit', 'q']:
-                print("👋 CanRun plugin shutting down...")
-                break
-            
-            if not user_prompt:
+            # Read command from G-Assist via stdin pipe
+            command = read_command()
+            if command is None:
                 continue
             
-            # Process the user query
-            response = process_user_query(user_prompt)
-            
-            # Send response through RISE
-            rise_response = rise.send_rise_command(response)
-            print(f"🎯 Response: {rise_response}")
+            # Process tool calls
+            for tool_call in command.get("tool_calls", []):
+                func = tool_call.get("func")
+                params = tool_call.get("params", {})
+                
+                if func == "check_compatibility":
+                    response = check_compatibility(params)
+                    write_response(response)
+                elif func == "detect_hardware":
+                    response = detect_hardware(params)
+                    write_response(response)
+                elif func == "shutdown":
+                    logging.info("👋 CanRun plugin shutting down...")
+                    return
+                else:
+                    response = {"success": False, "message": f"Unknown function: {func}"}
+                    write_response(response)
             
         except KeyboardInterrupt:
-            print("\n👋 CanRun plugin shutting down...")
+            logging.info("\n👋 CanRun plugin shutting down...")
             break
         except Exception as e:
-            logging.error(f"Error in RISE interface: {e}")
-            print(f"❌ Error: {e}")
+            logging.error(f"Error in G-Assist interface: {e}")
+            write_response({"success": False, "message": f"Error: {e}"})
 
 def main():
     """
     Main entry point for the CanRun G-Assist plugin.
     
-    Determines whether to run in command-line interface mode or RISE mode
-    based on the presence of command-line arguments.
+    Determines whether to run in command-line interface mode or G-Assist mode
+    based on the presence of command-line arguments and stdin availability.
     
     Command-line mode: Used when arguments are provided (e.g., --function, --game)
-    RISE mode: Used when no arguments are provided (default G-Assist behavior)
+    G-Assist mode: Used when no arguments are provided or stdin has data
     """
     # Check if command-line arguments are provided
     if len(sys.argv) > 1:
         # Run in command-line interface mode
         run_command_line_interface()
     else:
-        # Run in RISE interface mode for G-Assist
-        run_rise_interface()
+        # For Windows, we'll use a different approach
+        try:
+            # Try to read from stdin with a timeout
+            if sys.stdin.isatty():
+                # No piped input, run in G-Assist mode anyway
+                run_g_assist_interface()
+            else:
+                # Piped input detected, run in G-Assist mode
+                run_g_assist_interface()
+        except:
+            # Fallback to G-Assist mode
+            run_g_assist_interface()
 
 if __name__ == '__main__':
     main()

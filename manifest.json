@@ -5,34 +5,26 @@
   "version": "4.0.0",
   "author": "CanRun Development Team",
   "tags": ["game", "compatibility", "canrun", "performance", "system requirements"],
-  "executable": "python",
-  "args": ["plugin.py"],
-  "persistent": true,
+  "executable": "g-assist-plugin-python.exe",
+  "args": [],
+  "persistent": false,
   "functions": [
     {
       "name": "check_compatibility",
       "description": "Check if a game can run on this system and get performance analysis",
       "tags": ["game", "compatibility", "canrun", "can run", "will work", "diablo", "cyberpunk", "performance", "requirements"],
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "game_name": {
-            "type": "string",
-            "description": "Name of the game to check compatibility for"
-          }
-        },
-        "required": ["game_name"]
+      "properties": {
+        "game_name": {
+          "type": "string",
+          "description": "Name of the game to check compatibility for"
+        }
       }
     },
     {
       "name": "detect_hardware",
       "description": "Detect and analyze system hardware specifications",
       "tags": ["hardware", "system", "specs", "gpu", "cpu", "ram"],
-      "parameters": {
-        "type": "object",
-        "properties": {},
-        "required": []
-      }
+      "properties": {}
     }
   ]
 }
