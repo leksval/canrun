@@ -460,17 +460,14 @@ class CanRunGAssistPlugin:
                         "can_run_recommended": result.compatibility_analysis.can_run_recommended
                     },
                     "performance_prediction": {
-                        "predictions": [
-                            {
-                                "quality_preset": pred.quality_preset.value,
-                                "resolution": pred.resolution.value,
-                                "expected_fps": pred.expected_fps,
-                                "frame_time_ms": pred.frame_time_ms,
-                                "gpu_utilization": pred.gpu_utilization,
-                                "vram_usage_gb": pred.vram_usage_gb
-                            } for pred in result.performance_prediction.predictions
-                        ],
-                        "optimization_suggestions": result.performance_prediction.optimization_suggestions
+                        "tier": result.performance_prediction.tier.name,
+                        "tier_description": result.performance_prediction.tier_description,
+                        "score": result.performance_prediction.score,
+                        "expected_fps": result.performance_prediction.expected_fps,
+                        "recommended_settings": result.performance_prediction.recommended_settings,
+                        "recommended_resolution": result.performance_prediction.recommended_resolution,
+                        "bottlenecks": result.performance_prediction.bottlenecks,
+                        "upgrade_suggestions": result.performance_prediction.upgrade_suggestions
                     },
                     "analysis_metadata": {
                         "cache_used": result.cache_used,

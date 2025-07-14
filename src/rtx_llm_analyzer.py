@@ -264,6 +264,22 @@ class GAssistLLMAnalyzer:
     async def process_intelligent_query(self, query: str, system_context: Dict[str, Any]) -> LLMAnalysisResult:
         """Process intelligent query using G-Assist embedded LLM."""
         return await self.analyze(system_context, LLMAnalysisType.INTELLIGENT_QUERY, query)
+    
+    async def analyze_text(self, prompt: str) -> str:
+        """Analyze text using G-Assist embedded LLM - simplified interface for Steam integration."""
+        try:
+            if not self.model_available:
+                return "G-Assist LLM not available"
+            
+            # Use G-Assist's embedded LLM for text analysis
+            with self.analysis_lock:
+                loop = asyncio.get_event_loop()
+                result = await loop.run_in_executor(None, self._run_g_assist_inference, prompt)
+                return result
+                
+        except Exception as e:
+            self.logger.error(f"Text analysis failed: {e}")
+            return f"Analysis failed: {str(e)}"
     # Helper methods for unified analysis workflow
     def _get_fallback_analysis(self, context: Dict[str, Any], analysis_type: LLMAnalysisType, query: str = "") -> str:
         """Get fallback analysis when G-Assist is not available."""

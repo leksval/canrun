@@ -86,8 +86,8 @@ class PerformancePredictor:
             "i5-13400": 78, "i3-13100": 65,
             
             # AMD Ryzen 7000
-            "Ryzen 9 7950X": 98, "Ryzen 9 7900X": 94, "Ryzen 7 7700X": 90,
-            "Ryzen 5 7600X": 84, "Ryzen 5 7600": 80,
+            "Ryzen 9 7950X": 98, "Ryzen 9 7900X": 94, "Ryzen 7 7800X3D": 96,
+            "Ryzen 7 7700X": 90, "Ryzen 5 7600X": 84, "Ryzen 5 7600": 80,
             
             # AMD Ryzen 5000
             "Ryzen 9 5950X": 93, "Ryzen 9 5900X": 90, "Ryzen 7 5800X3D": 95,
@@ -203,17 +203,17 @@ class PerformancePredictor:
             optimization_suggestions=assessment.upgrade_suggestions,
             dlss_support=supports_dlss,
             rtx_support=supports_rtx,
-            overall_performance_score=ssessment.score
+            overall_performance_score=assessment.score
         )
     
     def _calculate_gpu_score(self, hardware_specs: Dict, game_requirements: Dict) -> int:
         """Calculate GPU performance score"""
-        gpu_name = getattr(hardware_specs, 'gpu_model', '') if hasattr(hardware_specs, 'gpu_model') else getattr(hardware_specs, 'gpu_model', '') if isinstance(hardware_specs, dict) else ''
+        gpu_name = hardware_specs.get('gpu_model', '')
         gpu_key = self._find_gpu_key(gpu_name)
         
         if not gpu_key:
             # Fallback: estimate based on VRAM
-            vram = getattr(hardware_specs, 'gpu_vram_gb', 4)
+            vram = hardware_specs.get('gpu_vram_gb', 4)
             if vram >= 16:
                 return 85
             elif vram >= 12:
@@ -231,12 +231,12 @@ class PerformancePredictor:
     
     def _calculate_cpu_score(self, hardware_specs: Dict, game_requirements: Dict) -> int:
         """Calculate CPU performance score"""
-        cpu_name = getattr(hardware_specs, 'cpu_model', '')
+        cpu_name = hardware_specs.get('cpu_model', '')
         cpu_key = self._find_cpu_key(cpu_name)
         
         if not cpu_key:
             # Fallback: estimate based on cores
-            cores = getattr(hardware_specs, 'cpu_cores', 4)
+            cores = hardware_specs.get('cpu_cores', 4)
             if cores >= 16:
                 return 85
             elif cores >= 8:
@@ -252,7 +252,7 @@ class PerformancePredictor:
     
     def _calculate_ram_score(self, hardware_specs: Dict, game_requirements: Dict) -> int:
         """Calculate RAM performance score"""
-        ram_gb = getattr(hardware_specs, 'ram_total_gb', 8)
+        ram_gb = hardware_specs.get('ram_total_gb', 8)
         
         # Score based on amount
         if ram_gb >= 32:
@@ -269,7 +269,7 @@ class PerformancePredictor:
             score = 30
         
         # Bonus for fast RAM
-        ram_speed = getattr(hardware_specs, 'ram_speed_mhz', 2400)
+        ram_speed = hardware_specs.get('ram_speed_mhz', 2400)
         if ram_speed >= 4800:
             score += 5
         elif ram_speed >= 3600:
@@ -363,7 +363,7 @@ class PerformancePredictor:
             suggestions.append("CPU upgrade recommended for better performance")
         
         # RAM upgrades
-        ram_gb = getattr(hardware_specs, 'ram_total_gb', 8)
+        ram_gb = hardware_specs.get('ram_total_gb', 8)
         
         # Account for system-reserved memory (30+ GB typically means 32GB installed)
         effective_ram = ram_gb
@@ -380,7 +380,7 @@ class PerformancePredictor:
             suggestions.append("Consider 32GB RAM for maximum performance")
         
         # Storage suggestions
-        storage_type = getattr(hardware_specs, 'storage_type', 'Unknown')
+        storage_type = hardware_specs.get('storage_type', 'Unknown')
         if 'HDD' in storage_type:
             suggestions.append("Upgrade to SSD/NVMe for faster loading times")
         
