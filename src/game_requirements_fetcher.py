@@ -16,6 +16,7 @@ import re
 import time
 import sys
 import os
+from src.optimized_game_fuzzy_matcher import OptimizedGameFuzzyMatcher
 
 def get_resource_path(relative_path):
     """Get absolute path to resource, works for dev and for PyInstaller"""
@@ -27,8 +28,6 @@ def get_resource_path(relative_path):
         base_path = Path(__file__).parent.parent
     return os.path.join(base_path, relative_path)
 
-# Import the optimized fuzzy matcher
-from optimized_game_fuzzy_matcher import OptimizedGameFuzzyMatcher
 
 # Create a global instance for use throughout the module
 game_fuzzy_matcher = OptimizedGameFuzzyMatcher()
@@ -121,9 +120,10 @@ class SteamAPISource(DataSource):
         return None
     
     async def _search_steam_store_suggest(self, game_name: str) -> Optional[str]:
-        """Search using Steam Store suggest API."""
+        """Search using Steam Store suggest API with robust error handling."""
         try:
-            async with aiohttp.ClientSession() as session:
+            timeout = aiohttp.ClientTimeout(total=10, connect=5)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
                 params = {
                     'term': game_name,
                     'f': 'games',
@@ -133,23 +133,59 @@ class SteamAPISource(DataSource):
                 
                 async with session.get(self.store_search_url, params=params) as response:
                     if response.status == 200:
-                        data = await response.json()
-                        if isinstance(data, list) and len(data) > 0:
-                            # Return the first match's app ID
-                            app_data = data[0]
-                            if 'id' in app_data:
-                                return str(app_data['id'])
-                            elif 'appid' in app_data:
-                                return str(app_data['appid'])
+                        # Check content type before attempting JSON parsing
+                        content_type = response.headers.get('content-type', '').lower()
+                        
+                        if 'application/json' in content_type:
+                            try:
+                                data = await response.json()
+                                if isinstance(data, list) and len(data) > 0:
+                                    # Return the first match's app ID
+                                    app_data = data[0]
+                                    if 'id' in app_data:
+                                        return str(app_data['id'])
+                                    elif 'appid' in app_data:
+                                        return str(app_data['appid'])
+                            except json.JSONDecodeError as e:
+                                self.logger.debug(f"Steam store suggest JSON decode error for '{game_name}': {e}")
+                                return None
+                        else:
+                            # Handle non-JSON responses (HTML, etc.)
+                            self.logger.debug(f"Steam store suggest returned non-JSON content type: {content_type}")
+                            text = await response.text()
+                            
+                            # Try to extract app ID from HTML using regex
+                            patterns = [
+                                r'data-ds-appid="(\d+)"',
+                                r'"appid":\s*(\d+)',
+                                r'app/(\d+)/',
+                                r'appid=(\d+)'
+                            ]
+                            
+                            for pattern in patterns:
+                                match = re.search(pattern, text)
+                                if match:
+                                    return match.group(1)
+                    else:
+                        self.logger.debug(f"Steam store suggest returned status {response.status} for '{game_name}'")
+                        
+        except asyncio.CancelledError:
+            self.logger.warning(f"Steam store suggest search cancelled for '{game_name}'")
+            raise  # Re-raise CancelledError to allow proper cleanup
+        except asyncio.TimeoutError:
+            self.logger.warning(f"Steam store suggest search timed out for '{game_name}'")
+        except aiohttp.ClientError as e:
+            self.logger.warning(f"Steam store suggest network error for '{game_name}': {e}")
         except Exception as e:
-            self.logger.debug(f"Steam store suggest search failed: {e}")
+            self.logger.debug(f"Steam store suggest search failed for '{game_name}': {e}")
         
         return None
     
     async def _search_steam_community(self, game_name: str) -> Optional[str]:
-        """Search using Steam Community API."""
+        """Search using Steam Community API with robust error handling."""
         try:
-            async with aiohttp.ClientSession() as session:
+            timeout = aiohttp.ClientTimeout(total=10, connect=5)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
                 params = {
                     'text': game_name,
                     'max_results': 10
@@ -198,18 +234,26 @@ class SteamAPISource(DataSource):
                                 if match:
                                     return match.group(1)
                                     
+        except asyncio.CancelledError:
+            self.logger.warning(f"Steam community search cancelled for '{game_name}'")
+            raise  # Re-raise CancelledError to allow proper cleanup
+        except asyncio.TimeoutError:
+            self.logger.warning(f"Steam community search timed out for '{game_name}'")
+        except aiohttp.ClientError as e:
+            self.logger.warning(f"Steam community network error for '{game_name}': {e}")
         except Exception as e:
-            self.logger.debug(f"Steam community search failed: {e}")
+            self.logger.debug(f"Steam community search failed for '{game_name}': {e}")
         
         return None
     
     async def _search_steam_store_direct(self, game_name: str) -> Optional[str]:
-        """Direct search on Steam store page."""
+        """Direct search on Steam store page with robust error handling."""
         try:
             # This is a more aggressive search method
             search_url = f"https://store.steampowered.com/search/?term={game_name.replace(' ', '+')}"
             
-            async with aiohttp.ClientSession() as session:
+            timeout = aiohttp.ClientTimeout(total=15, connect=5)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
                 async with session.get(search_url) as response:
                     if response.status == 200:
                         text = await response.text()
@@ -226,8 +270,15 @@ class SteamAPISource(DataSource):
                             if match:
                                 return match.group(1)
                                 
+        except asyncio.CancelledError:
+            self.logger.warning(f"Steam store direct search cancelled for '{game_name}'")
+            raise  # Re-raise CancelledError to allow proper cleanup
+        except asyncio.TimeoutError:
+            self.logger.warning(f"Steam store direct search timed out for '{game_name}'")
+        except aiohttp.ClientError as e:
+            self.logger.warning(f"Steam store direct network error for '{game_name}': {e}")
         except Exception as e:
-            self.logger.debug(f"Steam store direct search failed: {e}")
+            self.logger.debug(f"Steam store direct search failed for '{game_name}': {e}")
         
         return None
     
@@ -265,8 +316,16 @@ class SteamAPISource(DataSource):
                             else:
                                 self.logger.warning(f"Steam API returned status {response.status}")
                                 return None
+                    except asyncio.CancelledError:
+                        self.logger.warning(f"Steam API app info request cancelled for {steam_id}")
+                        raise  # Re-raise CancelledError to allow proper cleanup
                     except asyncio.TimeoutError:
                         self.logger.warning(f"Steam API timeout, attempt {attempt + 1}/3")
+                        if attempt < 2:
+                            await asyncio.sleep(1)
+                        continue
+                    except aiohttp.ClientError as e:
+                        self.logger.warning(f"Steam API network error: {e}, attempt {attempt + 1}/3")
                         if attempt < 2:
                             await asyncio.sleep(1)
                         continue
@@ -579,49 +638,43 @@ class GameRequirementsFetcher:
     
     async def fetch_requirements(self, game_name: str) -> Optional[GameRequirements]:
         """
-        Fetch game requirements with Steam API prioritization and LLM-enhanced parsing.
-        Steam API is the primary source, with intelligent fallback to local cache.
+        Fetch game requirements with local cache prioritization.
+        Local cache is the primary source, with fallback to Steam API.
         """
         
         try:
-            self.logger.info(f"Fetching requirements for '{game_name}' - Steam API priority enabled")
+            self.logger.info(f"Fetching requirements for '{game_name}' - checking local cache first")
             
-            # Step 1: Try Steam API first (primary source)
-            try:
-                steam_requirements = await self.steam_source.fetch(game_name)
-                if steam_requirements:
-                    self.logger.info(f"Successfully fetched '{game_name}' from Steam API")
-                    
-                    # Cache the Steam result for future use
-                    await self._cache_requirements(steam_requirements)
-                    return steam_requirements
-                else:
-                    self.logger.info(f"Steam API returned no results for '{game_name}', trying LLM-enhanced search")
-                    
-                    # Try LLM-enhanced game matching with Steam
-                    if self.llm_analyzer:
-                        enhanced_result = await self._llm_enhanced_steam_search(game_name)
-                        if enhanced_result:
-                            await self._cache_requirements(enhanced_result)
-                            return enhanced_result
-                            
-            except Exception as e:
-                self.logger.warning(f"Steam API failed for '{game_name}': {e}")
-            
-            # Step 2: Fallback to local cache with fuzzy matching
-            self.logger.info(f"Trying local cache with fuzzy matching for '{game_name}'")
+            # Step 1: Try local cache first (primary source)
             cache_requirements = await self.cache_source.fetch(game_name)
             if cache_requirements:
                 self.logger.info(f"Found '{game_name}' in local cache")
                 return cache_requirements
+                
+            # Special handling for Diablo 4 <-> Diablo IV mapping
+            if game_name.lower() == "diablo 4":
+                diablo_iv = await self.cache_source.fetch("Diablo IV")
+                if diablo_iv:
+                    self.logger.info(f"Mapped 'Diablo 4' to 'Diablo IV' in cache")
+                    return diablo_iv
+            elif game_name.lower() == "diablo iv":
+                diablo_4 = await self.cache_source.fetch("Diablo 4")
+                if diablo_4:
+                    self.logger.info(f"Mapped 'Diablo IV' to 'Diablo 4' in cache")
+                    return diablo_4
             
-            # Step 3: Try LLM-enhanced cache interpretation
-            if self.llm_analyzer:
-                self.logger.info(f"Trying LLM-enhanced cache interpretation for '{game_name}'")
-                llm_result = await self._llm_enhanced_cache_search(game_name)
-                if llm_result:
-                    return llm_result
+            # Step 2: Fallback to Steam API if not in cache
+            self.logger.info(f"Not found in cache, trying Steam API for '{game_name}'")
+            try:
+                steam_requirements = await self.steam_source.fetch(game_name)
+                if steam_requirements:
+                    self.logger.info(f"Successfully fetched '{game_name}' from Steam API")
+                    await self._cache_requirements(steam_requirements)
+                    return steam_requirements
+            except Exception as e:
+                self.logger.warning(f"Steam API failed for '{game_name}': {e}")
             
+            # Step 3: If all else fails, return a clear message instead of using LLM
             self.logger.warning(f"No requirements found for '{game_name}' after trying all sources")
             return None
             

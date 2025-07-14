@@ -184,30 +184,33 @@ class TestSteamScrapingFix(unittest.TestCase):
             
         print("✅ CanRun engine integration test passed")
     
-    def test_performance_predictor_typo_fix(self):
-        """Test that the performance predictor typo is fixed."""
-        from performance_predictor import PerformancePredictor
-        from compatibility_analyzer import CompatibilityAnalysis, CompatibilityLevel, ComponentAnalysis, ComponentType
+    def test_dynamic_performance_predictor_integration(self):
+        """Test that the new dynamic performance predictor works correctly."""
+        from dynamic_performance_predictor import DynamicPerformancePredictor
         
-        predictor = PerformancePredictor()
+        predictor = DynamicPerformancePredictor()
         
-        # Create mock compatibility analysis
-        mock_analysis = Mock(spec=CompatibilityAnalysis)
-        mock_analysis.game_name = "Test Game"
+        # Test RTX 3080 + i7-10700K system (should get A-tier)
+        hardware_specs = {
+            'gpu_model': 'RTX 3080',
+            'cpu_model': 'Intel i7-10700K',
+            'ram_total_gb': 16,
+            'cpu_cores': 8,
+            'cpu_threads': 16,
+            'cpu_frequency': 3800,
+            'gpu_vram_gb': 10
+        }
         
-        try:
-            # This should not raise an error due to the typo
-            result = predictor.predict_performance(
-                mock_analysis, "RTX 3080", 10, True, True
-            )
-            self.assertIsNotNone(result)
-            print("✅ Performance predictor typo fix test passed")
-        except NameError as e:
-            if "ssessment" in str(e):
-                self.fail("Performance predictor typo not fixed")
-            else:
-                # Different error, that's okay for this test
-                pass
+        # Test performance assessment
+        assessment = predictor.assess_performance(hardware_specs=hardware_specs)
+        
+        # Verify mid-high-end hardware gets good tier
+        self.assertGreaterEqual(assessment.score, 70, "RTX 3080 + i7-10700K should get 70+ score")
+        self.assertIn(assessment.tier.name, ['A', 'B', 'S'], "Should get good tier")
+        self.assertIsNotNone(assessment.recommended_settings, "Should have settings recommendation")
+        self.assertIsNotNone(assessment.recommended_resolution, "Should have resolution recommendation")
+        
+        print("✅ Dynamic performance predictor integration test passed")
 
 
 def run_async_test(test_func):

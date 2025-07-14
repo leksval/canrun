@@ -9,8 +9,8 @@ from typing import Dict, List, Optional, Tuple, Any
 from dataclasses import dataclass
 from enum import Enum
 
-from privacy_aware_hardware_detector import PrivacyAwareHardwareSpecs
-from game_requirements_fetcher import GameRequirements
+from src.privacy_aware_hardware_detector import PrivacyAwareHardwareSpecs
+from src.game_requirements_fetcher import GameRequirements
 
 
 class CompatibilityLevel(Enum):

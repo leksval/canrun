@@ -339,7 +339,7 @@ def test_manifest_structure():
 
 def run_all_tests():
     """Run all plugin tests"""
-    print("🎮 CanRun Plugin Core Logic Tests")
+    print("CanRun Plugin Core Logic Tests")
     print("="*50)
     
     tests = [

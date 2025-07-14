@@ -31,6 +31,7 @@ colorama>=0.4.6        # Cross-platform colored terminal output
 tqdm>=4.65.0          # Progress bars for long operations
 
 # G-Assist integration dependencies
+rise>=1.0.0            # Official NVIDIA G-Assist Python bindings
 # Note: torch removed as CUDA detection moved to nvidia-ml-py and pynvml
 
 # Runtime testing (minimal for G-Assist plugin validation)

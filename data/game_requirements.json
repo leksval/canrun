@@ -57,38 +57,38 @@
     },
     "Hogwarts Legacy": {
       "minimum": {
-        "os": "Windows 10",
-        "processor": "Intel Core i5-6600 or AMD Ryzen 5 1400",
-        "memory": "16 GB RAM",
-        "graphics": "NVIDIA GeForce GTX 960 or AMD Radeon RX 470",
+        "processor": "Intel Core i5-6600 (3.3Ghz) or AMD Ryzen 5 1400 (3.2Ghz)",
+        "graphics": "NVIDIA GeForce GTX 960 4GB or AMD Radeon RX 470 4GB",
+        "memory": "16 GB",
+        "storage": "85 GB",
         "directx": "Version 12",
-        "storage": "85 GB available space"
+        "os": "64-bit Windows 10"
       },
       "recommended": {
-        "os": "Windows 10",
-        "processor": "Intel Core i7-8700K or AMD Ryzen 5 3600",
-        "memory": "16 GB RAM",
-        "graphics": "NVIDIA GeForce RTX 2070 or AMD Radeon RX 6800 XT",
+        "processor": "Intel Core i7-8700 (3.2Ghz) or AMD Ryzen 5 3600 (3.6 Ghz)",
+        "graphics": "NVIDIA GeForce 1080 Ti or AMD Radeon RX 5700 XT or INTEL Arc A770",
+        "memory": "16 GB",
+        "storage": "85 GB",
         "directx": "Version 12",
-        "storage": "85 GB available space"
+        "os": "64-bit Windows 10"
       }
     },
     "Call of Duty: Modern Warfare II": {
       "minimum": {
-        "os": "Windows 10",
-        "processor": "Intel Core i3-6100 or AMD Ryzen 3 1200",
-        "memory": "8 GB RAM",
-        "graphics": "NVIDIA GeForce GTX 960 or AMD Radeon RX 470",
-        "directx": "Version 12",
-        "storage": "125 GB available space"
+        "processor": "Intel\u00ae Core\u2122 i3-6100 / Core\u2122 i5-2500K or AMD Ryzen\u2122 3 1200",
+        "graphics": "NVIDIA\u00ae GeForce\u00ae GTX 960 or AMD Radeon\u2122 RX 470 -",
+        "memory": "8 GB",
+        "storage": "125 GB",
+        "directx": "Version 12 Network: Broadband Internet connection",
+        "os": "Windows\u00ae 10 64 Bit (latest update)"
       },
       "recommended": {
-        "os": "Windows 10",
-        "processor": "Intel Core i5-6600K or AMD Ryzen 5 1600",
-        "memory": "12 GB RAM",
-        "graphics": "NVIDIA GeForce GTX 1060 or AMD Radeon RX 580",
-        "directx": "Version 12",
-        "storage": "125 GB available space"
+        "processor": "Intel\u00ae Core\u2122 i5-6600K / Core\u2122 i7-4770 or AMD Ryzen\u2122 5 1400",
+        "graphics": "NVIDIA\u00ae GeForce\u00ae GTX 1060 or AMD Radeon\u2122 RX 580 -",
+        "memory": "8 GB",
+        "storage": "125 GB",
+        "directx": "Version 12 Network: Broadband Internet connection",
+        "os": "Windows\u00ae 10 64 Bit (latest update) or Windows\u00ae 11 64 Bit (latest update)"
       }
     },
     "Red Dead Redemption 2": {

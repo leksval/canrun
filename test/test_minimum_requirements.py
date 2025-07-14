@@ -21,7 +21,7 @@ async def test_minimum_requirements_logic():
     min_req_status = result.get_minimum_requirements_status()
     print(f"Can run game: {min_req_status['can_run_game']}")
     print(f"Overall status: {min_req_status['overall_status']}")
-    print(f"Summary message: {min_req_status['summary_message']}")
+    print(f"Summary message: {min_req_status['summary_message']}", encoding='utf-8', errors='replace')
     
     print("\n=== COMPONENT DETAILS ===")
     for component in min_req_status['meeting_components']:

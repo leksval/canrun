@@ -3,34 +3,49 @@
 
 import sys
 import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from performance_predictor import PerformancePredictor
-from compatibility_analyzer import CompatibilityAnalysis
+from dynamic_performance_predictor import DynamicPerformancePredictor
 
 def test_performance_prediction():
-    predictor = PerformancePredictor()
+    predictor = DynamicPerformancePredictor()
     
-    # Create a dummy compatibility analysis
-    class DummyAnalysis:
-        def __init__(self):
-            self.game_name = "Diablo IV"
-            self.overall_score = 0.85
+    # Test with RTX 3070 + i5-12400 system (mid-range)
+    hardware_specs = {
+        'gpu_model': 'RTX 3070',
+        'cpu_model': 'Intel i5-12400',
+        'ram_total_gb': 16,
+        'cpu_cores': 6,
+        'cpu_threads': 12,
+        'cpu_frequency': 3600,
+        'gpu_vram_gb': 8
+    }
     
-    analysis = DummyAnalysis()
+    game_requirements = {
+        'recommended': {
+            'processor': 'Intel Core i5-8400',
+            'graphics': 'NVIDIA GeForce GTX 1060',
+            'memory': 8
+        }
+    }
     
-    # Test the predict_performance method
+    # Test the assess_performance method
     try:
-        result = predictor.predict_performance(analysis, "RTX 4090", 24, True, True)
+        result = predictor.assess_performance(
+            hardware_specs=hardware_specs,
+            game_requirements=game_requirements
+        )
         print(f"Result type: {type(result)}")
-        print(f"Result: {result}")
+        print(f"Performance Score: {result.score}")
+        print(f"Performance Tier: {result.tier.name}")
+        print(f"Expected FPS: {result.expected_fps}")
+        print(f"Recommended Settings: {result.recommended_settings}")
+        print(f"Recommended Resolution: {result.recommended_resolution}")
         
-        if hasattr(result, 'predictions'):
-            print(f"Predictions: {result.predictions}")
-            if result.predictions:
-                print(f"First prediction: {result.predictions[0]}")
-                if 'fps' in result.predictions[0]:
-                    print(f"Expected FPS: {result.predictions[0]['fps']}")
+        if result.bottlenecks:
+            print(f"Bottlenecks: {result.bottlenecks}")
+        if result.upgrade_suggestions:
+            print(f"Upgrade Suggestions: {result.upgrade_suggestions}")
         
     except Exception as e:
         print(f"Error: {e}")

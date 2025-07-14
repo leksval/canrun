@@ -12,11 +12,8 @@ from enum import Enum
 import threading
 from datetime import datetime, timedelta
 
-# Torch imports removed - CUDA detection not needed in G-Assist plugin context
-# Torch core functionality still available for LLM operations if needed
-
-from performance_predictor import PerformanceAssessment
-from privacy_aware_hardware_detector import PrivacyAwareHardwareSpecs
+from src.dynamic_performance_predictor import PerformanceAssessment
+from src.privacy_aware_hardware_detector import PrivacyAwareHardwareSpecs
 
 
 class LLMAnalysisType(Enum):
@@ -124,8 +121,15 @@ class GAssistLLMAnalyzer:
         """Generate cache key for analysis result."""
         # Extract game name for more readable cache keys
         game_name = context.get('game_name', 'unknown')
-        context_str = json.dumps(context, sort_keys=True)
-        return f"{analysis_type}_{game_name}_{hash(context_str)}"
+        try:
+            # Make sure context is serializable before creating cache key
+            serializable_context = self._make_context_serializable(context)
+            context_str = json.dumps(serializable_context, sort_keys=True)
+            return f"{analysis_type}_{game_name}_{hash(context_str)}"
+        except Exception as e:
+            self.logger.warning(f"Failed to serialize context for cache key: {e}")
+            # Fallback to simpler cache key
+            return f"{analysis_type}_{game_name}_{hash(str(context))}"
     
     def _get_cached_result(self, cache_key: str) -> Optional[LLMAnalysisResult]:
         """Get cached analysis result if available and not expired."""
@@ -191,8 +195,8 @@ class GAssistLLMAnalyzer:
         start_time = datetime.now()
         
         try:
-            # Enhanced context for intelligent queries
-            enhanced_context = system_context.copy()
+            # Enhanced context for intelligent queries - make it JSON serializable
+            enhanced_context = self._make_context_serializable(system_context.copy())
             if query and analysis_type == LLMAnalysisType.INTELLIGENT_QUERY:
                 enhanced_context['query'] = query
             
@@ -806,3 +810,67 @@ Please provide a detailed analysis focusing on:
                 }
         
         return None
+    
+    def _make_context_serializable(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        """Convert context to JSON-serializable format by handling dataclass objects and enums."""
+        serializable_context = {}
+        
+        for key, value in context.items():
+            try:
+                if hasattr(value, 'value') and hasattr(value, 'name'):
+                    # Handle Enum objects
+                    serializable_context[key] = value.value if hasattr(value.value, '__iter__') and not isinstance(value.value, str) else str(value.value)
+                elif hasattr(value, '__dict__'):
+                    # Convert dataclass or object to dict
+                    if hasattr(value, '_asdict'):
+                        # NamedTuple
+                        serializable_context[key] = value._asdict()
+                    elif hasattr(value, '__dataclass_fields__'):
+                        # Dataclass - recursively serialize fields
+                        serializable_context[key] = {}
+                        for field in value.__dataclass_fields__:
+                            field_value = getattr(value, field)
+                            serializable_context[key][field] = self._serialize_value(field_value)
+                    else:
+                        # Generic object with __dict__
+                        serializable_context[key] = self._serialize_value(value.__dict__)
+                elif isinstance(value, (list, tuple)):
+                    # Handle lists/tuples that might contain objects
+                    serializable_context[key] = [self._serialize_value(item) for item in value]
+                elif isinstance(value, dict):
+                    # Recursively handle nested dictionaries
+                    serializable_context[key] = self._make_context_serializable(value)
+                else:
+                    # Primitive types (str, int, float, bool, None)
+                    serializable_context[key] = value
+            except Exception as e:
+                # If serialization fails, convert to string representation
+                self.logger.debug(f"Failed to serialize {key}: {e}")
+                serializable_context[key] = str(value)
+        
+        return serializable_context
+    
+    def _serialize_value(self, value: Any) -> Any:
+        """Serialize a single value, handling enums, datetime, and complex objects."""
+        try:
+            if hasattr(value, 'value') and hasattr(value, 'name'):
+                # Handle Enum objects
+                return value.value if hasattr(value.value, '__iter__') and not isinstance(value.value, str) else str(value.value)
+            elif hasattr(value, 'isoformat'):
+                # Handle datetime objects
+                return value.isoformat()
+            elif hasattr(value, '__dict__'):
+                # Handle objects with __dict__
+                return {k: self._serialize_value(v) for k, v in value.__dict__.items()}
+            elif isinstance(value, (list, tuple)):
+                # Handle collections
+                return [self._serialize_value(item) for item in value]
+            elif isinstance(value, dict):
+                # Handle dictionaries
+                return {k: self._serialize_value(v) for k, v in value.items()}
+            else:
+                # Primitive types
+                return value
+        except Exception:
+            # Fallback to string representation
+            return str(value)

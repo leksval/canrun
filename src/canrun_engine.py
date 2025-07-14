@@ -12,12 +12,12 @@ from typing import Dict, List, Optional, Tuple, Any
 from dataclasses import dataclass, asdict
 from datetime import datetime, timedelta
 
-from privacy_aware_hardware_detector import PrivacyAwareHardwareDetector, PrivacyAwareHardwareSpecs
-from game_requirements_fetcher import GameRequirementsFetcher, GameRequirements
-from optimized_game_fuzzy_matcher import OptimizedGameFuzzyMatcher
-from compatibility_analyzer import CompatibilityAnalyzer, CompatibilityAnalysis, ComponentAnalysis, ComponentType, CompatibilityLevel
-from performance_predictor import PerformancePredictor, PerformanceAssessment, PerformanceTier
-from rtx_llm_analyzer import GAssistLLMAnalyzer, LLMAnalysisResult
+from src.privacy_aware_hardware_detector import PrivacyAwareHardwareDetector, PrivacyAwareHardwareSpecs
+from src.game_requirements_fetcher import GameRequirementsFetcher, GameRequirements
+from src.optimized_game_fuzzy_matcher import OptimizedGameFuzzyMatcher
+from src.compatibility_analyzer import CompatibilityAnalyzer, CompatibilityAnalysis, ComponentAnalysis, ComponentType, CompatibilityLevel
+from src.dynamic_performance_predictor import DynamicPerformancePredictor, PerformanceAssessment, PerformanceTier
+from src.rtx_llm_analyzer import GAssistLLMAnalyzer, LLMAnalysisResult
 
 
 @dataclass
@@ -77,7 +77,7 @@ class CanRunEngine:
         self.requirements_fetcher = GameRequirementsFetcher(self.llm_analyzer)
         self.fuzzy_matcher = OptimizedGameFuzzyMatcher()
         self.compatibility_analyzer = CompatibilityAnalyzer()
-        self.performance_predictor = PerformancePredictor()
+        self.performance_predictor = DynamicPerformancePredictor()
         
         # Create cache directory and validate
         os.makedirs(cache_dir, exist_ok=True)
@@ -122,7 +122,9 @@ class CanRunEngine:
         
         # Step 2: Fetch game requirements
         game_requirements = await self._fetch_game_requirements(game_name)
-        assert game_requirements is not None, "Game requirements fetching failed"
+        if game_requirements is None:
+            # Instead of using LLM fallback or raising error, create a more helpful message
+            raise ValueError(f"Game requirements not found for '{game_name}'. The game may not be in our database or might be known by another name. For Diablo 4, try 'Diablo IV' instead.")
         
         # Step 3: Analyze compatibility
         compatibility_analysis = await self._analyze_compatibility(
@@ -367,9 +369,19 @@ class CanRunEngine:
             component_analyses = []
             for comp_data in compat_data['component_analyses']:
                 if isinstance(comp_data, dict):
+                    # Handle enum serialization - extract value from string representation
+                    component_value = comp_data['component']
+                    if isinstance(component_value, str):
+                        # Handle both "ComponentType.GPU" and "GPU" formats
+                        if '.' in component_value:
+                            component_value = component_value.split('.')[-1]  # Extract "GPU" from "ComponentType.GPU"
+                        component_type = ComponentType(component_value)
+                    else:
+                        component_type = component_value
+                    
                     # Convert dictionary back to ComponentAnalysis
                     component_analyses.append(ComponentAnalysis(
-                        component=ComponentType(comp_data['component']),
+                        component=component_type,
                         meets_minimum=comp_data['meets_minimum'],
                         meets_recommended=comp_data['meets_recommended'],
                         score=comp_data['score'],
@@ -391,6 +403,9 @@ class CanRunEngine:
             bottlenecks = []
             for bottleneck in compat_data['bottlenecks']:
                 if isinstance(bottleneck, str):
+                    # Handle both "ComponentType.GPU" and "GPU" formats
+                    if '.' in bottleneck:
+                        bottleneck = bottleneck.split('.')[-1]  # Extract "GPU" from "ComponentType.GPU"
                     bottlenecks.append(ComponentType(bottleneck))
                 else:
                     bottlenecks.append(bottleneck)
