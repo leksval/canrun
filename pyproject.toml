@@ -79,6 +79,12 @@ Documentation = "https://github.com/canrun/canrun/blob/main/README.md"
 [project.scripts]
 canrun = "plugin:main"
 
+[project.entry-points.'nvidia.g-assist.plugins']
+canrun = "plugin:main"
+
+[project.entry-points.'g-assist.plugins']
+canrun = "plugin:main"
+
 [tool.uv]
 dev-dependencies = [
     "pytest>=7.0.0",

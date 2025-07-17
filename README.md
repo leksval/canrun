@@ -1,6 +1,6 @@
 <table> <tr> <td width="110" valign="middle"> <img width="100" height="100" alt="canrun_logo" src="https://github.com/user-attachments/assets/239082bd-d5ca-427b-b235-5326299f3104" /> </td> <td valign="middle"> <h1 style="display:inline-block; vertical-align:middle; margin:0; padding:0;">  CanRun - G-Assist Game Compatibility Checker </h1> </td> </tr> </table>
   
-  [![Version](https://img.shields.io/badge/version-4.0.0-blue.svg)](https://github.com/canrun/canrun)
+  [![Version](https://img.shields.io/badge/version-5.0.0-blue.svg)](https://github.com/canrun/canrun)
   [![Python](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/downloads/)
   [![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
   [![G-Assist](https://img.shields.io/badge/G--Assist-Official%20Integration-brightgreen.svg)](https://www.nvidia.com/en-us/geforce/technologies/g-assist/)
@@ -10,7 +10,40 @@
 
 ## 🚀 Overview
 
-**CanRun** is an RTX/GTX-exclusive G-Assist plugin that instantly tells you if your PC can run any game with an advanced **S-A-B-C-D-F tier system**. Now featuring **official NVIDIA G-Assist integration** using the `rise` Python library, it delivers intelligent, privacy-protected compatibility analysis with zero data leaving your system.
+**CanRun** is an RTX/GTX-exclusive G-Assist plugin that instantly tells you if your PC can run any game with an advanced **S-A-B-C-D-F tier system**. Now featuring **Enhanced G-Assist Integration v5.0** with tool name detection, Steam Compare UI, and intelligent chat responses using advanced communication patterns from NVIDIA G-Assist examples.
+
+## 🆕 Enhanced G-Assist Features v5.0
+
+### **🎯 Tool Name Detection System**
+- **Natural Language Processing**: Automatically detects user intent from conversational queries
+- **Pattern Recognition**: Uses regex patterns to identify compatibility, hardware, and comparison requests
+- **Game Name Extraction**: Intelligently extracts game names from natural language input
+- **Auto-Routing**: Automatically routes to appropriate functions based on detected intent
+
+### **🎮 Steam Compare UI Integration**
+- **Real-Time Steam Data**: Fetches live game requirements directly from Steam API
+- **Compatibility Overlay**: Shows your system specs vs. game requirements side-by-side
+- **Rich Formatting**: Enhanced G-Assist chat responses with emojis and structured layout
+- **Performance Analysis**: Integrated performance predictions with Steam data
+
+### **💬 Enhanced Chat Responses**
+- **Professional G-Assist Style**: Rich emoji-based formatting optimized for G-Assist chat window
+- **Performance Tiers**: S/A/B/C/D/F tier system with detailed explanations
+- **Gaming Performance Levels**: 4K/1440p/1080p ready indicators
+- **Optimization Tips**: AI-powered recommendations for better performance
+
+### **🔧 Five Enhanced Functions**
+1. **`check_compatibility`**: Enhanced compatibility check with Steam Compare UI
+2. **`detect_hardware`**: Gaming-focused hardware detection with performance assessment
+3. **`steam_compare`**: Dedicated Steam Compare UI functionality
+4. **`compare_games`**: Multi-game performance comparison (2-3 games)
+5. **`auto_detect`**: Automatic tool detection from natural language input
+
+### **🗣️ Natural Language Examples**
+- **"Can I run Diablo 4?"** → Compatibility check with Steam data
+- **"What are my system specs?"** → Hardware detection with gaming assessment
+- **"Compare Cyberpunk vs Elden Ring"** → Multi-game comparison
+- **"Show me Steam requirements for Baldur's Gate 3"** → Steam Compare UI
 
 ## 🎯 Performance Transformation: F-Tier → S-Tier (100/100)
 
@@ -62,9 +95,17 @@ uv sync
 # Alternative: Install with pip
 pip install -r requirements.txt
 
-# 3. Test the S-tier performance transformation
-uv run python plugin.py --function check_compatibility --game "Diablo 4"
-# Expected: "CanRun Analysis: Diablo 4 - Tier S - EXCELLENT"
+# 3. Test the enhanced G-Assist plugin
+uv run python plugin.py --function check_compatibility --game "Diablo 4" --show-steam
+# Expected: Enhanced G-Assist response with Steam Compare UI
+
+# 4. Test natural language auto-detection
+uv run python plugin.py --function auto_detect --input "Can I run Elden Ring?"
+# Expected: Automatic routing to compatibility check
+
+# 5. Test multi-game comparison
+uv run python plugin.py --function compare_games --games "Diablo 4" "Cyberpunk 2077"
+# Expected: Side-by-side performance comparison
 
 # 4. Verify Steam API integration
 uv run python -c "
@@ -78,11 +119,13 @@ asyncio.run(test())
 "
 ```
 
-**G-Assist Voice Commands (Ready for Testing):**
-- "Can my system run Diablo 4?"
-- "Check compatibility for Cyberpunk 2077"
-- "What tier performance will I get in Baldur's Gate 3?"
-- "Analyze my hardware specs"
+**Enhanced G-Assist Voice Commands (v5.0 Ready):**
+- "Can my system run Diablo 4?" → Enhanced compatibility check with Steam Compare UI
+- "Check compatibility for Cyberpunk 2077" → Full compatibility analysis with optimization tips
+- "What are my system specs?" → Gaming-focused hardware detection with performance assessment
+- "Compare Cyberpunk vs Elden Ring" → Multi-game performance comparison
+- "Show me Steam requirements for Baldur's Gate 3" → Steam Compare UI with compatibility overlay
+- "What tier performance will I get?" → Enhanced performance prediction with detailed analysis
 
 **Performance Verification:**
 ```bash
@@ -95,36 +138,77 @@ uv run python plugin.py --function check_compatibility --game "Diablo 4"
 # ✅ Result: "CanRun Analysis: Diablo 4 - Tier S - EXCELLENT"
 ```
 
-## 🆕 What's New in v4.0.0 - The S-Tier Transformation
+## 📦 G-Assist Plugin Installation
 
-### 🎯 Critical Performance Transformation (F-Tier → S-Tier)
-- **Steam API Complete Overhaul**: Fixed all Steam scraping issues, now fetches real-time game requirements
-- **Dynamic Performance Predictor**: New NVIDIA-focused system with RTX 50/40/30 series support
-- **S-Tier Achievement**: RTX 4090 + Ryzen 7 7800X3D systems now correctly achieve 100/100 score
-- **Official G-Assist Integration**: Updated to use NVIDIA's `rise` library for proper plugin communication
+### Ready-to-Use Executable
+The G-Assist plugin is available as a pre-built executable in the root directory:
+- **Executable**: [`canrun-g-assist-plugin.exe`](canrun-g-assist-plugin.exe) - Ready for G-Assist installation
+- **Installer**: [`install_plugin.bat`](install_plugin.bat) - Automated installation script
 
-### 🔧 Major Technical Fixes
-- **Steam API Integration**: Complete rewrite with proper app ID resolution and requirements parsing
-- **asyncio.CancelledError Handling**: Robust timeout and cancellation handling across all Steam API calls
-- **G-Assist Function Matching**: Enhanced manifest.json with proper triggers for "canrun diablo4?" queries
-- **JSON Serialization**: Fixed all dataclass and enum serialization issues for LLM integration
-- **Hardware Detection**: Intelligent CPU frequency detection instead of hardcoded defaults
-
-### ✅ Verified Working Features
+### Quick Installation
 ```bash
-# All core functionality now working perfectly:
-✅ Steam API Integration (Diablo 4 ID: 2344520)
-✅ Dynamic Performance Prediction (S-tier: 100/100)
-✅ G-Assist Plugin Discovery (manifest.json optimized)
-✅ Hardware Detection (RTX 4090, Ryzen 7 7800X3D)
-✅ Error Handling (asyncio.CancelledError resolved)
+# Run the automated installer
+.\install_plugin.bat
+
+# This will:
+# 1. Create %USERPROFILE%\canrun\ directory
+# 2. Copy canrun-g-assist-plugin.exe and required files
+# 3. Install data files and dependencies
+# 4. Test the plugin functionality
 ```
 
-### 🚀 G-Assist Integration Status
-- **Plugin Architecture**: Updated to use official NVIDIA `rise` library
-- **Manifest Configuration**: Optimized for G-Assist function discovery
-- **Communication Protocol**: Asynchronous function registration and execution
-- **Ready for Testing**: All technical components working, awaiting G-Assist environment testing
+### Manual Installation
+```bash
+# 1. Create plugin directory
+mkdir "%USERPROFILE%\canrun"
+
+# 2. Copy essential files
+copy canrun-g-assist-plugin.exe "%USERPROFILE%\canrun\"
+copy manifest.json "%USERPROFILE%\canrun\"
+copy config.json "%USERPROFILE%\canrun\"
+
+# 3. Copy data directories
+xcopy data "%USERPROFILE%\canrun\data" /E /I /Q
+xcopy src "%USERPROFILE%\canrun\src" /E /I /Q
+```
+
+## 🆕 What's New in v5.0.0 - Enhanced G-Assist Communication
+
+### 🎯 Enhanced G-Assist Integration (v4.0.0 → v5.0.0)
+- **Tool Name Detection System**: Automatic intent recognition from natural language queries
+- **Steam Compare UI**: Real-time Steam API integration with compatibility overlay
+- **Enhanced Chat Responses**: Professional G-Assist formatting with emojis and structured layout
+- **Multi-Function Architecture**: 5 enhanced functions with intelligent routing
+- **Auto-Detection**: Natural language processing for seamless user experience
+
+### 🔧 Major Communication Enhancements
+- **ToolNameDetector Class**: Regex-based pattern matching for user intent detection
+- **SteamCompareUI Class**: Real-time Steam API integration with rich formatting
+- **EnhancedResponseFormatter Class**: Professional G-Assist style responses
+- **Multi-Game Comparison**: Side-by-side performance analysis for 2-3 games
+- **Natural Language Processing**: Intelligent game name extraction and routing
+
+### ✅ Enhanced Functions Working
+```bash
+# All enhanced functionality verified:
+✅ check_compatibility: Enhanced with Steam Compare UI
+✅ detect_hardware: Gaming-focused with performance assessment
+✅ steam_compare: Dedicated Steam requirements display
+✅ compare_games: Multi-game performance comparison
+✅ auto_detect: Natural language intent recognition
+```
+
+### 🚀 Enhanced G-Assist Communication Status
+- **Communication Patterns**: Based on NVIDIA G-Assist examples (rise-chat.py, rise-gui.py)
+- **Tool Call Routing**: Intelligent function selection from user input
+- **Rich Response Formatting**: Optimized for G-Assist chat window display
+- **Ready for Enhanced Testing**: All enhanced features verified in CLI mode
+
+### 🔄 Previous v4.0.0 Achievements (Maintained)
+- **S-Tier Performance**: RTX 4090 + Ryzen 7 7800X3D systems achieve 100/100 score
+- **Steam API Integration**: Real-time game requirements fetching
+- **Official G-Assist Integration**: NVIDIA `rise` library implementation
+- **Robust Error Handling**: Comprehensive asyncio and timeout management
 
 ## 🔄 Real Workflow (LLM-Powered)
 
@@ -211,19 +295,40 @@ uv run python -m pytest test/test_privacy_aware_hardware.py -v
 
 The plugin now uses the official NVIDIA G-Assist Python bindings for proper integration:
 
-### Plugin Configuration
+### Enhanced Plugin Configuration (v5.0)
 ```json
 {
   "manifestVersion": 1,
-  "name": "CanRun Game Compatibility Checker",
+  "name": "CanRun Game Compatibility Checker - Enhanced",
+  "version": "5.0.0",
   "executable": "python",
   "args": ["plugin.py"],
   "persistent": true,
   "functions": [
     {
       "name": "check_compatibility",
-      "description": "Check if a game can run on this system and get performance analysis",
-      "tags": ["game", "compatibility", "canrun", "can run", "will work", "diablo", "cyberpunk"]
+      "description": "Enhanced compatibility check with Steam Compare UI and performance analysis",
+      "tags": ["game", "compatibility", "canrun", "can run", "will work", "diablo", "cyberpunk", "steam"]
+    },
+    {
+      "name": "detect_hardware",
+      "description": "Gaming-focused hardware detection with performance assessment",
+      "tags": ["hardware", "specs", "system", "gpu", "cpu", "performance"]
+    },
+    {
+      "name": "steam_compare",
+      "description": "Steam Compare UI with real-time requirements and compatibility overlay",
+      "tags": ["steam", "requirements", "compare", "specs"]
+    },
+    {
+      "name": "compare_games",
+      "description": "Multi-game performance comparison for 2-3 games",
+      "tags": ["compare", "games", "performance", "multiple"]
+    },
+    {
+      "name": "auto_detect",
+      "description": "Automatic tool detection from natural language input",
+      "tags": ["auto", "detect", "natural", "language", "smart"]
     }
   ]
 }
@@ -238,12 +343,24 @@ pip install rise>=1.0.0
 uv add rise
 ```
 
-### Testing the Integration
+### Testing the Enhanced Integration
 ```bash
-# Test plugin functionality (works without G-Assist)
-uv run python plugin.py --function check_compatibility --game "Diablo 4"
+# Test enhanced compatibility check with Steam Compare UI
+uv run python plugin.py --function check_compatibility --game "Diablo 4" --show-steam
 
-# Expected output: "CanRun Analysis: Diablo 4 - Tier S - EXCELLENT"
+# Test natural language auto-detection
+uv run python plugin.py --function auto_detect --input "Can I run Elden Ring on my system?"
+
+# Test Steam Compare UI
+uv run python plugin.py --function steam_compare --game "Cyberpunk 2077"
+
+# Test multi-game comparison
+uv run python plugin.py --function compare_games --games "Diablo 4" "Cyberpunk 2077" "Elden Ring"
+
+# Test gaming-focused hardware detection
+uv run python plugin.py --function detect_hardware
+
+# Expected: Enhanced G-Assist responses with rich formatting and Steam data
 ```
 
 ### G-Assist Integration Architecture
@@ -495,9 +612,17 @@ uv run python plugin.py --function predict_advanced_performance --game "Test Gam
 # Rebuild the G-Assist plugin executable (required after code changes)
 uv run pyinstaller --distpath c:\projects\canrun_1\canrun g-assist-plugin-python.spec
 
-# This creates g-assist-plugin-python.exe in the root directory
-# The executable includes all dependencies and can be used by G-Assist
+# Copy the executable to root directory for easy access
+copy dist\g-assist-plugin-python.exe canrun-g-assist-plugin.exe
+
+# The executable is now available in the root directory as canrun-g-assist-plugin.exe
+# This includes all dependencies and can be used by G-Assist
 ```
+
+**Executable Location:**
+- **Root Directory**: [`canrun-g-assist-plugin.exe`](canrun-g-assist-plugin.exe) - Ready-to-use executable
+- **Dist Directory**: [`dist/g-assist-plugin-python.exe`](dist/g-assist-plugin-python.exe) - PyInstaller output
+- **Installation**: Use [`install_plugin.bat`](install_plugin.bat) for automated G-Assist installation
 
 ## 📈 Version History
 
