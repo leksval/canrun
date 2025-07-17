@@ -1,0 +1,38 @@
+{
+  "manifestVersion": 1,
+  "name": "CanRun Game Compatibility Checker",
+  "description": "Check if games can run on your system with performance analysis",
+  "version": "5.0.0",
+  "author": "CanRun Development Team",
+  "tags": ["game", "compatibility", "canrun", "performance", "system", "requirements"],
+  "executable": "python",
+  "args": ["plugin.py"],
+  "persistent": true,
+  "functions": [
+    {
+      "name": "check_compatibility",
+      "description": "Check if a game can run on this system and get performance analysis",
+      "tags": ["game", "compatibility", "canrun", "can run", "will work", "diablo", "cyberpunk"]
+    },
+    {
+      "name": "detect_hardware",
+      "description": "Detect system hardware specifications",
+      "tags": ["hardware", "system", "specs", "gpu", "cpu"]
+    },
+    {
+      "name": "steam_compare",
+      "description": "Compare game requirements with Steam data",
+      "tags": ["steam", "compare", "requirements"]
+    },
+    {
+      "name": "compare_games",
+      "description": "Compare multiple games performance",
+      "tags": ["compare", "games", "performance"]
+    },
+    {
+      "name": "auto_detect",
+      "description": "Auto-detect user intent from natural language",
+      "tags": ["auto", "detect", "smart"]
+    }
+  ]
+}
