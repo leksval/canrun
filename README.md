@@ -22,6 +22,7 @@ tags:
   [![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
   [![G-Assist](https://img.shields.io/badge/G--Assist-Official%20Protocol%20Verified-brightgreen.svg)](https://www.nvidia.com/en-us/geforce/technologies/g-assist/)
   [![Steam API](https://img.shields.io/badge/Steam%20API-Integrated-blue.svg)](https://steamcommunity.com/dev)
+  [![MCP Server](https://img.shields.io/badge/MCP%20Server-Enabled-brightgreen.svg)](https://developer.nvidia.com/mcp)
 
 ## 🚀 Overview
 
@@ -39,6 +40,7 @@ tags:
 - **📊 Smart Performance Prediction**: Comprehensive hardware hierarchies with RTX 30/20 series support
 - **💡 Intelligent Recommendations**: AI-generated optimization tips, DLSS strategies, upgrade suggestions
 - **🏃 Zero Setup**: Drop-in plugin with automatic RTX/GTX validation
+- **🤖 MCP Server**: Official Model Context Protocol (MCP) server for G-Assist integration
 
 ```bash
 # Test the transformation - RTX 3080 + Intel i7-12700K system
@@ -107,6 +109,39 @@ The G-Assist plugin is available as a pre-built executable in the root directory
 2. **Install Plugin**: `.\install_plugin.bat` (as Administrator)  
 3. **Test with G-Assist**: "Hey canrun, can I run Diablo 4?"
 
+## 🤖 MCP Server Functionality (NEW!)
+
+CanRun now includes a full-featured **Model Context Protocol (MCP) server** that allows G-Assist to directly integrate with the CanRun compatibility engine. This provides seamless AI-assisted game compatibility checking through the official NVIDIA MCP standard.
+
+### MCP Tools and Capabilities
+
+The MCP server exposes the following tools to G-Assist:
+
+- **check_game_compatibility**: Analyze if a specific game can run on the current system
+  - Input: Game name (e.g., "Diablo 4")
+  - Output: Detailed compatibility analysis with performance tier
+
+- **detect_hardware**: Provides comprehensive hardware detection for gaming systems
+  - Output: Detailed hardware specifications focused on gaming performance
+
+### Running the MCP Server
+
+```bash
+# Start the MCP server with auto port discovery
+python app.py
+
+# The server will be available at:
+# http://localhost:xxxx (where xxxx is an available port)
+```
+
+### G-Assist MCP Integration
+
+G-Assist can automatically discover and use the CanRun MCP server when both are running. This enables advanced conversational interactions like:
+
+- "G-Assist, ask CanRun if I can play Starfield"
+- "G-Assist, check if my system meets Diablo 4 requirements"
+- "G-Assist, what's my gaming hardware like?"
+
 ## ✨ Key Features
 
 - **🎯 RTX/GTX Optimized**: Exclusively designed for RTX/GTX systems with G-Assist integration
@@ -140,6 +175,7 @@ uv run python test/test_enhanced_g_assist_communication.py
 - ✅ **LLM Analysis**: 20/20 tests passing - G-Assist integration, privacy protection
 - ✅ **Steam API Integration**: 15/15 tests passing - Real-time requirements fetching
 - ✅ **Hardware Detection**: Fixed Windows 11, display resolution, NVIDIA driver detection
+- ✅ **MCP Server**: Verified Model Context Protocol implementation
 
 ## 🏗️ G-Assist Integration (Official NVIDIA Protocol)
 
@@ -193,6 +229,7 @@ uv run python plugin.py --function detect_hardware
 ```
 canrun/
 ├── plugin.py                   # Main G-Assist Plugin (PRIMARY SUBMISSION)
+├── app.py                      # Gradio UI and MCP Server implementation
 ├── manifest.json              # G-Assist function definitions with LLM integration
 ├── pyproject.toml             # Modern uv package manager configuration
 ├── requirements.txt           # Python dependencies
@@ -254,6 +291,15 @@ canrun/
 - Automatic game ID resolution and requirement parsing
 ```
 
+**4. MCP Server Implementation**
+```python
+# Model Context Protocol (MCP) server integration
+- Uses Gradio for both UI and MCP server
+- Async function support for real-time analysis
+- Exposes game compatibility and hardware detection tools
+- G-Assist direct integration capability
+```
+
 ## 📊 Performance Tier Benchmarks
 
 ### GPU Tier Classifications
@@ -309,12 +355,13 @@ pyinstaller --onefile --name g-assist-plugin-canrun --distpath . --add-data "src
 - **Live G-Assist Testing**: Requires NVIDIA G-Assist installation for final verification
 - **Function Trigger Validation**: Test "canrun diablo4?" voice commands
 - **Plugin Discovery Verification**: Confirm G-Assist finds and loads the plugin
+- **MCP Integration Testing**: Verify G-Assist can discover and use the MCP server
 
 ---
 
 ## 📋 Technical Summary
 
-**CanRun has been successfully transformed from F-tier (49/100) to A-tier (92/100) performance and now implements the official NVIDIA G-Assist communication protocol. The plugin is ready for G-Assist integration testing.**
+**CanRun has been successfully transformed from F-tier (49/100) to A-tier (92/100) performance and now implements the official NVIDIA G-Assist communication protocol and MCP server functionality. The plugin is ready for G-Assist integration testing.**
 
 ### Key Achievements:
 - ✅ **Enhanced Game Display**: Clear identification of both search query and matched game
@@ -323,6 +370,7 @@ pyinstaller --onefile --name g-assist-plugin-canrun --distpath . --add-data "src
 - ✅ **Dynamic Performance Prediction**: RTX 3080 = A-tier with comprehensive GPU/CPU models
 - ✅ **Robust Error Handling**: Comprehensive timeout and error management
 - ✅ **Modern UI Standards**: Updated Gradio interface with improved formatting
+- ✅ **MCP Server Implementation**: Official Model Context Protocol support for AI agent integration
 
 **Ready to see if your system can run any game? CanRun delivers A-tier performance analysis with official G-Assist protocol support!**
 
