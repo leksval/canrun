@@ -610,10 +610,9 @@ uv run python plugin.py --function predict_advanced_performance --game "Test Gam
 **Rebuilding the Executable:**
 ```bash
 # Rebuild the G-Assist plugin executable (required after code changes)
-uv run pyinstaller --distpath c:\projects\canrun_1\canrun g-assist-plugin-python.spec
+uv run pyinstaller --name canrun-g-assist-plugin --distpath c:\projects\canrun_1\canrun g-assist-plugin-python.spec
 
-# Copy the executable to root directory for easy access
-copy dist\g-assist-plugin-python.exe canrun-g-assist-plugin.exe
+
 
 # The executable is now available in the root directory as canrun-g-assist-plugin.exe
 # This includes all dependencies and can be used by G-Assist
