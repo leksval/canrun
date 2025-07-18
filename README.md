@@ -5,78 +5,24 @@
   [![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
   [![G-Assist](https://img.shields.io/badge/G--Assist-Official%20Protocol%20Verified-brightgreen.svg)](https://www.nvidia.com/en-us/geforce/technologies/g-assist/)
   [![Steam API](https://img.shields.io/badge/Steam%20API-Integrated-blue.svg)](https://steamcommunity.com/dev)
-  [![Performance](https://img.shields.io/badge/Performance-A%20Tier%20(92%2F100)-gold.svg)](#performance-transformation)
 
 ## 🚀 Overview
 
 **CanRun** is an RTX/GTX-exclusive G-Assist plugin that instantly tells you if your PC can run any game with an advanced **S-A-B-C-D-F tier system**. Now featuring **Official G-Assist Protocol v5.1** with verified NVIDIA communication standards and enhanced Steam integration.
 
-## 🔧 **CRITICAL G-ASSIST PROTOCOL FIXES (v5.1)**
+## ✨ Key Features
 
-**MAJOR BREAKTHROUGH**: The CanRun plugin now implements the **official NVIDIA G-Assist communication protocol**. All previous G-Assist communication issues have been resolved.
+- **🎯 RTX/GTX Optimized**: Exclusively designed for RTX/GTX systems with G-Assist integration
+- **🎮 CANRUN! Indicator**: Instant visual feedback when your system meets game requirements
+- **⭐ S-A-B-C-D-F Tier System**: Advanced performance classification with weighted scoring (GPU 60%, CPU 25%, RAM 15%)
+- **🧠 AI-Powered Analysis**: Leverages G-Assist's embedded 8B Llama model for intelligent insights
+- **🔒 Privacy-by-Design**: All processing happens locally on your RTX GPU—no data leaves your system
+- **🎯 Steam-First Data**: Prioritizes Steam API for most up-to-date game requirements
+- **🎯 Intelligent Game Matching**: Advanced fuzzy matching handles game name variations
+- **📊 Smart Performance Prediction**: Comprehensive hardware hierarchies with RTX 30/20 series support
+- **💡 Intelligent Recommendations**: AI-generated optimization tips, DLSS strategies, upgrade suggestions
+- **🏃 Zero Setup**: Drop-in plugin with automatic RTX/GTX validation
 
-### **Root Causes Identified & Fixed:**
-- **❌ WRONG PROTOCOL**: Using Windows API pipes instead of stdin/stdout
-- **❌ WRONG DETECTION**: Plugin never entered G-Assist mode due to incorrect detection logic  
-- **❌ WRONG FORMAT**: Not using official `<<END>>` termination marker
-- **❌ WRONG ASSUMPTION**: Initial assumption about Windows named pipes was incorrect
-
-### **✅ OFFICIAL PROTOCOL IMPLEMENTATION:**
-```python
-# BEFORE (BROKEN) - Windows API Pipes
-pipe = windll.kernel32.GetStdHandle(STD_INPUT_HANDLE)
-
-# AFTER (FIXED) - Official stdin/stdout Protocol  
-line = sys.stdin.readline()
-sys.stdout.write(json.dumps(response) + '<<END>>')
-sys.stdout.flush()
-```
-
-### **✅ PROTOCOL VERIFICATION RESULTS:**
-```bash
-🧪 Testing Official NVIDIA G-Assist Protocol Implementation
-============================================================
-🔍 Test 1: Hardware Detection - ✅ PASSED
-🔍 Test 2: Game Compatibility Check - ✅ PASSED  
-🔍 Test 3: Auto Detection from Natural Language - ✅ PASSED
-🔍 Test 4: Shutdown Command - ✅ PASSED
-🧪 Testing stdin/stdout Communication - ✅ PASSED
-```
-
-## 🆕 Enhanced G-Assist Features v5.1
-
-### **🎯 Official Protocol Compliance**
-- **Communication**: Standard stdin/stdout (not Windows pipes)
-- **Input Format**: `{"tool_calls": [{"func": "function_name", "params": {...}}]}`
-- **Output Format**: `{"success": true, "message": "..."}<<END>>`
-- **Mode Detection**: Proper `stdin.isatty()` check for G-Assist environment
-- **Process Management**: Clean stdin/stdout handling without contamination
-
-### **🎮 Enhanced Functions**
-1. **`check_compatibility`**: Enhanced compatibility check with Steam Compare UI
-2. **`detect_hardware`**: Gaming-focused hardware detection with performance assessment
-3. **`steam_compare`**: Dedicated Steam Compare UI functionality
-4. **`compare_games`**: Multi-game performance comparison (2-3 games)
-5. **`auto_detect`**: Automatic tool detection from natural language input
-
-### **🗣️ Natural Language Examples**
-- **"Can I run Diablo 4?"** → Compatibility check with Steam data
-- **"What are my system specs?"** → Hardware detection with gaming assessment
-- **"Compare Cyberpunk vs Elden Ring"** → Multi-game comparison
-- **"Show me Steam requirements for Baldur's Gate 3"** → Steam Compare UI
-
-## 🎯 Performance Transformation: F-Tier → A-Tier (92/100)
-
-**MAJOR BREAKTHROUGH**: CanRun has been completely transformed from F-tier (49/100) to **A-tier (92/100)** performance assessment through comprehensive technical fixes:
-
-### ✅ Critical Issues Resolved
-- **Steam API Integration**: Complete overhaul with real-time game requirements fetching
-- **Dynamic Performance Prediction**: RTX 3080 + Intel i7-12700K now correctly achieves A-tier (92/100)
-- **G-Assist Integration**: Official NVIDIA protocol implementation verified
-- **Error Handling**: Comprehensive asyncio.CancelledError and timeout handling
-- **Function Trigger Matching**: Enhanced manifest.json for proper G-Assist discovery
-
-### 🔥 Live Performance Verification
 ```bash
 # Test the transformation - RTX 3080 + Intel i7-12700K system
 uv run python plugin.py --function check_compatibility --game "Diablo 4"
@@ -340,40 +286,6 @@ pyinstaller --onefile --name g-assist-plugin-canrun --distpath . --add-data "src
 ```
 
 ## 📈 Version History
-
-### v7.0.0 (Current) - Enhanced Game Display and Hardware Analysis
-- ✅ **Improved Game Identification**: Clear display of both user query and Steam API matched game
-- ✅ **VRAM Estimation**: Added automatic VRAM requirement estimation based on GPU models
-- ✅ **RAM Tolerance**: Implemented 5% tolerance for RAM comparison to handle theoretical vs actual values
-- ✅ **UI Enhancement**: Removed redundant status message and improved title format
-- ✅ **Framework Updates**: Updated Gradio interface to use newer flagging_mode parameter
-- ✅ **New Executable**: Regenerated plugin.exe with all latest improvements
-
-### v6.0.0 (Previous) - Unicode Compatibility & Production Ready
-- ✅ **Unicode Fixes**: Removed all emoji characters from main source files for Windows console compatibility
-- ✅ **Import Organization**: Moved all imports to top of files and removed unused imports
-- ✅ **New Executable**: Fresh `plugin.exe` built with Unicode fixes and optimized for G-Assist
-- ✅ **Test Validation**: All 126 tests passing, including G-Assist protocol validation
-- ✅ **Windows Console**: Plugin now works properly in Windows console environments
-- ✅ **Production Ready**: Streamlined executable naming and deployment process
-
-### v5.1.0 (Previous) - Official G-Assist Protocol Verification
-- ✅ **Official Protocol Implementation**: Complete NVIDIA G-Assist protocol compliance
-- ✅ **Communication Fixes**: Fixed Windows pipe issues, implemented stdin/stdout
-- ✅ **Mode Detection**: Proper G-Assist environment detection with stdin.isatty()
-- ✅ **Response Format**: Official JSON + `<<END>>` termination marker
-- ✅ **Protocol Verification**: All tests passing with official NVIDIA standards
-
-### v5.0.0 (Previous) - Enhanced G-Assist Communication
-- ✅ **Tool Name Detection System**: Automatic intent recognition from natural language
-- ✅ **Steam Compare UI**: Real-time Steam API integration with compatibility overlay
-- ✅ **Enhanced Chat Responses**: Professional G-Assist formatting with emojis
-- ✅ **Multi-Function Architecture**: 5 enhanced functions with intelligent routing
-
-### v4.0.0 (Legacy) - The A-Tier Transformation
-- ✅ **Performance Transformation**: F-tier (49/100) → A-tier (92/100) achievement
-- ✅ **Steam API Complete Overhaul**: Real-time game requirements with proper error handling
-- ✅ **Dynamic Performance Predictor**: NVIDIA-focused with RTX 30/20 series support
 
 ## 🎯 Current Status & Next Steps
 
