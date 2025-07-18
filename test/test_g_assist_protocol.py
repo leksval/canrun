@@ -14,7 +14,7 @@ def test_g_assist_message_parsing():
     """Test parsing G-Assist JSON messages"""
     
     # Import the plugin functions
-    from plugin import handle_g_assist_message, check_compatibility, detect_hardware
+    from plugin import process_enhanced_tool_call, read_g_assist_command, write_g_assist_response
     
     print("Testing G-Assist message parsing...")
     

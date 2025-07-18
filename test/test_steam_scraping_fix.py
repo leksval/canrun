@@ -22,7 +22,7 @@ class TestSteamScrapingFix(unittest.TestCase):
     
     def setUp(self):
         """Set up test fixtures."""
-        self.mock_llm_analyzer = Mock(spec=GAssistLLMAnalyzer)
+        self.mock_llm_analyzer = Mock()
         self.mock_llm_analyzer.analyze_text = AsyncMock()
         self.mock_llm_analyzer.interpret_game_requirements = AsyncMock()
         

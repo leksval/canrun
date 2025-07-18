@@ -2,10 +2,10 @@
   "manifestVersion": 1,
   "name": "CanRun Game Compatibility Checker",
   "description": "Check if games can run on your system with performance analysis",
-  "version": "5.0.0",
+  "version": "5.1.0",
   "author": "leksval",
   "tags": ["game", "compatibility", "canrun", "performance", "system", "requirements"],
-  "executable": "canrun-g-assist-plugin.exe",
+  "executable": "plugin.exe",
   "args": [],
   "persistent": true,
   "functions": [

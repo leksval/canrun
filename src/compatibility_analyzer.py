@@ -102,12 +102,12 @@ class CompatibilityAnalysis:
         """Generate clear message about minimum requirements status."""
         if self.can_run_minimum:
             if self.can_run_recommended:
-                return f"✅ CANRUN: {self.game_name} will run EXCELLENTLY - System exceeds recommended requirements!"
+                return f"CANRUN: {self.game_name} will run EXCELLENTLY - System exceeds recommended requirements!"
             else:
-                return f"✅ CANRUN: {self.game_name} will run - System meets minimum requirements!"
+                return f"CANRUN: {self.game_name} will run - System meets minimum requirements!"
         else:
             failing_components = [c.component.value for c in self.component_analyses if not c.meets_minimum]
-            return f"❌ CANNOT RUN: {self.game_name} requires upgrades - Failing components: {', '.join(failing_components)}"
+            return f" CANNOT RUN: {self.game_name} requires upgrades - Failing components: {', '.join(failing_components)}"
 
     def get_runnable_status(self) -> str:
         """Get simple runnable status message."""
@@ -117,8 +117,9 @@ class CompatibilityAnalysis:
 class CompatibilityAnalyzer:
     """Compatibility analyzer for RTX/GTX gaming systems."""
     
-    def __init__(self):
+    def __init__(self, llm_analyzer=None):
         self.logger = logging.getLogger(__name__)
+        self.llm_analyzer = llm_analyzer
         
         # RTX/GTX-focused component weights for gaming performance
         self.component_weights = {
@@ -684,3 +685,104 @@ class CompatibilityAnalyzer:
             return 50
         
         return 50  # Conservative fallback
+    
+    async def get_llm_analysis_context(self, game_name: str, hardware: PrivacyAwareHardwareSpecs,
+                                     requirements: GameRequirements, analysis: CompatibilityAnalysis) -> Dict[str, Any]:
+        """Provide structured context for LLM analysis with all compatibility data."""
+        try:
+            # Create comprehensive context for LLM
+            context = {
+                'game_name': game_name,
+                'hardware_specs': {
+                    'gpu_model': hardware.gpu_model,
+                    'gpu_vram_gb': hardware.gpu_vram_gb,
+                    'cpu_model': hardware.cpu_model,
+                    'cpu_cores': hardware.cpu_cores,
+                    'cpu_threads': hardware.cpu_threads,
+                    'ram_total_gb': hardware.ram_total_gb,
+                    'os_version': hardware.os_version,
+                    'directx_version': hardware.directx_version,
+                    'supports_rtx': hardware.supports_rtx,
+                    'supports_dlss': hardware.supports_dlss,
+                    'is_nvidia_gpu': hardware.is_nvidia_gpu
+                },
+                'game_requirements': {
+                    'minimum': {
+                        'cpu': requirements.minimum_cpu,
+                        'gpu': requirements.minimum_gpu,
+                        'ram_gb': requirements.minimum_ram_gb,
+                        'vram_gb': requirements.minimum_vram_gb,
+                        'storage_gb': requirements.minimum_storage_gb,
+                        'directx': requirements.minimum_directx,
+                        'os': requirements.minimum_os
+                    },
+                    'recommended': {
+                        'cpu': requirements.recommended_cpu,
+                        'gpu': requirements.recommended_gpu,
+                        'ram_gb': requirements.recommended_ram_gb,
+                        'vram_gb': requirements.recommended_vram_gb,
+                        'storage_gb': requirements.recommended_storage_gb,
+                        'directx': requirements.recommended_directx,
+                        'os': requirements.recommended_os
+                    },
+                    'source': requirements.source
+                },
+                'compatibility_analysis': {
+                    'overall_compatibility': analysis.overall_compatibility.value,
+                    'can_run_minimum': analysis.can_run_minimum,
+                    'can_run_recommended': analysis.can_run_recommended,
+                    'overall_score': analysis.overall_score,
+                    'summary': analysis.summary,
+                    'recommendations': analysis.recommendations,
+                    'bottlenecks': [b.value for b in analysis.bottlenecks],
+                    'component_analyses': [
+                        {
+                            'component': comp.component.value,
+                            'meets_minimum': comp.meets_minimum,
+                            'meets_recommended': comp.meets_recommended,
+                            'score': comp.score,
+                            'bottleneck_factor': comp.bottleneck_factor,
+                            'details': comp.details,
+                            'upgrade_suggestion': comp.upgrade_suggestion
+                        }
+                        for comp in analysis.component_analyses
+                    ]
+                }
+            }
+            
+            # Use LLM for enhanced analysis if available
+            if self.llm_analyzer:
+                try:
+                    llm_result = await self.llm_analyzer.analyze(
+                        context,
+                        self.llm_analyzer.LLMAnalysisType.DEEP_SYSTEM_ANALYSIS
+                    )
+                    
+                    # Add LLM insights to context
+                    context['llm_analysis'] = {
+                        'confidence_score': llm_result.confidence_score,
+                        'analysis_text': llm_result.analysis_text,
+                        'structured_data': llm_result.structured_data,
+                        'recommendations': llm_result.recommendations,
+                        'processing_time_ms': llm_result.processing_time_ms,
+                        'g_assist_used': llm_result.g_assist_used
+                    }
+                    
+                    self.logger.info(f"LLM enhanced compatibility analysis for {game_name}")
+                    
+                except Exception as e:
+                    self.logger.warning(f"LLM analysis failed: {e}")
+                    context['llm_analysis'] = {'error': str(e)}
+            
+            return context
+            
+        except Exception as e:
+            self.logger.error(f"Failed to create LLM analysis context: {e}")
+            return {
+                'game_name': game_name,
+                'error': str(e),
+                'fallback_data': {
+                    'can_run': analysis.can_run_minimum if analysis else False,
+                    'summary': analysis.summary if analysis else "Analysis failed"
+                }
+            }

@@ -23,24 +23,9 @@ def get_resource_path(relative_path):
     if getattr(sys, 'frozen', False):
         # Running as PyInstaller executable
         base_path = sys._MEIPASS
-        # Debug: Print the base path and check if data exists
-        print(f"PyInstaller base path: {base_path}")
+        # Get data path for PyInstaller executable
         data_path = os.path.join(base_path, relative_path)
-        print(f"Looking for data at: {data_path}")
-        print(f"Data file exists: {os.path.exists(data_path)}")
-        if os.path.exists(data_path):
-            print(f"✅ Found data file: {data_path}")
-        else:
-            print(f"❌ Data file not found: {data_path}")
-            # List contents of base path for debugging
-            try:
-                contents = os.listdir(base_path)
-                print(f"Contents of {base_path}: {contents}")
-                if 'data' in contents:
-                    data_contents = os.listdir(os.path.join(base_path, 'data'))
-                    print(f"Contents of data directory: {data_contents}")
-            except Exception as e:
-                print(f"Error listing contents: {e}")
+        # Removed debug prints to prevent stdout contamination in G-Assist mode
         return data_path
     else:
         # Running as normal Python script
@@ -811,7 +796,7 @@ class GameRequirementsFetcher:
             Generate alternative names and variations for the game: "{game_name}"
             
             Include common variations like:
-            - Roman numeral conversions (4 ↔ IV, 2 ↔ II)
+            - Roman numeral conversions (4 <-> IV, 2 <-> II)
             - Subtitle variations
             - Abbreviations and full names
             - Common misspellings

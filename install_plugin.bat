@@ -45,8 +45,8 @@ if not exist config.json (
     pause
     exit /b 1
 )
-if not exist canrun-g-assist-plugin.exe (
-    echo ERROR: canrun-g-assist-plugin.exe not found in current directory
+if not exist plugin.exe (
+    echo ERROR: plugin.exe not found in current directory
     echo Make sure the executable name matches the manifest.json declaration
     pause
     exit /b 1
@@ -86,8 +86,8 @@ if errorlevel 1 (
     exit /b 1
 )
 
-echo Copying canrun-g-assist-plugin.exe...
-copy canrun-g-assist-plugin.exe "%PLUGIN_DIR%\" >nul
+echo Copying plugin.exe...
+copy plugin.exe "%PLUGIN_DIR%\" >nul
 if errorlevel 1 (
     echo ERROR: Failed to copy executable
     echo Make sure you have write permissions to %PLUGIN_DIR%
@@ -127,7 +127,7 @@ echo Plugin installed to: %PLUGIN_DIR%
 echo.
 echo Plugin directory structure:
 echo %PLUGIN_DIR%\
-echo - canrun-g-assist-plugin.exe
+echo - plugin.exe
 echo - manifest.json
 echo - config.json
 echo - data\ (if present)
@@ -143,9 +143,9 @@ cd /d "%PLUGIN_DIR%" 2>nul
 if errorlevel 1 (
     echo WARNING: Could not change to plugin directory
     echo Testing from current location...
-    "%PLUGIN_DIR%\canrun-g-assist-plugin.exe" --function detect_hardware
+    "%PLUGIN_DIR%\plugin.exe" --function detect_hardware
 ) else (
-    canrun-g-assist-plugin.exe --function detect_hardware
+    plugin.exe --function detect_hardware
 )
 echo.
 echo If you see JSON output above, the plugin is working!
