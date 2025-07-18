@@ -202,49 +202,66 @@ class CanRunGAssistPlugin:
         }
     
     def detect_hardware(self, params: Dict[str, str]) -> Dict[str, Any]:
-        """Provide simplified hardware detection focused on immediate response."""
-        logging.info("Starting simplified hardware detection")
+        """Provide comprehensive hardware detection with real system information."""
+        logging.info("Starting hardware detection with actual system data")
         
-        # Provide immediate, useful hardware information
-        hardware_message = """💻 SYSTEM HARDWARE DETECTION:
+        try:
+            # Get actual hardware specs from the CanRun engine
+            # Create event loop for async operation
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            
+            # Get actual hardware specs using the engine's hardware detector
+            hardware_specs = loop.run_until_complete(self.canrun_engine.hardware_detector.get_hardware_specs())
+            loop.close()
+            
+            # Format the hardware information in a readable way
+            hardware_message = f"""💻 SYSTEM HARDWARE DETECTION:
 
 🖥️ GRAPHICS CARD:
-• GPU: RTX/GTX Series Detected
-• VRAM: 8GB+ Gaming Ready
-• RTX Features: ✅ Supported
-• DLSS Support: ✅ Available
-• Driver Status: ✅ Compatible
+• GPU: {hardware_specs.gpu_model}
+• VRAM: {hardware_specs.gpu_vram_gb}GB
+• RTX Features: {'✅ Supported' if hardware_specs.supports_rtx else '❌ Not Available'}
+• DLSS Support: {'✅ Available' if hardware_specs.supports_dlss else '❌ Not Available'}
+• Driver Status: {'✅ Compatible' if hardware_specs.nvidia_driver_version != 'Unknown' else '⚠️ Unknown Version'}
 
 🧠 PROCESSOR:
-• CPU: Modern Gaming Processor
-• Cores: Multi-core Gaming Ready
-• Performance: ✅ Optimized
+• CPU: {hardware_specs.cpu_model}
+• Cores: {hardware_specs.cpu_cores} Physical / {hardware_specs.cpu_threads} Logical
+• Performance: {'✅ High-Performance' if hardware_specs.cpu_cores >= 6 else '⚠️ Mid-Range'}
 
 💾 MEMORY:
-• RAM: 16GB+ Gaming Configuration
-• Speed: High-speed DDR4/DDR5
-• Gaming Performance: ✅ Excellent
+• RAM: {hardware_specs.ram_total_gb}GB Total
+• Speed: {hardware_specs.ram_speed_mhz}MHz
+• Gaming Performance: {'✅ Excellent' if hardware_specs.ram_total_gb >= 16 else '⚠️ Adequate' if hardware_specs.ram_total_gb >= 8 else '❌ Below Recommended'}
 
 🖥️ DISPLAY:
-• Resolution: High-resolution Gaming
-• Refresh Rate: High-refresh Compatible
-• G-Sync/FreeSync: ✅ Supported
+• Resolution: {hardware_specs.primary_monitor_resolution}
+• Refresh Rate: {hardware_specs.primary_monitor_refresh_hz}Hz
+• G-Sync/FreeSync: {'✅ Likely Supported' if hardware_specs.supports_rtx else '⚠️ Check Monitor Settings'}
 
 💾 STORAGE:
-• Type: NVMe SSD Gaming Ready
-• Performance: ✅ Fast Loading
+• Type: {hardware_specs.storage_type}
+• Performance: {'✅ Fast Loading' if 'SSD' in hardware_specs.storage_type else '⚠️ Standard'}
 
 🖥️ SYSTEM:
-• OS: Windows 11 Gaming Ready
-• DirectX: DirectX 12 Ultimate
-• G-Assist: ✅ Fully Compatible
+• OS: {hardware_specs.os_version}
+• DirectX: {hardware_specs.directx_version}
+• G-Assist: ✅ Compatible (Plugin Working)
 
-Hardware detection completed successfully. For detailed specifications, use the full CanRun desktop application."""
+Hardware detection completed successfully using CanRun's privacy-aware detection system."""
 
-        return {
-            "success": True,
-            "message": hardware_message
-        }
+            return {
+                "success": True,
+                "message": hardware_message
+            }
+        except Exception as e:
+            logging.error(f"Error in hardware detection: {e}")
+            # Fall back to generic message if detection fails
+            return {
+                "success": False,
+                "message": f"Hardware detection failed: {str(e)}\n\nPlease check system compatibility and try again."
+            }
     
     def format_canrun_response(self, result) -> str:
         """Format CanRun result for G-Assist display with complete information."""
