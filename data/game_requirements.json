@@ -1,42 +1,6 @@
 {
   "games": {
-    "diablo": {
-      "minimum": {
-        "processor": "Intel\u00ae Core\u2122 i5-2500K or AMD\u2122 FX-8350",
-        "graphics": "NVIDIA\u00ae GeForce\u00ae GTX 660 or Intel\u00ae Arc\u2122 A380 or AMD Radeon\u2122 R9 280",
-        "memory": "8 GB",
-        "storage": "90 GB",
-        "directx": "Version 12 Network: Broadband Internet connection",
-        "os": "64-bit Windows\u00ae 10 version 1909 or newer"
-      },
-      "recommended": {
-        "processor": "Intel\u00ae Core\u2122 i5-4670K or AMD Ryzen\u2122 1300X",
-        "graphics": "NVIDIA\u00ae GeForce\u00ae GTX 970 or Intel\u00ae Arc\u2122 A750 or AMD Radeon\u2122 RX 470",
-        "memory": "16 GB",
-        "storage": "90 GB",
-        "directx": "Version 12 Network: Broadband Internet connection",
-        "os": "64-bit Windows\u00ae 10 version 1909 or newer"
-      }
-    },
-    "settlers": {
-      "minimum": {
-        "processor": "Core i3",
-        "graphics": "Intel HD Graphics 4000 or equivalent, Integrated cards also work",
-        "memory": "4 GB",
-        "storage": "0 GB",
-        "directx": "DirectX 11",
-        "os": "Windows 10"
-      },
-      "recommended": {
-        "processor": "Unknown",
-        "graphics": "Unknown",
-        "memory": "0 GB",
-        "storage": "0 GB",
-        "directx": "DirectX 12",
-        "os": "Windows 11"
-      }
-    },
-    "cyberpunk": {
+    "cyberpunk 2077": {
       "minimum": {
         "processor": "Core i7-6700 or Ryzen 5 1600",
         "graphics": "GeForce GTX 1060 6GB or Radeon RX 580 8GB or Arc A380",
@@ -58,7 +22,7 @@
       "minimum": {
         "processor": "1.2Ghz+",
         "graphics": "256MB",
-        "memory": "512 GB",
+        "memory": "1 GB",
         "storage": "256 GB",
         "directx": "Version 11",
         "os": "Windows 10"
@@ -70,6 +34,24 @@
         "storage": "256 GB",
         "directx": "Version 11",
         "os": "Windows 10"
+      }
+    },
+    "diablo 2": {
+      "minimum": {
+        "processor": "Intel Core i3-4130",
+        "graphics": "GeForce GTX 650 or Radeon R7 250",
+        "memory": "8 GB",
+        "storage": "500 GB",
+        "directx": "DirectX 11",
+        "os": "Windows 10 (64-bit)"
+      },
+      "recommended": {
+        "processor": "Intel Core i5-4430 or better",
+        "graphics": "GeForce GTX 960 or Radeon RX 470",
+        "memory": "8 GB",
+        "storage": "1 GB",
+        "directx": "DirectX 12",
+        "os": "Windows 10 (64-bit) or later"
       }
     },
     "diablo 4": {
@@ -88,24 +70,6 @@
         "storage": "90 GB",
         "directx": "Version 12 Network: Broadband Internet connection",
         "os": "64-bit Windows\u00ae 10 version 1909 or newer"
-      }
-    },
-    "cyberpunk 2077": {
-      "minimum": {
-        "processor": "Core i7-6700 or Ryzen 5 1600",
-        "graphics": "GeForce GTX 1060 6GB or Radeon RX 580 8GB or Arc A380",
-        "memory": "12 GB",
-        "storage": "70 GB",
-        "directx": "Version 12",
-        "os": "64-bit Windows 10"
-      },
-      "recommended": {
-        "processor": "Core i7-12700 or Ryzen 7 7800X3D",
-        "graphics": "GeForce RTX 2060 SUPER or Radeon RX 5700 XT or Arc A770",
-        "memory": "16 GB",
-        "storage": "70 GB",
-        "directx": "Version 12",
-        "os": "64-bit Windows 10"
       }
     }
   }

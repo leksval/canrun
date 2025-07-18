@@ -86,36 +86,16 @@ BUFFER_SIZE = pipe_config.get("BUFFER_SIZE", 4096)
 
 
 def read_command() -> Optional[Dict[str, Any]]:
-    """Read command from stdin pipe - OFFICIAL NVIDIA IMPLEMENTATION"""
+    """Read command from stdin - OFFICIAL NVIDIA IMPLEMENTATION"""
     try:
-        pipe = windll.kernel32.GetStdHandle(STD_INPUT_HANDLE)
-        chunks = []
-        
-        while True:
-            message_bytes = wintypes.DWORD()
-            buffer = bytes(BUFFER_SIZE)
-            success = windll.kernel32.ReadFile(
-                pipe,
-                buffer,
-                BUFFER_SIZE,
-                byref(message_bytes),
-                None
-            )
-
-            if not success:
-                logging.error('Error reading from pipe')
-                return None
-
-            chunk = buffer.decode('utf-8')[:message_bytes.value]
-            chunks.append(chunk)
-
-            # Break if we've read less than buffer size (end of message)
-            if message_bytes.value < BUFFER_SIZE:
-                break
-
-        message = ''.join(chunks)
-        logging.info(f'Received command: {message}')
-        return json.loads(message)
+        # Read from stdin using the official protocol
+        line = sys.stdin.readline()
+        if not line:
+            logging.error('Empty input received')
+            return None
+            
+        logging.info(f'Received command: {line.strip()}')
+        return json.loads(line)
         
     except json.JSONDecodeError as e:
         logging.error(f'Invalid JSON received: {e}')
@@ -126,24 +106,20 @@ def read_command() -> Optional[Dict[str, Any]]:
 
 
 def write_response(response: Dict[str, Any]) -> None:
-    """Write response to stdout pipe - OFFICIAL NVIDIA IMPLEMENTATION"""
+    """Write response to stdout - OFFICIAL NVIDIA IMPLEMENTATION"""
     try:
-        pipe = windll.kernel32.GetStdHandle(STD_OUTPUT_HANDLE)
         # CRITICAL: Add <<END>> marker for message termination
         message = json.dumps(response) + '<<END>>'
-        message_bytes = message.encode('utf-8')
-        
-        bytes_written = wintypes.DWORD()
-        windll.kernel32.WriteFile(
-            pipe,
-            message_bytes,
-            len(message_bytes),
-            byref(bytes_written),
-            None
-        )
+        sys.stdout.write(message)
+        sys.stdout.flush()
         logging.info(f'Response sent: {len(message)} characters')
     except Exception as e:
         logging.error(f'Error writing response: {e}')
+
+def is_g_assist_environment() -> bool:
+    """Check if running in G-Assist environment"""
+    # In G-Assist environment, stdin is not a TTY
+    return not sys.stdin.isatty()
 
 
 class CanRunGAssistPlugin:
@@ -353,32 +329,207 @@ Hardware detection completed successfully. For detailed specifications, use the 
             return f"🎮 CANRUN ANALYSIS: {getattr(result, 'game_name', 'Unknown Game')}\n\n✅ Analysis completed but formatting error occurred.\nRaw result available in logs."
 
 
+async def handle_natural_language_query(query: str) -> str:
+    """Handle natural language queries like 'canrun game?' and return formatted result."""
+    # Extract game name from query
+    game_name = query.strip()
+    
+    # Remove leading command patterns
+    patterns = ["canrun ", "can run ", "can i run "]
+    for pattern in patterns:
+        if game_name.lower().startswith(pattern):
+            game_name = game_name[len(pattern):].strip()
+            break
+    
+    # Remove trailing question mark if present
+    if game_name and game_name.endswith("?"):
+        game_name = game_name[:-1].strip()
+    
+    if not game_name:
+        return "Please specify a game name after 'canrun'."
+    
+    # Initialize plugin
+    plugin = CanRunGAssistPlugin()
+    
+    # Use the same logic as in app.py for fresh analysis
+    has_number = any(c.isdigit() for c in game_name)
+    force_refresh = has_number  # Force refresh for numbered games
+    
+    # Create params
+    params = {"game_name": game_name, "force_refresh": force_refresh}
+    
+    # Execute compatibility check
+    response = await plugin.check_game_compatibility(params)
+    
+    # Return the formatted message (same as what Gradio would display)
+    if response.get("success", False):
+        return response.get("message", "Analysis completed successfully.")
+    else:
+        return response.get("message", f"Could not analyze game: {game_name}. Please check the game name and try again.")
+
 def main():
     """Main plugin execution loop - OFFICIAL NVIDIA IMPLEMENTATION"""
     setup_logging()
     logging.info("CanRun Plugin Started")
     
+    # Check if command line arguments were provided
+    if len(sys.argv) > 1:
+        # Handle command-line arguments in "canrun game?" format
+        args = sys.argv[1:]
+        
+        # Process query
+        query = " ".join(args)
+        game_query = ""
+        
+        # Check if the query matches our expected format "canrun game?"
+        # This will handle both "canrun game?" and just "game?"
+        if args[0].lower() == "canrun" and len(args) > 1:
+            # Extract just the game name after "canrun"
+            game_query = " ".join(args[1:])
+        elif query.lower().startswith("canrun "):
+            # Handle case where "canrun" might be part of a single argument
+            game_query = query[7:].strip()
+        else:
+            # Assume the entire query is the game name
+            game_query = query
+        
+        # Always remove question mark from the end for processing
+        game_query = game_query.rstrip("?").strip()
+        
+        # Debugging output to help troubleshoot argument issues
+        logging.info(f"Command line args: {args}")
+        logging.info(f"Processed game query: {game_query}")
+        
+        # Create event loop for async operation
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+        # Run the query and print result directly to stdout
+        result = loop.run_until_complete(handle_natural_language_query(game_query))
+        print(result)
+        loop.close()
+        return
+    
+    # Check if running in G-Assist environment
+    in_g_assist = is_g_assist_environment()
+    logging.info(f"Running in G-Assist environment: {in_g_assist}")
+    
     # Initialize plugin - CanRun engine always available
     plugin = CanRunGAssistPlugin()
     logging.info("CanRun plugin initialized successfully")
     
+    # If not in G-Assist environment, exit - we only care about G-Assist mode
+    if not in_g_assist:
+        print("This is a G-Assist plugin. Please run through G-Assist.")
+        return
+    
+    # G-Assist protocol mode
     while True:
         command = read_command()
         if command is None:
             continue
         
-        for tool_call in command.get("tool_calls", []):
-            func = tool_call.get("func")
-            params = tool_call.get("params", {})
+        # Handle G-Assist input in different formats
+        if "tool_calls" in command:
+            # Standard G-Assist protocol format with tool_calls
+            for tool_call in command.get("tool_calls", []):
+                func = tool_call.get("func")
+                params = tool_call.get("params", {})
+                
+                if func == "check_compatibility":
+                    # For async function, we need to run in an event loop
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    response = loop.run_until_complete(plugin.check_game_compatibility(params))
+                    write_response(response)
+                    loop.close()
+                elif func == "detect_hardware":
+                    response = plugin.detect_hardware(params)
+                    write_response(response)
+                elif func == "auto_detect":
+                    # Handle natural language input like "canrun game?"
+                    user_input = params.get("user_input", "")
+                    logging.info(f"Auto-detect received: {user_input}")
+                    
+                    # Extract game name from queries like "canrun game?"
+                    game_name = user_input
+                    if "canrun" in user_input.lower():
+                        # Remove "canrun" prefix and extract game name
+                        parts = user_input.lower().split("canrun")
+                        if len(parts) > 1:
+                            game_name = parts[1].strip()
+                    
+                    # Remove question mark if present
+                    game_name = game_name.rstrip("?").strip()
+                    
+                    if game_name:
+                        # Create compatibility check params
+                        compat_params = {"game_name": game_name}
+                        
+                        # For async function, we need to run in an event loop
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                        response = loop.run_until_complete(plugin.check_game_compatibility(compat_params))
+                        write_response(response)
+                        loop.close()
+                    else:
+                        write_response({
+                            "success": False,
+                            "message": "Could not identify a game name in your query. Please try 'Can I run <game name>?'"
+                        })
+                elif func == "shutdown":
+                    logging.info("Shutdown command received. Exiting.")
+                    return
+                else:
+                    logging.warning(f"Unknown function: {func}")
+                    write_response({
+                        "success": False,
+                        "message": f"Unknown function: {func}"
+                    })
+        elif "user_input" in command:
+            # Alternative format with direct user_input field
+            user_input = command.get("user_input", "")
+            logging.info(f"Direct user input received: {user_input}")
             
-            if func == "check_compatibility":
-                response = plugin.check_game_compatibility(params)
-                write_response(response)
-            elif func == "detect_hardware":
-                response = plugin.detect_hardware(params)
-                write_response(response)
-            elif func == "shutdown":
-                return
+            # Check if this is a game compatibility query
+            if "canrun" in user_input.lower() or "can run" in user_input.lower() or "can i run" in user_input.lower():
+                # Extract game name
+                game_name = ""
+                for prefix in ["canrun ", "can run ", "can i run "]:
+                    if user_input.lower().startswith(prefix):
+                        game_name = user_input[len(prefix):].strip()
+                        break
+                
+                # If no prefix found but contains "canrun" somewhere
+                if not game_name and "canrun" in user_input.lower():
+                    parts = user_input.lower().split("canrun")
+                    if len(parts) > 1:
+                        game_name = parts[1].strip()
+                
+                # Remove question mark if present
+                game_name = game_name.rstrip("?").strip()
+                
+                if game_name:
+                    # Create compatibility check params
+                    compat_params = {"game_name": game_name}
+                    
+                    # For async function, we need to run in an event loop
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    response = loop.run_until_complete(plugin.check_game_compatibility(compat_params))
+                    write_response(response)
+                    loop.close()
+                else:
+                    write_response({
+                        "success": False,
+                        "message": "Could not identify a game name in your query. Please try 'Can I run <game name>?'"
+                    })
+            else:
+                # Not a game compatibility query
+                write_response({
+                    "success": False,
+                    "message": "I can check if your system can run games. Try asking 'Can I run <game name>?'"
+                })
 
 
 if __name__ == "__main__":
