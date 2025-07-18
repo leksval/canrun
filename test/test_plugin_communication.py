@@ -38,11 +38,21 @@ def test_plugin_communication():
         
         # Send the JSON message
         json_input = json.dumps(test_message) + "\n"
-        stdout, stderr = process.communicate(input=json_input, timeout=30)
+        process.stdin.write(json_input)
+        process.stdin.flush()
+        
+        # Read the response
+        stdout = process.stdout.readline()
         
         print("Plugin Response:")
         print(stdout)
         
+        # Clean up the process
+        process.stdin.close()
+        process.wait(timeout=5)
+        
+        # Check for errors
+        stderr = process.stderr.read()
         if stderr:
             print("Plugin Errors:")
             print(stderr)
@@ -50,7 +60,7 @@ def test_plugin_communication():
         print(f"Exit code: {process.returncode}")
         
     except subprocess.TimeoutExpired:
-        print("Plugin timed out")
+        print("Plugin timed out during cleanup")
         process.kill()
     except Exception as e:
         print(f"Error testing plugin: {e}")

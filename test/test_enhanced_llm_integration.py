@@ -13,11 +13,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from src.compatibility_analyzer import CompatibilityAnalyzer
-from src.rtx_llm_analyzer import RTXLLMAnalyzer
+from src.rtx_llm_analyzer import GAssistLLMAnalyzer
 from src.privacy_aware_hardware_detector import PrivacyAwareHardwareDetector
 from src.game_requirements_fetcher import GameRequirementsFetcher
 from src.data_sources.game_requirements_model import GameRequirements
-from src.data_sources.compatibility_model import CompatibilityAnalysis, ComponentAnalysis, CompatibilityLevel, BottleneckType, ComponentType
+from src.compatibility_analyzer import CompatibilityAnalysis, ComponentAnalysis, CompatibilityLevel, ComponentType
 
 async def test_enhanced_llm_integration():
     """Test the enhanced LLM integration with structured context."""
@@ -26,7 +26,7 @@ async def test_enhanced_llm_integration():
     try:
         # Initialize components
         print("📋 Initializing components...")
-        llm_analyzer = RTXLLMAnalyzer()
+        llm_analyzer = GAssistLLMAnalyzer()
         compatibility_analyzer = CompatibilityAnalyzer(llm_analyzer=llm_analyzer)
         hardware_detector = PrivacyAwareHardwareDetector()
         requirements_fetcher = GameRequirementsFetcher()

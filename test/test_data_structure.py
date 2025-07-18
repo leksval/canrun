@@ -38,12 +38,12 @@ def test_game_requirements_dataclass():
         print(f"Min GPU: {requirements.minimum_gpu}")
         print(f"Min RAM: {requirements.minimum_ram_gb}GB")
         
-        return True
+        assert True
         
     except Exception as e:
         print(f"❌ GameRequirements dataclass creation: FAILED")
         print(f"Error: {e}")
-        return False
+        assert False
 
 if __name__ == "__main__":
     print("Testing GameRequirements dataclass structure...")

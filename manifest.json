@@ -1,38 +1,19 @@
 {
   "manifestVersion": 1,
-  "name": "CanRun Game Compatibility Checker",
-  "description": "Check if games can run on your system with performance analysis",
-  "version": "5.1.0",
-  "author": "leksval",
-  "tags": ["game", "compatibility", "canrun", "performance", "system", "requirements"],
-  "executable": "plugin.exe",
-  "args": [],
-  "persistent": true,
+  "executable": "g-assist-plugin-canrun.exe",
+  "persistent": false,
   "functions": [
     {
-      "name": "check_compatibility",
-      "description": "Check if a game can run on this system and get performance analysis",
-      "tags": ["game", "compatibility", "canrun", "can run", "will work", "diablo", "cyberpunk"]
-    },
-    {
-      "name": "detect_hardware",
-      "description": "Detect system hardware specifications",
-      "tags": ["hardware", "system", "specs", "gpu", "cpu"]
-    },
-    {
-      "name": "steam_compare",
-      "description": "Compare game requirements with Steam data",
-      "tags": ["steam", "compare", "requirements"]
-    },
-    {
-      "name": "compare_games",
-      "description": "Compare multiple games performance",
-      "tags": ["compare", "games", "performance"]
-    },
-    {
-      "name": "auto_detect",
-      "description": "Auto-detect user intent from natural language",
-      "tags": ["auto", "detect", "smart"]
+      "name": "canrun",
+      "description": "Complete CanRun analysis - check if a game can run with full performance assessment, Steam API integration, hardware detection, fuzzy matching, and S-tier scoring system. Responds to 'canrun diablo', 'can I run cyberpunk', etc.",
+      "tags": ["canrun", "can run", "can i run", "will run", "game", "compatibility", "diablo", "cyberpunk", "elden ring", "baldurs gate", "performance", "tier", "score"],
+      "properties": {
+        "game_name": {
+          "type": "string",
+          "description": "The name of the game to check compatibility for"
+        }
+      },
+      "required": ["game_name"]
     }
   ]
 }
