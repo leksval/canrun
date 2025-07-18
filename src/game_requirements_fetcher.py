@@ -139,9 +139,10 @@ class SteamAPISource(DataSource):
         return None
     
     async def _search_steam_store_suggest(self, game_name: str) -> Optional[str]:
-        """Search using Steam Store suggest API with robust error handling."""
+        """Search using Steam Store suggest API with robust error handling and quick timeout."""
         try:
-            timeout = aiohttp.ClientTimeout(total=10, connect=5)
+            # Reduced timeout for G-Assist compatibility
+            timeout = aiohttp.ClientTimeout(total=5, connect=3)
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 params = {
                     'term': game_name,
@@ -201,9 +202,10 @@ class SteamAPISource(DataSource):
         return None
     
     async def _search_steam_community(self, game_name: str) -> Optional[str]:
-        """Search using Steam Community API with robust error handling."""
+        """Search using Steam Community API with robust error handling and quick timeout."""
         try:
-            timeout = aiohttp.ClientTimeout(total=10, connect=5)
+            # Reduced timeout for G-Assist compatibility
+            timeout = aiohttp.ClientTimeout(total=5, connect=3)
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 params = {
                     'text': game_name,
@@ -266,12 +268,13 @@ class SteamAPISource(DataSource):
         return None
     
     async def _search_steam_store_direct(self, game_name: str) -> Optional[str]:
-        """Direct search on Steam store page with robust error handling."""
+        """Direct search on Steam store page with robust error handling and quick timeout."""
         try:
             # This is a more aggressive search method
             search_url = f"https://store.steampowered.com/search/?term={game_name.replace(' ', '+')}"
             
-            timeout = aiohttp.ClientTimeout(total=15, connect=5)
+            # Reduced timeout for G-Assist compatibility
+            timeout = aiohttp.ClientTimeout(total=8, connect=3)
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 async with session.get(search_url) as response:
                     if response.status == 200:
@@ -302,9 +305,10 @@ class SteamAPISource(DataSource):
         return None
     
     async def _get_app_info(self, steam_id: str) -> Optional[Dict]:
-        """Get detailed app information from Steam Store API (public, no key required)."""
+        """Get detailed app information from Steam Store API with quick timeout for G-Assist."""
         try:
-            timeout = aiohttp.ClientTimeout(total=15)
+            # Reduced timeout for G-Assist compatibility
+            timeout = aiohttp.ClientTimeout(total=8)
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 url = f"{self.base_url}/appdetails"
                 params = {
@@ -657,25 +661,30 @@ class GameRequirementsFetcher:
     
     async def fetch_requirements(self, game_name: str) -> Optional[GameRequirements]:
         """
-        Fetch game requirements with local cache prioritization and LLM enhancement.
-        Local cache is the primary source, with LLM-enhanced search and Steam API fallback.
+        Fetch game requirements with improved timeout handling and fallback strategies.
+        Steam API is primary source with quick timeout, then local cache fallback.
         """
         
         try:
-            self.logger.info(f"Fetching requirements for '{game_name}' - trying Steam API first")
+            self.logger.info(f"Fetching requirements for '{game_name}' - trying Steam API with timeout")
             
-            # Step 1: Try Steam API first (primary source for real-time data)
+            # Step 1: Try Steam API first with quick timeout to prevent G-Assist hanging
             try:
-                steam_requirements = await self.steam_source.fetch(game_name)
+                steam_requirements = await asyncio.wait_for(
+                    self.steam_source.fetch(game_name),
+                    timeout=15.0  # 15 second timeout for Steam API
+                )
                 if steam_requirements:
                     self.logger.info(f"Successfully fetched '{game_name}' from Steam API")
                     await self._cache_requirements(steam_requirements)
                     return steam_requirements
+            except asyncio.TimeoutError:
+                self.logger.warning(f"Steam API timeout for '{game_name}', using cache fallback")
             except Exception as e:
                 self.logger.warning(f"Steam API failed for '{game_name}': {e}")
             
-            # Step 2: Fallback to local cache
-            self.logger.info(f"Steam API failed, checking local cache for '{game_name}'")
+            # Step 2: Immediate fallback to local cache
+            self.logger.info(f"Steam API failed/timeout, checking local cache for '{game_name}'")
             cache_requirements = await self.cache_source.fetch(game_name)
             if cache_requirements:
                 self.logger.info(f"Found '{game_name}' in local cache")
