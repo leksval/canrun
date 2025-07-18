@@ -4,3 +4,9 @@ psutil>=5.9.0
 aiohttp>=3.8.0
 asyncio-throttle>=1.0.0
 gradio
+py-cpuinfo>=9.0.0
+pyinstaller>=5.13.0
+# Optional platform-specific packages
+# Windows-specific - will be skipped on other platforms
+pynvml; platform_system=="Windows"
+wmi; platform_system=="Windows"
