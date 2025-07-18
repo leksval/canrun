@@ -94,7 +94,6 @@ uv run python plugin.py --function auto_detect --input "Can I run Elden Ring?"
 ### Ready-to-Use Executable
 The G-Assist plugin is available as a pre-built executable in the root directory:
 - **Executable**: [`plugin.exe`](plugin.exe) - Ready for G-Assist installation
-- **Installer**: [`install_plugin.bat`](install_plugin.bat) - Automated installation script
 
 ### Quick Installation
 ```bash
