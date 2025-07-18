@@ -59,7 +59,6 @@ class HardwareSpecs:
     cpu_cores: int
     cpu_freq: float  # GHz
     ram_total: int  # MB
-    ram_available: int  # MB
     directx_version: str
     os_version: str
 
@@ -97,7 +96,6 @@ class HardwareDetector:
             cpu_cores=cpu_info.get('cores', 0),
             cpu_freq=cpu_info.get('freq', 0.0),
             ram_total=ram_info.get('total', 0),
-            ram_available=ram_info.get('available', 0),
             directx_version=directx_version,
             os_version=os_version
         )
@@ -292,7 +290,7 @@ def main():
     print("Hardware Detection Results:")
     print(f"GPU: {specs.gpu_name} ({specs.gpu_memory} MB)")
     print(f"CPU: {specs.cpu_name} ({specs.cpu_cores} cores, {specs.cpu_freq:.2f} GHz)")
-    print(f"RAM: {specs.ram_total} MB ({specs.ram_available} MB available)")
+    print(f"RAM: {specs.ram_total} MB ({specs.ram_total} MB total)")
     print(f"DirectX: {specs.directx_version}")
     print(f"OS: {specs.os_version}")
     

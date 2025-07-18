@@ -27,10 +27,10 @@ class OptimizedGameFuzzyMatcher:
         self.game_map = {
             # Diablo games with numbers preserved
             'diablo': 'diablo',
-            'diablo I': 'diablo',
-            'diablo ii': 'diablo 2',
-            'diablo iii': 'diablo 3',
-            'diablo iv': 'diablo 4',
+            'diablo i': 'diablo',
+            'diablo 2': 'diablo ii',
+            'diablo 3': 'diablo iii',
+            'diablo 4': 'diablo iv',
             
             'grand theft auto': 'grand theft auto',
             'gta': 'grand theft auto',
@@ -281,10 +281,18 @@ class OptimizedGameFuzzyMatcher:
             mapped_name = self.game_map[query_lower]
             self.logger.info(f"Direct game map match: '{query}' -> '{mapped_name}'")
             
-            # Find this mapped name in the candidates
+            # Find this mapped name in the candidates (case-insensitive)
+            # First, try exact match
             for candidate in candidates:
-                if candidate.lower() == mapped_name or candidate.lower().startswith(mapped_name):
+                if candidate.lower() == mapped_name.lower():
+                    # For 'diablo 3', return 'Diablo III' from candidates with proper capitalization
                     return candidate, 1.0
+                    
+            # Then try contains - needed for games like "Diablo III" which might be "Diablo III: Reaper of Souls" in candidates
+            for candidate in candidates:
+                if mapped_name.lower() in candidate.lower().split():
+                    self.logger.info(f"Partial match for mapped name: '{mapped_name}' found in '{candidate}'")
+                    return candidate, 0.95
                     
         # Look for exact match in candidates
         for candidate in candidates:

@@ -67,7 +67,7 @@ class PrivacyAwareHardwareSpecs:
     cpu_threads: int                            # Logical core count
     ram_total_gb: int                           # Total RAM
     ram_speed_mhz: int                          # RAM speed
-    storage_type: str                           # Storage type
+    storage_type: str                           # Primary storage type
     primary_monitor_refresh_hz: int             # Monitor refresh rate
     primary_monitor_resolution: str             # Monitor resolution
     os_version: str                             # Windows version
@@ -82,6 +82,8 @@ class PrivacyAwareHardwareSpecs:
     supports_rtx: Optional[bool] = None         # Ray tracing support
     supports_dlss: Optional[bool] = None        # DLSS support
     nvidia_driver_version: str = "Unknown"      # Driver version
+    total_storage_gb: int = 0                   # Total storage capacity across all drives
+    drives: List[Dict[str, Any]] = None         # List of all detected storage drives
     
     def __post_init__(self):
         """Validate hardware specs after initialization."""
@@ -92,6 +94,10 @@ class PrivacyAwareHardwareSpecs:
         # Generate anonymous ID if not provided
         if not self.anonymous_system_id:
             self.anonymous_system_id = self._generate_anonymous_id()
+        
+        # Initialize drives list if None
+        if self.drives is None:
+            self.drives = []
         
         # Validate RTX/GTX GPU requirement
         assert self.gpu_vendor.upper() == "NVIDIA", "Only NVIDIA RTX/GTX GPUs supported"
@@ -129,6 +135,8 @@ class PrivacyAwareHardwareSpecs:
             'ram_total_gb': self.ram_total_gb,
             'ram_speed_mhz': self.ram_speed_mhz,
             'storage_type': self.storage_type,
+            'total_storage_gb': self.total_storage_gb,
+            'drives': self.drives,
             'primary_monitor_refresh_hz': self.primary_monitor_refresh_hz,
             'primary_monitor_resolution': self.primary_monitor_resolution,
             'os_version': self.os_version,
@@ -898,39 +906,64 @@ class PrivacyAwareHardwareDetector:
                     except Exception:
                         specs['ram_speed_mhz'] = 4800  # Modern DDR5 estimation
                 
-                # Try to detect storage type from primary drive
+                # Try to detect all storage drives (for systems with multiple drives)
                 try:
                     if os.name == 'nt':
                         # Windows storage detection via WMI
                         try:
                             import wmi
                             c = wmi.WMI()
-                            # Look for NVMe or SSD drives first (common in modern gaming systems)
+                            drives = []
+                            total_storage_gb = 0
+                            
+                            # Detect all physical disk drives
                             for disk in c.Win32_DiskDrive():
                                 if disk.Model:
+                                    drive_info = {}
                                     model_upper = str(disk.Model).upper()
-                                    # Check for NVMe, SSD indicators in model name
+                                    
+                                    # Determine drive type
                                     if any(indicator in model_upper for indicator in ['NVME', 'SSD', 'SAMSUNG', 'WD_BLACK']):
-                                        specs['storage_type'] = 'NVMe SSD'
-                                        break
+                                        drive_info['type'] = 'NVMe SSD'
                                     elif any(indicator in model_upper for indicator in ['M.2', 'PCIE']):
-                                        specs['storage_type'] = 'SSD'
-                                        break
+                                        drive_info['type'] = 'SSD'
+                                    elif disk.MediaType and 'SSD' in str(disk.MediaType).upper():
+                                        drive_info['type'] = 'SSD'
+                                    elif disk.MediaType and any(hdd_indicator in str(disk.MediaType).upper() for hdd_indicator in ['FIXED', 'HARD']):
+                                        drive_info['type'] = 'HDD'
+                                    else:
+                                        drive_info['type'] = 'Unknown'
+                                    
+                                    # Get size in GB (convert from bytes)
+                                    if disk.Size:
+                                        try:
+                                            size_gb = int(int(disk.Size) / (1024**3))
+                                            drive_info['size_gb'] = size_gb
+                                            total_storage_gb += size_gb
+                                        except (ValueError, TypeError):
+                                            drive_info['size_gb'] = 0
+                                    
+                                    drive_info['model'] = disk.Model
+                                    drives.append(drive_info)
                             
-                            # If no clear SSD found, check MediaType
-                            if 'storage_type' not in specs:
-                                for disk in c.Win32_DiskDrive():
-                                    if disk.MediaType:
-                                        media_type = str(disk.MediaType).upper()
-                                        if 'SSD' in media_type:
-                                            specs['storage_type'] = 'SSD'
-                                            break
-                                        elif any(hdd_indicator in media_type for hdd_indicator in ['FIXED', 'HARD']):
-                                            specs['storage_type'] = 'HDD'
-                                            break
-                            
-                            # Default for high-end gaming systems
-                            if 'storage_type' not in specs:
+                            # Store information about all drives
+                            if drives:
+                                specs['drives'] = drives
+                                specs['total_storage_gb'] = total_storage_gb
+                                
+                                # Set primary storage type to the fastest available type
+                                if any(drive['type'] == 'NVMe SSD' for drive in drives):
+                                    specs['storage_type'] = 'NVMe SSD'
+                                elif any(drive['type'] == 'SSD' for drive in drives):
+                                    specs['storage_type'] = 'SSD'
+                                elif any(drive['type'] == 'HDD' for drive in drives):
+                                    specs['storage_type'] = 'HDD'
+                                else:
+                                    specs['storage_type'] = 'Unknown'
+                                
+                                self.logger.info(f"Detected {len(drives)} storage drives, total {total_storage_gb}GB")
+                            else:
+                                # Default for high-end gaming systems if no drives detected
                                 specs['storage_type'] = 'NVMe SSD'  # Modern gaming systems default
                                 
                         except ImportError:

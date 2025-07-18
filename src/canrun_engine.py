@@ -573,49 +573,15 @@ class CanRunEngine:
         return 0
 
     async def analyze_multiple_games(self, game_names: List[str], use_cache: bool = True) -> Dict[str, Optional[CanRunResult]]:
-        """Analyze multiple games and # Convert to dictionary format expected by tests
-        return {
-            'compatibility': {
-                'compatibility_level': compatibility_analysis.overall_compatibility,
-                'overall_score': compatibility_analysis.overall_score,
-                'bottlenecks': compatibility_analysis.bottlenecks,
-                'component_analysis': {
-                    'cpu': {
-                        'status': next((
-                            'excellent' if comp.meets_recommended else 
-                            'adequate' if comp.meets_minimum else 'insufficient'
-                            for comp in compatibility_analysis.component_analyses 
-                            if comp.component.name.lower() == 'cpu'), 'unknown'),
-                        'score': next((int(comp.score * 100) 
-                            for comp in compatibility_analysis.component_analyses 
-                            if comp.component.name.lower() == 'cpu'), 75)
-                    },
-                    'gpu': {
-                        'status': compatibility_analysis.gpu_compatibility,
-                        'score': 80  # Default score
-                    },
-                    'memory': {
-                        'status': compatibility_analysis.ram_compatibility,
-                        'score': 85  # Default score
-                    },
-                    'storage': {
-                        'status': compatibility_analysis.storage_compatibility,
-                        'score': 90  # Default score
-                    }
-                }
-            },
-            'performance': {
-                'fps': performance_prediction.predictions[0].expected_fps if performance_prediction.predictions else 0,
-                'performance_level': performance_prediction.predictions[0].quality_preset.value if performance_prediction.predictions else 'Unknown',
-                'stability': 'stable',  # Default stability
-                'optimization_suggestions': performance_prediction.optimization_suggestions
-            },
-            'optimization_suggestions': performance_prediction.optimization_suggestions,
-            'hardware_analysis': {
-                'gpu_tier': 'high-end',  # Default tier
-                'bottleneck_analysis': compatibility_analysis.bottlenecks
-            }
-        } dictionary."""
+        """Analyze multiple games and convert the results to a dictionary format expected by tests.
+        
+        Args:
+            game_names: List of game names to analyze
+            use_cache: Whether to use cached results
+            
+        Returns:
+            Dictionary containing compatibility and performance analysis in the format expected by tests
+        """
         results = {}
         
         for game_name in game_names:
@@ -626,49 +592,8 @@ class CanRunEngine:
                 self.logger.error(f"Failed to analyze {game_name}: {e}")
                 results[game_name] = None
                 
-        # Convert to dictionary format expected by tests
-        return {
-            'compatibility': {
-                'compatibility_level': compatibility_analysis.overall_compatibility,
-                'overall_score': compatibility_analysis.overall_score,
-                'bottlenecks': compatibility_analysis.bottlenecks,
-                'component_analysis': {
-                    'cpu': {
-                        'status': next((
-                            'excellent' if comp.meets_recommended else 
-                            'adequate' if comp.meets_minimum else 'insufficient'
-                            for comp in compatibility_analysis.component_analyses 
-                            if comp.component.name.lower() == 'cpu'), 'unknown'),
-                        'score': next((int(comp.score * 100) 
-                            for comp in compatibility_analysis.component_analyses 
-                            if comp.component.name.lower() == 'cpu'), 75)
-                    },
-                    'gpu': {
-                        'status': compatibility_analysis.gpu_compatibility,
-                        'score': 80  # Default score
-                    },
-                    'memory': {
-                        'status': compatibility_analysis.ram_compatibility,
-                        'score': 85  # Default score
-                    },
-                    'storage': {
-                        'status': compatibility_analysis.storage_compatibility,
-                        'score': 90  # Default score
-                    }
-                }
-            },
-            'performance': {
-                'fps': performance_prediction.predictions[0].expected_fps if performance_prediction.predictions else 0,
-                'performance_level': performance_prediction.predictions[0].quality_preset.value if performance_prediction.predictions else 'Unknown',
-                'stability': 'stable',  # Default stability
-                'optimization_suggestions': performance_prediction.optimization_suggestions
-            },
-            'optimization_suggestions': performance_prediction.optimization_suggestions,
-            'hardware_analysis': {
-                'gpu_tier': 'high-end',  # Default tier
-                'bottleneck_analysis': compatibility_analysis.bottlenecks
-            }
-        }
+        # Return the dictionary of results
+        return results
 
     async def get_system_info(self) -> Dict[str, Any]:
         """Get comprehensive system information."""
@@ -824,24 +749,33 @@ class CanRunEngine:
             return None
 
     def _parse_ram_value(self, ram_str: str) -> int:
-        """Parse RAM value from string to integer GB."""
+        """Parse RAM value from string to integer GB with proper unit handling."""
         if not ram_str or ram_str == "Unknown":
             return 0
         
-        # Extract number from strings like "8 GB", "16GB", "8192 MB", etc.
-        import re
+        # Convert to uppercase for consistency
         ram_str = str(ram_str).upper()
         
-        # Match number followed by optional space and unit
-        match = re.search(r'(\d+)\s*(GB|MB|G|M)?', ram_str)
-        if match:
-            value = int(match.group(1))
-            unit = match.group(2) or 'GB'
-            
-            # Convert MB to GB
-            if unit in ['MB', 'M']:
-                value = max(1, value // 1024)  # Convert MB to GB, minimum 1GB
-            
-            return value
+        # Check if explicitly specified as MB
+        if 'MB' in ram_str:
+            # Extract number
+            mb_match = re.search(r'(\d+\.?\d*)\s*MB', ram_str)
+            if mb_match:
+                # Convert MB to GB (rounded up to 0.5 GB minimum for values under 512MB)
+                mb_value = float(mb_match.group(1))
+                if mb_value < 512:
+                    return 0.5  # Minimum 0.5GB for small values
+                else:
+                    return max(1, int(mb_value / 1024))  # Convert MB to GB, minimum 1GB
         
+        # Default GB matching - more flexible pattern to match various formats
+        gb_match = re.search(r'(\d+\.?\d*)\s*G?B?', ram_str)
+        if gb_match:
+            return int(float(gb_match.group(1)))
+        
+        # Last resort fallback - just try to extract any number
+        number_match = re.search(r'(\d+\.?\d*)', ram_str)
+        if number_match:
+            return int(float(number_match.group(1)))
+            
         return 0
