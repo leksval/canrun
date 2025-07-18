@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 Enhanced CanRun G-Assist Plugin - NVIDIA G-Assist Integration
 Enhanced frontend-backend communication with tool name detection and Steam Compare UI integration.
@@ -15,12 +16,27 @@ import sys
 import logging
 import os
 import asyncio
-import argparse
 import re
 from typing import Optional, Dict, Any, List
 from pathlib import Path
 from ctypes import byref, windll, wintypes
 from datetime import datetime
+
+# CRITICAL FIX: Set UTF-8 encoding for Windows console (Official Microsoft solution)
+# Based on: https://learn.microsoft.com/en-us/windows/console/console-application-issues
+if sys.platform == "win32":
+    try:
+        # Set console code pages to UTF-8 (CP_UTF8 = 65001)
+        windll.kernel32.SetConsoleCP(65001)
+        windll.kernel32.SetConsoleOutputCP(65001)
+        
+        # Also configure Python's stdout/stderr encoding
+        if hasattr(sys.stdout, 'reconfigure'):
+            sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+            sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    except Exception:
+        # Fallback: ignore encoding errors silently
+        pass
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
@@ -35,13 +51,21 @@ STD_INPUT_HANDLE = -10
 STD_OUTPUT_HANDLE = -11
 BUFFER_SIZE = 4096
 
-# Configure logging with detailed format
+# Configure logging with detailed format - FIXED: Prevent stdout contamination and Unicode issues
 LOG_FILE = os.path.join(os.environ.get('USERPROFILE', '.'), 'canrun-enhanced-plugin.log')
-logging.basicConfig(
-    filename=LOG_FILE,
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s"
-)
+
+# Only configure logging if not already configured (prevents duplicate handlers)
+if not logging.getLogger().handlers:
+    logging.basicConfig(
+        filename=LOG_FILE,
+        level=logging.INFO,
+        format="%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s",
+        filemode='a',  # Append mode to prevent file conflicts
+        encoding='utf-8'  # CRITICAL FIX: Handle Unicode characters properly
+    )
+
+# Ensure no console output during G-Assist mode
+logging.getLogger().handlers = [h for h in logging.getLogger().handlers if not isinstance(h, logging.StreamHandler)]
 
 # Global plugin components
 canrun_engine = None
@@ -425,30 +449,48 @@ def initialize_enhanced_plugin() -> dict:
     global canrun_engine, privacy_detector, performance_predictor, requirements_fetcher
     
     try:
-        logging.info("🚀 Initializing Enhanced CanRun G-Assist plugin...")
+        logging.info("Initializing Enhanced CanRun G-Assist plugin...")
         
         # Initialize CanRun engine with Steam API integration
         canrun_engine = CanRunEngine(enable_llm=True)
-        logging.info("✅ CanRun engine initialized with Steam API integration")
+        logging.info("CanRun engine initialized with Steam API integration")
         
         # Initialize privacy-aware hardware detector
         privacy_detector = PrivacyAwareHardwareDetector()
-        logging.info("✅ Privacy detector initialized")
+        logging.info("Privacy detector initialized")
         
         # Initialize dynamic performance predictor
         performance_predictor = DynamicPerformancePredictor()
-        logging.info("✅ Dynamic performance predictor initialized")
+        logging.info("Dynamic performance predictor initialized")
         
         # Initialize requirements fetcher
         requirements_fetcher = GameRequirementsFetcher()
-        logging.info("✅ Game requirements fetcher initialized")
+        logging.info("Game requirements fetcher initialized")
         
-        logging.info("🎯 Enhanced CanRun G-Assist plugin initialized successfully")
+        logging.info("Enhanced CanRun G-Assist plugin initialized successfully")
         return {"success": True, "message": "Enhanced CanRun plugin initialized successfully"}
         
     except Exception as e:
-        logging.error(f"❌ Enhanced plugin initialization failed: {e}")
-        return {"success": False, "message": f"Enhanced plugin initialization failed: {str(e)}"}
+        # CRITICAL FIX: Comprehensive Unicode error handling for compiled executable
+        try:
+            # Try to log with Unicode characters
+            logging.error(f"Enhanced plugin initialization failed: {e}")
+        except (UnicodeEncodeError, UnicodeDecodeError, OSError):
+            # Fallback: Log without Unicode characters and handle all encoding issues
+            try:
+                error_msg = str(e).encode('ascii', 'replace').decode('ascii')
+                logging.error(f"Enhanced plugin initialization failed: {error_msg}")
+            except:
+                # Ultimate fallback: minimal logging
+                logging.error("Enhanced plugin initialization failed: encoding error")
+        
+        # CRITICAL FIX: Ensure response message is completely safe for all environments
+        try:
+            safe_error_msg = str(e).encode('ascii', 'replace').decode('ascii')
+        except:
+            safe_error_msg = "initialization error (encoding issue)"
+        
+        return {"success": False, "message": f"Enhanced plugin initialization failed: {safe_error_msg}"}
 
 
 async def process_enhanced_tool_call(tool_call: Dict[str, Any]) -> Dict[str, Any]:
@@ -494,20 +536,54 @@ async def handle_enhanced_compatibility_check(params: Dict[str, Any], steam_comp
         if not game_name:
             return {"success": False, "message": "Game name is required"}
         
-        logging.info(f"🎮 Enhanced compatibility check for: {game_name}")
+        logging.info(f"Enhanced compatibility check for: {game_name}")
         logging.info(f"Step 1: Initializing CanRun engine for {game_name}")
+        
+        # CRITICAL FIX: Always fetch Steam data first to ensure it's available
+        steam_data = None
+        steam_requirements_text = ""
+        
+        # Get Steam comparison data with improved error handling
+        try:
+            logging.info(f"Step 1.5: Fetching Steam data for {game_name}")
+            steam_result = await asyncio.wait_for(
+                steam_compare.get_steam_comparison_data(game_name),
+                timeout=20.0  # Increased timeout for Steam data
+            )
+            if steam_result.get('success'):
+                steam_data = steam_result['steam_data']
+                logging.info(f"Steam data retrieved for {game_name}")
+                
+                # Format Steam requirements for inclusion in response
+                min_req = steam_data.get('minimum_requirements', {})
+                rec_req = steam_data.get('recommended_requirements', {})
+                steam_requirements_text = f"""
+📊 **STEAM REQUIREMENTS COMPARISON**
+**Minimum**: {min_req.get('cpu', 'Unknown')} | {min_req.get('gpu', 'Unknown')} | {min_req.get('ram', 'Unknown')}
+**Recommended**: {rec_req.get('cpu', 'Unknown')} | {rec_req.get('gpu', 'Unknown')} | {rec_req.get('ram', 'Unknown')}"""
+            else:
+                logging.warning(f"Steam data unavailable for {game_name}: {steam_result.get('message', 'Unknown error')}")
+                steam_requirements_text = f"\n📊 **STEAM DATA**: Not available for {game_name}"
+        except asyncio.TimeoutError:
+            logging.warning(f"Steam data timeout for {game_name}, proceeding without Steam data")
+            steam_requirements_text = f"\n📊 **STEAM DATA**: Timeout fetching data for {game_name}"
+        except Exception as e:
+            logging.warning(f"Steam data error for {game_name}: {e}")
+            steam_requirements_text = f"\n📊 **STEAM DATA**: Error fetching data - {str(e)}"
         
         # Run compatibility check with timeout protection
         try:
             # Use asyncio.wait_for with timeout to prevent hanging in G-Assist
             result = await asyncio.wait_for(
                 canrun_engine.check_game_compatibility(game_name),
-                timeout=30.0  # 30 second timeout for G-Assist compatibility
+                timeout=25.0  # Reduced timeout since Steam data is already fetched
             )
             logging.info(f"Step 2: CanRun engine completed for {game_name}")
         except asyncio.TimeoutError:
             logging.error(f"❌ Timeout checking compatibility for {game_name}")
-            return {"success": False, "message": f"Timeout checking compatibility for {game_name} - Steam API may be slow"}
+            # FALLBACK: Provide basic response with Steam data if available
+            fallback_message = f"⏰ **{game_name}** - Analysis timeout, but here's what we found:{steam_requirements_text}"
+            return {"success": True, "message": fallback_message}
         except RuntimeError as e:
             # Handle event loop issues in G-Assist environment
             logging.warning(f"Event loop issue for {game_name}: {e}")
@@ -517,60 +593,97 @@ async def handle_enhanced_compatibility_check(params: Dict[str, Any], steam_comp
                 logging.info(f"Step 2: CanRun engine completed (fallback) for {game_name}")
             except Exception as fallback_error:
                 logging.error(f"❌ Fallback failed for {game_name}: {fallback_error}")
-                return {"success": False, "message": f"Engine error for {game_name}: {str(fallback_error)}"}
+                # FALLBACK: Provide basic response with Steam data if available
+                fallback_message = f"❌ **{game_name}** - Engine error, but here's Steam data:{steam_requirements_text}"
+                return {"success": True, "message": fallback_message}
         
         if result:
             logging.info(f"Step 3: Processing results for {game_name}")
             
-            # Get Steam comparison data if requested (with timeout)
-            steam_data = None
-            if include_steam_ui:
-                try:
-                    steam_result = await asyncio.wait_for(
-                        steam_compare.get_steam_comparison_data(game_name),
-                        timeout=15.0  # 15 second timeout for Steam data
-                    )
-                    if steam_result.get('success'):
-                        steam_data = steam_result['steam_data']
-                        logging.info(f"Step 4: Steam data retrieved for {game_name}")
-                    else:
-                        logging.warning(f"Steam data unavailable for {game_name}: {steam_result.get('message', 'Unknown error')}")
-                except asyncio.TimeoutError:
-                    logging.warning(f"Steam data timeout for {game_name}, proceeding without Steam UI")
-                except Exception as e:
-                    logging.warning(f"Steam data error for {game_name}: {e}")
-            
-            # Format enhanced response
+            # ENHANCED: Extract comprehensive performance data with LLM analysis
             try:
-                response_data = {
-                    'success': True,
-                    'game_name': result.game_name,
-                    'can_run': result.can_run_game(),
-                    'performance_tier': result.performance_prediction.tier.name if hasattr(result.performance_prediction, 'tier') else 'Unknown',
-                    'expected_fps': getattr(result.performance_prediction, 'expected_fps', 0),
-                    'gpu_model': result.hardware_specs.gpu_model,
-                    'steam_data': steam_data
-                }
+                can_run = result.can_run_game()
+                performance_tier = "Unknown"
+                expected_fps = 0
+                gpu_model = "Unknown GPU"
                 
-                # Add optimization tips
-                if hasattr(result.performance_prediction, 'upgrade_suggestions'):
-                    response_data['optimization_tips'] = '; '.join(result.performance_prediction.upgrade_suggestions[:3])
+                # Extract performance tier
+                if hasattr(result.performance_prediction, 'tier'):
+                    performance_tier = result.performance_prediction.tier.name
+                elif hasattr(result, 'performance_tier'):
+                    performance_tier = result.performance_tier
                 
-                formatted_response = formatter.format_compatibility_response(response_data, include_steam_ui)
+                # Extract expected FPS
+                if hasattr(result.performance_prediction, 'expected_fps'):
+                    expected_fps = result.performance_prediction.expected_fps
+                elif hasattr(result, 'expected_fps'):
+                    expected_fps = result.expected_fps
                 
-                logging.info(f"✅ Enhanced compatibility check successful for {game_name}")
-                return {"success": True, "message": formatted_response}
+                # Extract GPU model
+                if hasattr(result, 'hardware_specs') and hasattr(result.hardware_specs, 'gpu_model'):
+                    gpu_model = result.hardware_specs.gpu_model
+                
+                # Enhanced LLM analysis using structured context
+                llm_insights = ""
+                if hasattr(canrun_engine, 'compatibility_analyzer') and canrun_engine.compatibility_analyzer.llm_analyzer:
+                    try:
+                        # Get comprehensive LLM analysis context
+                        llm_context = await canrun_engine.compatibility_analyzer.get_llm_analysis_context(
+                            game_name, result.hardware_specs, result.requirements, result.compatibility_analysis
+                        )
+                        
+                        # Extract LLM insights if available
+                        if 'llm_analysis' in llm_context and 'analysis_text' in llm_context['llm_analysis']:
+                            llm_insights = f"\n\n🤖 **AI INSIGHTS**\n{llm_context['llm_analysis']['analysis_text'][:200]}..."
+                            logging.info(f"LLM analysis integrated for {game_name}")
+                        
+                    except Exception as e:
+                        logging.warning(f"LLM analysis integration failed: {e}")
+                
+                # Create comprehensive response
+                verdict_emoji = "✅" if can_run else "❌"
+                verdict_text = "YES! Your system can run this game" if can_run else "Your system may struggle with this game"
+                
+                # Performance recommendation based on tier and FPS
+                if performance_tier in ['S', 'A'] and expected_fps >= 60:
+                    settings_rec = "Ultra settings at 4K"
+                elif performance_tier in ['A', 'B'] and expected_fps >= 45:
+                    settings_rec = "High settings at 1440p"
+                elif performance_tier in ['B', 'C'] and expected_fps >= 30:
+                    settings_rec = "Medium settings at 1080p"
+                else:
+                    settings_rec = "Low settings recommended"
+                
+                # Build comprehensive G-Assist response
+                comprehensive_response = f"""{verdict_emoji} **{game_name}** - {verdict_text}
+
+🎯 **PERFORMANCE ANALYSIS**
+• Performance Tier: {performance_tier}
+• Expected FPS: {expected_fps}
+• Your GPU: {gpu_model}
+• Recommended: {settings_rec}{steam_requirements_text}{llm_insights}"""
+
+                # Add optimization tips if available
+                if hasattr(result.performance_prediction, 'upgrade_suggestions') and result.performance_prediction.upgrade_suggestions:
+                    tips = '; '.join(result.performance_prediction.upgrade_suggestions[:3])
+                    comprehensive_response += f"""
+
+💡 **OPTIMIZATION TIPS**
+{tips}"""
+                
+                logging.info(f"Enhanced compatibility check successful for {game_name}")
+                return {"success": True, "message": comprehensive_response}
                 
             except Exception as format_error:
                 logging.error(f"Response formatting error for {game_name}: {format_error}")
-                # Fallback to simple response
-                return {
-                    "success": True,
-                    "message": f"✅ {game_name} - Performance analysis completed (formatting error: {str(format_error)})"
-                }
+                # FALLBACK: Provide basic response with available data
+                fallback_message = f"✅ **{game_name}** - Analysis completed with some formatting issues{steam_requirements_text}"
+                return {"success": True, "message": fallback_message}
         else:
             logging.error(f"❌ CanRun engine returned None for {game_name}")
-            return {"success": False, "message": f"Could not analyze {game_name} - Steam API may be unavailable or game not found"}
+            # FALLBACK: Provide Steam data if available
+            fallback_message = f"❌ **{game_name}** - Could not complete full analysis{steam_requirements_text}"
+            return {"success": True, "message": fallback_message}
             
     except Exception as e:
         logging.error(f"❌ Enhanced compatibility check exception for {game_name}: {str(e)}", exc_info=True)
@@ -580,7 +693,7 @@ async def handle_enhanced_compatibility_check(params: Dict[str, Any], steam_comp
 async def handle_enhanced_hardware_detection(formatter: EnhancedResponseFormatter) -> Dict[str, Any]:
     """Handle enhanced hardware detection."""
     try:
-        logging.info("🔍 Enhanced hardware detection...")
+        logging.info("Enhanced hardware detection...")
         
         # Use existing event loop or create new one if needed
         try:
@@ -613,7 +726,7 @@ async def handle_enhanced_hardware_detection(formatter: EnhancedResponseFormatte
         
         formatted_response = formatter.format_hardware_response(response_data)
         
-        logging.info("✅ Enhanced hardware detection successful")
+        logging.info("Enhanced hardware detection successful")
         return {"success": True, "message": formatted_response}
         
     except Exception as e:
@@ -629,7 +742,7 @@ async def handle_enhanced_game_comparison(params: Dict[str, Any], formatter: Enh
         if len(games) < 2:
             return {"success": False, "message": "At least 2 games required for comparison"}
         
-        logging.info(f"🎮 Enhanced game comparison for: {games}")
+        logging.info(f"Enhanced game comparison for: {games}")
         
         # Check compatibility for each game
         comparison_results = []
@@ -673,7 +786,7 @@ async def handle_enhanced_game_comparison(params: Dict[str, Any], formatter: Enh
         
         formatted_response = formatter.format_comparison_response(comparison_results)
         
-        logging.info(f"✅ Enhanced game comparison successful")
+        logging.info(f"Enhanced game comparison successful")
         return {"success": True, "message": formatted_response}
         
     except Exception as e:
@@ -689,7 +802,7 @@ async def handle_steam_compare_ui(params: Dict[str, Any], steam_compare: SteamCo
         if not game_name:
             return {"success": False, "message": "Game name is required for Steam comparison"}
         
-        logging.info(f"🎮 Steam Compare UI for: {game_name}")
+        logging.info(f"Steam Compare UI for: {game_name}")
         
         # Get Steam comparison data
         steam_result = await steam_compare.get_steam_comparison_data(game_name)
@@ -724,7 +837,7 @@ async def handle_steam_compare_ui(params: Dict[str, Any], steam_compare: SteamCo
             
             formatted_response = steam_compare.format_steam_compare_response(steam_result, compatibility_result)
             
-            logging.info(f"✅ Steam Compare UI successful for {game_name}")
+            logging.info(f"Steam Compare UI successful for {game_name}")
             return {"success": True, "message": formatted_response}
         else:
             return {"success": False, "message": steam_result.get('message', 'Steam comparison failed')}
@@ -742,7 +855,7 @@ async def handle_auto_detection(params: Dict[str, Any], steam_compare: SteamComp
         if not user_input:
             return {"success": False, "message": "User input is required for auto-detection"}
         
-        logging.info(f"🤖 Auto-detecting tool from input: {user_input}")
+        logging.info(f"Auto-detecting tool from input: {user_input}")
         
         # Detect tool and extract parameters
         detector = ToolNameDetector()
@@ -752,10 +865,13 @@ async def handle_auto_detection(params: Dict[str, Any], steam_compare: SteamComp
         detected_params = detection_result['params']
         confidence = detection_result['confidence']
         
-        logging.info(f"🎯 Detected tool: {detected_tool} (confidence: {confidence:.2f})")
+        logging.info(f"Detected tool: {detected_tool} (confidence: {confidence:.2f})")
         
-        # Route to appropriate handler
+        # ENHANCED: Ensure Steam data is always included for compatibility checks
         if detected_tool == 'check_compatibility':
+            # Force Steam data inclusion for G-Assist compatibility checks
+            detected_params['show_steam_data'] = True
+            logging.info(f" Routing to compatibility check with Steam data for: {detected_params.get('game_name', 'unknown game')}")
             return await handle_enhanced_compatibility_check(detected_params, steam_compare, formatter)
         elif detected_tool == 'detect_hardware':
             return await handle_enhanced_hardware_detection(formatter)
@@ -764,322 +880,278 @@ async def handle_auto_detection(params: Dict[str, Any], steam_compare: SteamComp
         elif detected_tool == 'steam_compare':
             return await handle_steam_compare_ui(detected_params, steam_compare, formatter)
         else:
-            return {"success": False, "message": f"Could not determine appropriate action from: {user_input}"}
+            # FALLBACK: If no specific tool detected but game name found, default to compatibility check
+            if detected_params.get('game_name'):
+                logging.info(f" Fallback: Defaulting to compatibility check for: {detected_params['game_name']}")
+                detected_params['show_steam_data'] = True
+                return await handle_enhanced_compatibility_check(detected_params, steam_compare, formatter)
+            else:
+                return {"success": False, "message": f"Could not determine appropriate action from: {user_input}"}
             
     except Exception as e:
-        error_msg = f"❌ Auto-detection failed: {str(e)}"
+        error_msg = f" Auto-detection failed: {str(e)}"
         logging.error(error_msg)
         return {"success": False, "message": error_msg}
 
 
-def read_enhanced_command() -> Optional[Dict[str, Any]]:
+def read_g_assist_command() -> Optional[Dict[str, Any]]:
     """
-    Read enhanced command from stdin using standard Python input.
-    Supports both traditional G-Assist commands and auto-detection.
+    Read G-Assist command using official NVIDIA G-Assist protocol.
+    Based on official documentation from https://github.com/NVIDIA/G-Assist
     
     Returns:
         Optional[Dict[str, Any]]: Parsed command dictionary or None if failed
     """
     try:
-        # Read from stdin
-        line = sys.stdin.readline().strip()
+        # OFFICIAL PROTOCOL: Read from stdin using standard input
+        # G-Assist communicates via standard input/output, not Windows pipes
+        import sys
+        
+        # Read line from stdin (G-Assist sends commands line by line)
+        line = sys.stdin.readline()
         if not line:
             return None
             
-        logging.info(f'Received enhanced command: {line}')
+        message = line.strip()
+        if not message:
+            return None
+            
+        logging.info(f' G-Assist command received: {message[:100]}...' if len(message) > 100 else f' G-Assist command: {message}')
         
-        # Try to parse as JSON first (traditional G-Assist format)
+        # Parse G-Assist JSON command
         try:
-            command = json.loads(line)
+            command = json.loads(message)
+            
+            # Validate G-Assist command structure
+            if not isinstance(command, dict):
+                logging.error(f"Invalid command format: not a dictionary")
+                return None
+                
+            # Official G-Assist format: {"tool_calls": [{"func": "function_name", "params": {...}}]}
+            if "tool_calls" not in command:
+                # Convert simple command to tool_calls format
+                if "function" in command:
+                    command = {
+                        "tool_calls": [
+                            {
+                                "func": command["function"],
+                                "params": command.get("params", {})
+                            }
+                        ]
+                    }
+                else:
+                    # Treat as natural language input
+                    command = {
+                        "tool_calls": [
+                            {
+                                "func": "auto_detect",
+                                "params": {"user_input": message}
+                            }
+                        ]
+                    }
+            
             return command
-        except json.JSONDecodeError:
+            
+        except json.JSONDecodeError as e:
+            logging.warning(f'JSON decode error: {e}, treating as natural language')
             # If not JSON, treat as raw user input for auto-detection
             return {
                 "tool_calls": [
                     {
                         "func": "auto_detect",
-                        "params": {"user_input": line}
+                        "params": {"user_input": message}
                     }
                 ]
             }
             
     except Exception as e:
-        logging.error(f'Error in read_enhanced_command: {e}')
+        logging.error(f' Error reading G-Assist command: {e}')
         return None
 
 
-def write_enhanced_response(response: Dict[str, Any]) -> None:
+def write_g_assist_response(response: Dict[str, Any]) -> None:
     """
-    Write enhanced response to stdout using multiple methods for G-Assist compatibility.
+    Write G-Assist response using official NVIDIA G-Assist protocol.
+    Based on official documentation from https://github.com/NVIDIA/G-Assist
     
     Args:
         response: Dictionary containing 'success' and optional 'message'
     """
     try:
-        # Method 1: Standard stdout (most compatible)
-        message = json.dumps(response)
-        print(message, flush=True)
-        logging.info(f'Sent response via stdout: {message}')
+        # Ensure response has required G-Assist format
+        if not isinstance(response, dict):
+            response = {"success": False, "message": "Invalid response format"}
         
-        # Method 2: Windows API with proper termination
-        try:
-            pipe = windll.kernel32.GetStdHandle(STD_OUTPUT_HANDLE)
-            message_with_terminator = message + '>'
-            message_bytes = message_with_terminator.encode('utf-8')
-            
-            bytes_written = wintypes.DWORD()
-            windll.kernel32.WriteFile(
-                pipe,
-                message_bytes,
-                len(message_bytes),
-                byref(bytes_written),
-                None
-            )
-            logging.info(f'Sent response via Windows API: {message_with_terminator}')
-        except Exception as api_error:
-            logging.warning(f'Windows API write failed: {api_error}')
-            
-        # Method 3: Direct sys.stdout write
-        try:
-            sys.stdout.write(message + '\n')
-            sys.stdout.flush()
-            logging.info(f'Sent response via sys.stdout: {message}')
-        except Exception as stdout_error:
-            logging.warning(f'sys.stdout write failed: {stdout_error}')
-            
+        # OFFICIAL G-ASSIST PROTOCOL: Simple response structure
+        g_assist_response = {
+            "success": response.get("success", False),
+            "message": response.get("message", "")
+        }
+        
+        # Convert to JSON with ASCII-safe formatting for better compatibility
+        json_response = json.dumps(g_assist_response, ensure_ascii=True)
+        
+        # CRITICAL: Use official G-Assist termination marker
+        # Based on official documentation: responses must end with '<<END>>'
+        message = json_response + '<<END>>'
+        
+        # OFFICIAL PROTOCOL: Write to stdout (G-Assist reads from plugin's stdout)
+        import sys
+        sys.stdout.write(message)
+        sys.stdout.flush()  # Ensure immediate delivery to G-Assist
+        
+        # Log the response (to file only, never to stdout after the response)
+        logging.info(f' G-Assist response sent: {json_response[:200]}...' if len(json_response) > 200 else f' G-Assist response: {json_response}')
+        
     except Exception as e:
-        logging.error(f'All response writing methods failed: {e}')
-        # Emergency fallback - just print the message
+        logging.error(f' Error writing G-Assist response: {e}')
+        # Fallback response to stdout
         try:
-            print(f"ERROR: {str(e)}")
+            fallback = json.dumps({"success": False, "message": f"Response error: {str(e)}"}) + '<<END>>'
+            import sys
+            sys.stdout.write(fallback)
+            sys.stdout.flush()
         except:
-            pass
+            pass  # If even fallback fails, log it but don't crash
 
 
-def run_enhanced_command_line_interface():
+# CLI mode removed - this plugin is designed exclusively for NVIDIA G-Assist
+# CLI functionality has been removed to eliminate Unicode encoding crashes
+# and focus on the core G-Assist integration which works perfectly
+
+
+async def run_g_assist_interface():
     """
-    Run the enhanced plugin in command-line interface mode.
-    Supports direct function calls with arguments and auto-detection.
+    Run the plugin in G-Assist interface mode with official NVIDIA protocol.
+    Based on official documentation from https://github.com/NVIDIA/G-Assist
     """
-    parser = argparse.ArgumentParser(
-        description="Enhanced CanRun G-Assist Plugin - Game Compatibility Analysis with Steam Compare UI",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Examples:
-  python plugin.py --function check_compatibility --game "Diablo 4"
-  python plugin.py --function detect_hardware
-  python plugin.py --function steam_compare --game "Cyberpunk 2077"
-  python plugin.py --function auto_detect --input "Can I run Elden Ring?"
-  
-Functions:
-  check_compatibility  Check if a game can run on this system with Steam Compare UI
-  detect_hardware      Detect system hardware specifications
-  steam_compare        Show Steam Compare UI for a specific game
-  compare_games        Compare multiple games performance
-  auto_detect          Automatically detect tool from natural language input
-        """
-    )
-    
-    parser.add_argument(
-        '--function',
-        required=True,
-        choices=['check_compatibility', 'detect_hardware', 'steam_compare', 'compare_games', 'auto_detect'],
-        help='Function to execute'
-    )
-    
-    parser.add_argument(
-        '--game',
-        help='Game name for compatibility check or Steam compare (required for check_compatibility, steam_compare)'
-    )
-    
-    parser.add_argument(
-        '--games',
-        nargs='+',
-        help='Multiple game names for comparison (required for compare_games)'
-    )
-    
-    parser.add_argument(
-        '--input',
-        help='Natural language input for auto-detection (required for auto_detect)'
-    )
-    
-    parser.add_argument(
-        '--show-steam',
-        action='store_true',
-        help='Include Steam Compare UI data in compatibility check'
-    )
-    
-    # Temporarily redirect stderr to suppress duplicate error messages
-    import io
-    old_stderr = sys.stderr
-    sys.stderr = io.StringIO()
-    
     try:
-        args = parser.parse_args()
-    except SystemExit as e:
-        # Restore stderr
-        sys.stderr = old_stderr
-        # If argument parsing fails, exit with error
-        if e.code != 0:
-            sys.exit(e.code)
-    finally:
-        # Always restore stderr
-        sys.stderr = old_stderr
+        # Initialize plugin components (logging only, no stdout)
+        init_result = initialize_enhanced_plugin()
+        
+        if not init_result["success"]:
+            logging.error(f" Plugin initialization failed: {init_result['message']}")
+            write_g_assist_response({
+                "success": False,
+                "message": f"Plugin initialization failed: {init_result['message']}"
+            })
+            return
     
-    # Initialize enhanced plugin
-    init_result = initialize_enhanced_plugin()
-    if not init_result["success"]:
-        result = {"success": False, "message": init_result["message"]}
-        print(json.dumps(result))
-        sys.exit(1)
-    
-    # Build tool call based on arguments
-    tool_call = {"func": args.function, "params": {}}
-    
-    if args.function == 'check_compatibility':
-        if not args.game:
-            result = {"success": False, "message": "Game name is required for compatibility check"}
-        else:
-            tool_call["params"] = {
-                "game_name": args.game,
-                "show_steam_data": args.show_steam
-            }
-    elif args.function == 'steam_compare':
-        if not args.game:
-            result = {"success": False, "message": "Game name is required for Steam compare"}
-        else:
-            tool_call["params"] = {"game_name": args.game}
-    elif args.function == 'compare_games':
-        if not args.games or len(args.games) < 2:
-            result = {"success": False, "message": "At least 2 games required for comparison"}
-        else:
-            tool_call["params"] = {"games": args.games}
-    elif args.function == 'auto_detect':
-        if not args.input:
-            result = {"success": False, "message": "Input text is required for auto-detection"}
-        else:
-            tool_call["params"] = {"user_input": args.input}
-    elif args.function == 'detect_hardware':
-        tool_call["params"] = {}
-    
-    # Execute the function if no errors
-    if 'result' not in locals():
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            result = loop.run_until_complete(process_enhanced_tool_call(tool_call))
-        finally:
-            loop.close()
-    
-    # Output result as JSON
-    print(json.dumps(result, indent=2))
-
-
-async def run_enhanced_g_assist_interface():
-    """
-    Run the enhanced plugin in G-Assist interface mode with timeout protection.
-    Uses Windows named pipes for communication with G-Assist.
-    Supports both traditional commands and auto-detection.
-    """
-    # Initialize enhanced plugin
-    init_result = initialize_enhanced_plugin()
-    if not init_result["success"]:
-        logging.error(f"❌ Enhanced plugin initialization failed: {init_result['message']}")
-        write_enhanced_response({"success": False, "message": f"Enhanced plugin initialization failed: {init_result['message']}"})
-        sys.exit(1)
-    
-    logging.info("🚀 Enhanced CanRun G-Assist Plugin starting...")
-    logging.info("🎮 Ready for enhanced game compatibility analysis with Steam Compare UI!")
-    
-    # Main interaction loop with timeout protection
-    while True:
-        try:
-            # Read command from G-Assist via stdin pipe
-            command = read_enhanced_command()
-            if command is None:
-                continue
-            
-            logging.info(f"📨 Received command with {len(command.get('tool_calls', []))} tool calls")
-            
-            # Process tool calls with overall timeout protection
-            for tool_call in command.get("tool_calls", []):
-                try:
-                    logging.info(f"🔧 Processing tool call: {tool_call.get('func', 'unknown')}")
-                    
-                    # Wrap each tool call with timeout to prevent G-Assist hanging
-                    response = await asyncio.wait_for(
-                        process_enhanced_tool_call(tool_call),
-                        timeout=45.0  # 45 second max per request for G-Assist compatibility
-                    )
-                    
-                    logging.info(f"✅ Tool call completed: {tool_call.get('func', 'unknown')}")
-                    write_enhanced_response(response)
-                    
-                except asyncio.TimeoutError:
-                    timeout_msg = f"Request timeout for {tool_call.get('func', 'unknown')} - please try again"
-                    logging.error(f"⏰ {timeout_msg}")
-                    write_enhanced_response({
-                        "success": False,
-                        "message": timeout_msg
-                    })
-                except Exception as e:
-                    error_msg = f"Processing error for {tool_call.get('func', 'unknown')}: {str(e)}"
-                    logging.error(f"❌ {error_msg}", exc_info=True)
-                    write_enhanced_response({"success": False, "message": error_msg})
+        logging.info(" CanRun G-Assist Plugin ready for communication")
+        logging.info(" Waiting for G-Assist commands...")
+        
+        # Main G-Assist communication loop
+        while True:
+            try:
+                # Read command from G-Assist using stdin
+                command = read_g_assist_command()
+                if command is None:
+                    # EOF or no command received, exit gracefully
+                    logging.info(" No more commands, exiting...")
+                    break
                 
-                # Handle shutdown
-                if tool_call.get("func") == "shutdown":
-                    logging.info("👋 Enhanced CanRun plugin shutting down...")
-                    return
-            
-        except KeyboardInterrupt:
-            logging.info("\n👋 Enhanced CanRun plugin shutting down...")
-            break
-        except Exception as e:
-            logging.error(f"❌ Error in enhanced G-Assist interface: {e}", exc_info=True)
-            write_enhanced_response({"success": False, "message": f"Interface error: {str(e)}"})
+                tool_calls = command.get("tool_calls", [])
+                logging.info(f" Processing {len(tool_calls)} tool call(s)")
+                
+                # Process each tool call
+                for tool_call in tool_calls:
+                    func_name = tool_call.get('func', 'unknown')
+                    
+                    try:
+                        logging.info(f" Executing: {func_name}")
+                        
+                        # Handle shutdown command immediately
+                        if func_name == "shutdown":
+                            logging.info(" G-Assist plugin shutting down...")
+                            write_g_assist_response({
+                                "success": True,
+                                "message": "Plugin shutdown complete"
+                            })
+                            return
+                        
+                        # Execute with timeout to prevent G-Assist hanging
+                        response = await asyncio.wait_for(
+                            process_enhanced_tool_call(tool_call),
+                            timeout=30.0  # 30 second timeout per function
+                        )
+                        
+                        logging.info(f" {func_name} completed successfully")
+                        write_g_assist_response(response)
+                        
+                    except asyncio.TimeoutError:
+                        timeout_msg = f"Function '{func_name}' timed out after 30 seconds"
+                        logging.error(f" {timeout_msg}")
+                        write_g_assist_response({
+                            "success": False,
+                            "message": timeout_msg
+                        })
+                        
+                    except Exception as e:
+                        error_msg = f"Error executing '{func_name}': {str(e)}"
+                        logging.error(f" {error_msg}", exc_info=True)
+                        write_g_assist_response({
+                            "success": False,
+                            "message": error_msg
+                        })
+                        
+            except KeyboardInterrupt:
+                logging.info(" Plugin interrupted, shutting down...")
+                break
+                
+            except EOFError:
+                logging.info(" G-Assist closed connection, shutting down...")
+                break
+                
+            except Exception as e:
+                logging.error(f" G-Assist interface error: {e}", exc_info=True)
+                write_g_assist_response({
+                    "success": False,
+                    "message": f"Interface error: {str(e)}"
+                })
+                
+    except Exception as e:
+        logging.error(f" Fatal G-Assist interface error: {e}", exc_info=True)
+        try:
+            write_g_assist_response({
+                "success": False,
+                "message": f"Fatal error: {str(e)}"
+            })
+        except:
+            pass  # If we can't even send error response, just log and exit
 
 
 def main():
     """
-    Main entry point for the Enhanced CanRun G-Assist plugin.
+    Main entry point for the CanRun G-Assist plugin.
     
-    Determines whether to run in command-line interface mode or G-Assist mode
-    based on the presence of command-line arguments and stdin availability.
-    
-    Command-line mode: Used when arguments are provided (e.g., --function, --game)
-    G-Assist mode: Used when no arguments are provided or stdin has data
+    This plugin is designed exclusively for NVIDIA G-Assist integration.
+    CLI mode has been removed to eliminate Unicode encoding issues and
+    focus on the core G-Assist functionality which works perfectly.
     """
-    # Add plugin discovery logging
-    logging.info("🚀 CanRun G-Assist Plugin starting...")
-    logging.info(f"📁 Plugin started from: {os.path.abspath(__file__)}")
+    # Log startup information (to file only)
+    logging.info("🎮 CanRun G-Assist Plugin starting...")
+    logging.info(f"📁 Plugin path: {os.path.abspath(__file__)}")
     logging.info(f"📂 Working directory: {os.getcwd()}")
-    logging.info(f"🔧 Python executable: {sys.executable}")
-    logging.info(f"📋 Command line args: {sys.argv}")
+    logging.info(f"🐍 Python executable: {sys.executable}")
+    logging.info(f"⚙️ Command line args: {sys.argv}")
     
-    # Check if this is G-Assist pipe mode (multiprocessing-fork) or command-line mode
-    if len(sys.argv) > 1 and '--multiprocessing-fork' in ' '.join(sys.argv):
-        # G-Assist pipe mode - run in G-Assist interface mode
-        logging.info("🔗 Detected G-Assist pipe mode, starting G-Assist interface...")
-        asyncio.run(run_enhanced_g_assist_interface())
-    elif len(sys.argv) > 1:
-        # Command-line interface mode
-        logging.info("💻 Detected command-line mode, starting CLI interface...")
-        run_enhanced_command_line_interface()
-    else:
-        # Default to G-Assist mode
-        logging.info("🎮 No arguments detected, starting G-Assist interface...")
+    # This plugin runs exclusively in G-Assist mode
+    logging.info("🚀 Running in G-Assist mode (CLI mode removed)")
+    
+    try:
+        asyncio.run(run_g_assist_interface())
+    except KeyboardInterrupt:
+        logging.info("⏹️ Plugin interrupted")
+    except Exception as e:
+        logging.error(f"❌ G-Assist mode error: {e}", exc_info=True)
+        # Try to send error response to G-Assist
         try:
-            # Try to read from stdin with a timeout
-            if sys.stdin.isatty():
-                # No piped input, run in G-Assist mode anyway
-                asyncio.run(run_enhanced_g_assist_interface())
-            else:
-                # Piped input detected, run in G-Assist mode
-                asyncio.run(run_enhanced_g_assist_interface())
+            write_g_assist_response({
+                "success": False,
+                "message": f"Plugin error: {str(e)}"
+            })
         except:
-            # Fallback to G-Assist mode
-            asyncio.run(run_enhanced_g_assist_interface())
+            pass
 
 
 if __name__ == '__main__':
