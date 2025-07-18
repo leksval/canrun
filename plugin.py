@@ -8,23 +8,35 @@ import logging
 import os
 import asyncio
 import sys
+import platform
 from typing import Optional, Dict, Any
-from ctypes import byref, windll, wintypes
 from datetime import datetime
 
 # Add src to path for CanRun engine imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+
+# Platform detection
+IS_WINDOWS = platform.system() == "Windows"
 
 # Import CanRun engine - should always be available
 from src.canrun_engine import CanRunEngine
 
 # Configuration paths
 CONFIG_FILE = os.path.join(os.path.dirname(__file__), 'config.json')
-FALLBACK_CONFIG_FILE = os.path.join(
-    os.environ.get("PROGRAMDATA", "."),
-    r'NVIDIA Corporation\nvtopps\rise\plugins\canrun',
-    'config.json'
-)
+# Create platform-independent paths
+if IS_WINDOWS:
+    FALLBACK_CONFIG_FILE = os.path.join(
+        os.environ.get("PROGRAMDATA", "."),
+        r'NVIDIA Corporation\nvtopps\rise\plugins\canrun',
+        'config.json'
+    )
+else:
+    # For Linux/macOS, use a standard location
+    FALLBACK_CONFIG_FILE = os.path.join(
+        os.environ.get("HOME", "."),
+        ".config/canrun",
+        'config.json'
+    )
 
 # Global config
 config = {}
@@ -66,7 +78,9 @@ def load_config():
 def setup_logging():
     """Configure logging with timestamp format following NVIDIA pattern."""
     log_config = config.get("logging_config", {})
-    log_file = os.path.join(os.environ.get("USERPROFILE", "."), log_config.get("log_file", "canrun_g_assist.log"))
+    # Use platform-independent home directory
+    home_dir = os.environ.get("USERPROFILE" if IS_WINDOWS else "HOME", ".")
+    log_file = os.path.join(home_dir, log_config.get("log_file", "canrun_g_assist.log"))
     
     logging.basicConfig(
         filename=log_file,
@@ -77,12 +91,13 @@ def setup_logging():
 
 # Load config at startup
 config = load_config()
+# Pipe constants from config - only used on Windows
+if IS_WINDOWS:
+    pipe_config = config.get("windows_pipe_config", {})
+    STD_INPUT_HANDLE = pipe_config.get("STD_INPUT_HANDLE", -10)
+    STD_OUTPUT_HANDLE = pipe_config.get("STD_OUTPUT_HANDLE", -11)
+    BUFFER_SIZE = pipe_config.get("BUFFER_SIZE", 4096)
 
-# Windows pipe constants from config
-pipe_config = config.get("windows_pipe_config", {})
-STD_INPUT_HANDLE = pipe_config.get("STD_INPUT_HANDLE", -10)
-STD_OUTPUT_HANDLE = pipe_config.get("STD_OUTPUT_HANDLE", -11)
-BUFFER_SIZE = pipe_config.get("BUFFER_SIZE", 4096)
 
 
 def read_command() -> Optional[Dict[str, Any]]:

@@ -10,6 +10,10 @@ import sys
 import time
 import asyncio
 import base64
+import platform
+
+# Platform detection
+IS_WINDOWS = platform.system() == "Windows"
 from src.canrun_engine import CanRunEngine
 from plugin import CanRunGAssistPlugin
 
@@ -166,15 +170,15 @@ def main():
     # Launch the server
     demo.queue().launch(**launch_kwargs)
     
-    # Keep the main thread alive
+    # Keep the main thread alive - Platform-independent approach
     logger.info("Press Ctrl+C to stop the server")
-    if hasattr(signal, 'pause'):
-        # Unix systems
-        signal.pause()
-    else:
-        # Windows systems
+    try:
+        # This works on most systems and is more reliable than signal.pause()
         while True:
             time.sleep(1)
+    except KeyboardInterrupt:
+        logger.info("Keyboard interrupt received, shutting down...")
+        sys.exit(0)
 
 if __name__ == "__main__":
     main()
