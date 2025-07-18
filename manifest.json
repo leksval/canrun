@@ -3,7 +3,7 @@
   "name": "CanRun Game Compatibility Checker",
   "description": "Check if games can run on your system with performance analysis",
   "version": "5.0.0",
-  "author": "CanRun Development Team",
+  "author": "leksval",
   "tags": ["game", "compatibility", "canrun", "performance", "system", "requirements"],
   "executable": "canrun-g-assist-plugin.exe",
   "args": [],

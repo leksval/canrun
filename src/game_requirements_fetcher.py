@@ -662,15 +662,26 @@ class GameRequirementsFetcher:
         """
         
         try:
-            self.logger.info(f"Fetching requirements for '{game_name}' - checking local cache first")
+            self.logger.info(f"Fetching requirements for '{game_name}' - trying Steam API first")
             
-            # Step 1: Try local cache first (primary source)
+            # Step 1: Try Steam API first (primary source for real-time data)
+            try:
+                steam_requirements = await self.steam_source.fetch(game_name)
+                if steam_requirements:
+                    self.logger.info(f"Successfully fetched '{game_name}' from Steam API")
+                    await self._cache_requirements(steam_requirements)
+                    return steam_requirements
+            except Exception as e:
+                self.logger.warning(f"Steam API failed for '{game_name}': {e}")
+            
+            # Step 2: Fallback to local cache
+            self.logger.info(f"Steam API failed, checking local cache for '{game_name}'")
             cache_requirements = await self.cache_source.fetch(game_name)
             if cache_requirements:
                 self.logger.info(f"Found '{game_name}' in local cache")
                 return cache_requirements
                 
-            # Step 2: Use LLM to intelligently search local cache data
+            # Step 3: Use LLM to intelligently search local cache data
             if self.llm_analyzer:
                 self.logger.info(f"Using LLM to interpret local cache data for '{game_name}'")
                 llm_cache_result = await self._llm_enhanced_cache_search(game_name)
@@ -678,7 +689,7 @@ class GameRequirementsFetcher:
                     self.logger.info(f"LLM successfully found '{game_name}' in local cache")
                     return llm_cache_result
             
-            # Step 3: Special handling for Diablo 4 <-> Diablo IV mapping (fallback)
+            # Step 4: Special handling for Diablo 4 <-> Diablo IV mapping (fallback)
             if game_name.lower() == "diablo 4":
                 diablo_iv = await self.cache_source.fetch("Diablo IV")
                 if diablo_iv:
@@ -689,17 +700,6 @@ class GameRequirementsFetcher:
                 if diablo_4:
                     self.logger.info(f"Mapped 'Diablo IV' to 'Diablo 4' in cache")
                     return diablo_4
-            
-            # Step 4: Fallback to Steam API if not in cache
-            self.logger.info(f"Not found in cache, trying Steam API for '{game_name}'")
-            try:
-                steam_requirements = await self.steam_source.fetch(game_name)
-                if steam_requirements:
-                    self.logger.info(f"Successfully fetched '{game_name}' from Steam API")
-                    await self._cache_requirements(steam_requirements)
-                    return steam_requirements
-            except Exception as e:
-                self.logger.warning(f"Steam API failed for '{game_name}': {e}")
             
             # Step 5: If all else fails, return None for clear error handling
             self.logger.warning(f"No requirements found for '{game_name}' after trying all sources")

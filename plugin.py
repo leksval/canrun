@@ -789,8 +789,8 @@ def write_enhanced_response(response: Dict[str, Any]) -> None:
     """
     try:
         pipe = windll.kernel32.GetStdHandle(STD_OUTPUT_HANDLE)
-        # Add <<END>> marker for message termination
-        message = json.dumps(response) + '<<END>>'
+        # FIXED: Using correct '>' termination marker for G-Assist communication
+        message = json.dumps(response) + '>'
         message_bytes = message.encode('utf-8')
         
         bytes_written = wintypes.DWORD()
@@ -988,12 +988,18 @@ def main():
     logging.info(f"🔧 Python executable: {sys.executable}")
     logging.info(f"📋 Command line args: {sys.argv}")
     
-    # Check if command-line arguments are provided
-    if len(sys.argv) > 1:
-        # Run in command-line interface mode
+    # Check if this is G-Assist pipe mode (multiprocessing-fork) or command-line mode
+    if len(sys.argv) > 1 and '--multiprocessing-fork' in ' '.join(sys.argv):
+        # G-Assist pipe mode - run in G-Assist interface mode
+        logging.info("🔗 Detected G-Assist pipe mode, starting G-Assist interface...")
+        asyncio.run(run_enhanced_g_assist_interface())
+    elif len(sys.argv) > 1:
+        # Command-line interface mode
+        logging.info("💻 Detected command-line mode, starting CLI interface...")
         run_enhanced_command_line_interface()
     else:
-        # For Windows, we'll use a different approach
+        # Default to G-Assist mode
+        logging.info("🎮 No arguments detected, starting G-Assist interface...")
         try:
             # Try to read from stdin with a timeout
             if sys.stdin.isatty():
