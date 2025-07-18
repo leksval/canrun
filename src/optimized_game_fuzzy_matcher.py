@@ -8,6 +8,7 @@ import logging
 from collections import defaultdict
 from typing import List, Tuple, Dict, Optional
 import asyncio
+from src.rtx_llm_analyzer import GAssistLLMAnalyzer
 
 
 class OptimizedGameFuzzyMatcher:
@@ -20,6 +21,26 @@ class OptimizedGameFuzzyMatcher:
         self.threshold = threshold
         self.cache = {}  # Unified cache for all preprocessing
         self.logger = logging.getLogger(__name__)
+        self.llm_analyzer = GAssistLLMAnalyzer()
+        
+        # Direct game name mapping with numbers preserved
+        self.game_map = {
+            # Diablo games with numbers preserved
+            'diablo': 'diablo',
+            'diablo I': 'diablo',
+            'diablo ii': 'diablo 2',
+            'diablo iii': 'diablo 3',
+            'diablo iv': 'diablo 4',
+            
+            'grand theft auto': 'grand theft auto',
+            'gta': 'grand theft auto',
+            'gta 3': 'grand theft auto 3',
+            'gta iii': 'grand theft auto 3',
+            'gta 4': 'grand theft auto 4',
+            'gta iv': 'grand theft auto 4',
+            'gta 5': 'grand theft auto 5',
+            'gta v': 'grand theft auto 5',           
+        }
 
         # Expanded game-specific mappings for common abbreviations
         self.acronym_map = {
@@ -37,7 +58,8 @@ class OptimizedGameFuzzyMatcher:
             'nfs': ['need', 'for', 'speed'],
             'ff': ['final', 'fantasy'],
             'lol': ['league', 'of', 'legends'],
-            'wow': ['world', 'of', 'warcraft']
+            'wow': ['world', 'of', 'warcraft'],
+            'diablo': ['diablo']
         }
 
         # Number normalization patterns (critical for Diablo 4 -> Diablo IV)
@@ -65,8 +87,17 @@ class OptimizedGameFuzzyMatcher:
         # Lowercase and remove special chars
         clean = re.sub(r'[^a-z0-9\s]', ' ', title.lower())
         
+        # Keep original game name with numbers intact
+        original_tokens = clean.split()
+        
         # Split into tokens
         tokens = clean.split()
+        
+        # Always preserve original game name with number intact
+        if len(original_tokens) >= 2 and any(t.isdigit() or t in self.roman_map for t in original_tokens):
+            self.logger.info(f"Preserving numbered game title: {title}")
+            self.cache[cache_key] = original_tokens
+            return original_tokens
 
         # Process each token
         processed_tokens = []
@@ -112,6 +143,10 @@ class OptimizedGameFuzzyMatcher:
             else:
                 return f"19{token}"
 
+        # Preserve numbers to avoid losing them in game titles
+        if token.isdigit() or token in self.roman_map:
+            return token
+            
         return token
 
     def fuzzy_match_with_variants(self, query: str, target: str) -> float:
@@ -224,10 +259,10 @@ class OptimizedGameFuzzyMatcher:
         tokens = self.preprocess_title(game_name)
         return ' '.join(tokens)
 
-    def find_best_match(self, query: str, candidates: List[str],
+    async def find_best_match(self, query: str, candidates: List[str],
                        steam_priority: bool = True) -> Optional[Tuple[str, float]]:
         """
-        Find the best match with Steam API prioritization.
+        Find the best match with Steam API prioritization and simplified mapping.
         
         Args:
             query: Game name to search for
@@ -239,28 +274,66 @@ class OptimizedGameFuzzyMatcher:
         """
         if not candidates:
             return None
-
-        matches = []
-        
-        for candidate in candidates:
-            score = self.fuzzy_match_with_variants(query, candidate)
             
-            if score >= self.threshold:
-                # Apply Steam priority boost
-                if steam_priority and self.looks_like_steam_title(candidate):
-                    score = min(1.0, score + 0.1)  # Small boost for Steam-like titles
+        # First, try direct mapping using the game_map
+        query_lower = query.lower()
+        if query_lower in self.game_map:
+            mapped_name = self.game_map[query_lower]
+            self.logger.info(f"Direct game map match: '{query}' -> '{mapped_name}'")
+            
+            # Find this mapped name in the candidates
+            for candidate in candidates:
+                if candidate.lower() == mapped_name or candidate.lower().startswith(mapped_name):
+                    return candidate, 1.0
+                    
+        # Look for exact match in candidates
+        for candidate in candidates:
+            if candidate.lower() == query_lower:
+                return candidate, 1.0
                 
-                matches.append((candidate, score))
-
-        if not matches:
+        # For games with numbers, preserve the exact numbered version from the query
+        query_words = query_lower.split()
+        if len(query_words) >= 2 and any(w.isdigit() or w in self.roman_map for w in query_words):
+            # Keep the exact query if it contains a number
+            self.logger.info(f"Preserving numbered query: {query}")
+            
+            # Check if any candidate contains both the base name and the number
+            for candidate in candidates:
+                candidate_lower = candidate.lower()
+                # Check if candidate contains all words from the query
+                if all(word in candidate_lower for word in query_words):
+                    return candidate, 1.0
+                
+            # Do NOT strip numbers for partial matching - numbered games are distinct entries
+            # Instead, try to find candidates that have at least the base name
+            # but return None if no exact match with number is found
+            self.logger.info(f"No exact match for numbered game: '{query}'")
             return None
-
-        # Sort by score and return best match
-        matches.sort(key=lambda x: x[1], reverse=True)
-        best_match, best_score = matches[0]
         
-        self.logger.info(f"Fuzzy match: '{query}' -> '{best_match}' (score: {best_score:.3f})")
-        return best_match, best_score
+        # For simple fuzzy matching, use the best candidate with high enough score
+        matches = []
+        for candidate in candidates:
+            # Simple similarity score
+            query_set = set(query_lower.split())
+            candidate_set = set(candidate.lower().split())
+            
+            intersection = query_set & candidate_set
+            if intersection and len(intersection) / len(query_set) > 0.5:
+                score = len(intersection) / max(len(query_set), len(candidate_set))
+                matches.append((candidate, score))
+        
+        if matches:
+            # Sort by score and return best match
+            matches.sort(key=lambda x: x[1], reverse=True)
+            best_match, best_score = matches[0]
+            if best_score > 0.6:
+                return best_match, best_score
+                
+        # If all else fails, return the first candidate
+        if candidates:
+            return candidates[0], 0.5
+            
+        return None
 
     def looks_like_steam_title(self, title: str) -> bool:
         """Heuristic to identify Steam-style game titles."""
@@ -281,13 +354,13 @@ class OptimizedGameFuzzyMatcher:
         """
         # First try Steam API candidates
         if steam_candidates:
-            steam_match = self.find_best_match(query, steam_candidates, steam_priority=True)
+            steam_match = await self.find_best_match(query, steam_candidates, steam_priority=True)
             if steam_match and steam_match[1] >= self.threshold:
                 return steam_match[0], steam_match[1], "Steam API"
 
         # Fallback to local cache
         if cache_candidates:
-            cache_match = self.find_best_match(query, cache_candidates, steam_priority=False)
+            cache_match = await self.find_best_match(query, cache_candidates, steam_priority=False)
             if cache_match and cache_match[1] >= self.threshold:
                 return cache_match[0], cache_match[1], "Local Cache"
 

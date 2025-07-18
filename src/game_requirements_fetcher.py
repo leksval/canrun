@@ -57,6 +57,7 @@ class GameRequirements:
     recommended_os: str = "Windows 11"
     source: str = "Unknown"
     last_updated: str = ""
+    steam_api_name: str = ""  # Actual name from Steam API
 
 
 class DataSource(ABC):
@@ -81,6 +82,9 @@ class SteamAPISource(DataSource):
     async def fetch(self, game_name: str) -> Optional[GameRequirements]:
         """Fetch game requirements from Steam API."""
         try:
+            # Check if the game name contains a number
+            has_number = any(c.isdigit() for c in game_name)
+            
             # First, search for the game to get its Steam ID
             steam_id = await self._search_game(game_name)
             if not steam_id:
@@ -93,6 +97,12 @@ class SteamAPISource(DataSource):
             
             # Parse requirements from app info
             requirements = self._parse_requirements(app_info, game_name)
+            
+            # If the original query had a number, ensure we preserve it
+            if has_number:
+                # Force the game_name to be the exact query with number
+                requirements.game_name = game_name
+                
             return requirements
             
         except Exception as e:
@@ -439,18 +449,94 @@ class SteamAPISource(DataSource):
             match = re.search(r'(\d+)', str(value))
             return int(match.group(1)) if match else 0
         
+        def estimate_vram_from_gpu(gpu_str: str) -> int:
+            """Estimate VRAM from GPU model string."""
+            if not gpu_str:
+                return 2  # Default conservative estimate
+            
+            gpu_lower = gpu_str.lower()
+            
+            # Look for explicit VRAM mention
+            vram_match = re.search(r'(\d+)\s*gb', gpu_lower)
+            if vram_match:
+                return int(vram_match.group(1))
+            
+            # RTX 30/40 series estimates
+            if 'rtx 4090' in gpu_lower:
+                return 24
+            elif 'rtx 4080' in gpu_lower:
+                return 16
+            elif 'rtx 4070 ti' in gpu_lower or 'rtx 4070ti' in gpu_lower:
+                return 12
+            elif 'rtx 4070' in gpu_lower:
+                return 12
+            elif 'rtx 4060 ti' in gpu_lower or 'rtx 4060ti' in gpu_lower:
+                return 8
+            elif 'rtx 4060' in gpu_lower:
+                return 8
+            elif 'rtx 3090' in gpu_lower:
+                return 24
+            elif 'rtx 3080' in gpu_lower:
+                return 10
+            elif 'rtx 3070' in gpu_lower:
+                return 8
+            elif 'rtx 3060' in gpu_lower:
+                return 6
+            elif 'rtx 3050' in gpu_lower:
+                return 4
+                
+            # RTX 20 series
+            elif 'rtx 2080 ti' in gpu_lower:
+                return 11
+            elif 'rtx 2080' in gpu_lower:
+                return 8
+            elif 'rtx 2070' in gpu_lower:
+                return 8
+            elif 'rtx 2060' in gpu_lower:
+                return 6
+                
+            # GTX 10 series
+            elif 'gtx 1080 ti' in gpu_lower:
+                return 11
+            elif 'gtx 1080' in gpu_lower:
+                return 8
+            elif 'gtx 1070' in gpu_lower:
+                return 8
+            elif 'gtx 1060' in gpu_lower:
+                return 6
+            elif 'gtx 1050' in gpu_lower:
+                return 4
+            
+            # Default estimates based on tier
+            elif 'rtx' in gpu_lower:
+                return 8  # Mid-range RTX assumption
+            elif 'gtx' in gpu_lower:
+                return 4  # Mid-range GTX assumption
+            elif 'amd' in gpu_lower or 'radeon' in gpu_lower:
+                return 6  # Mid-range AMD assumption
+            
+            return 2  # Default fallback
+        
+        # Get estimated VRAM values based on GPU models
+        min_vram = estimate_vram_from_gpu(minimum.get('graphics', ''))
+        rec_vram = estimate_vram_from_gpu(recommended.get('graphics', ''))
+        
+        # Ensure recommended is at least as high as minimum
+        if rec_vram < min_vram:
+            rec_vram = min_vram
+        
         return {
             'minimum_cpu': minimum.get('processor', 'Unknown'),
             'minimum_gpu': minimum.get('graphics', 'Unknown'),
             'minimum_ram_gb': parse_ram(minimum.get('memory', '0')),
-            'minimum_vram_gb': 0,  # Not typically in Steam API data
+            'minimum_vram_gb': min_vram,  # Estimated from GPU model
             'minimum_storage_gb': parse_storage(minimum.get('storage', '0')),
             'minimum_directx': minimum.get('directx', 'DirectX 11'),
             'minimum_os': minimum.get('os', 'Windows 10'),
             'recommended_cpu': recommended.get('processor', 'Unknown'),
             'recommended_gpu': recommended.get('graphics', 'Unknown'),
             'recommended_ram_gb': parse_ram(recommended.get('memory', '0')),
-            'recommended_vram_gb': 0,  # Not typically in Steam API data
+            'recommended_vram_gb': rec_vram,  # Estimated from GPU model
             'recommended_storage_gb': parse_storage(recommended.get('storage', '0')),
             'recommended_directx': recommended.get('directx', 'DirectX 12'),
             'recommended_os': recommended.get('os', 'Windows 11')
@@ -498,95 +584,46 @@ class LocalCacheSource(DataSource):
         return {}
     
     async def fetch(self, game_name: str) -> Optional[GameRequirements]:
-        """Fetch game requirements from local cache with optimized fuzzy matching."""
+        """Fetch game requirements from local cache using an exact, case-insensitive match."""
         try:
             games = self._cache.get('games', {})
-            
-            # Try exact match first
-            if game_name in games:
-                game_data = games[game_name]
-                minimum = game_data.get('minimum', {})
-                recommended = game_data.get('recommended', {})
-                
-                # Parse storage values
-                def parse_storage(value: str) -> int:
-                    if not value:
-                        return 0
-                    match = re.search(r'(\d+\.?\d*)', str(value))
-                    return int(float(match.group(1))) if match else 0
-                
-                # Parse RAM values
-                def parse_ram(value: str) -> int:
-                    if not value:
-                        return 0
-                    match = re.search(r'(\d+)', str(value))
-                    return int(match.group(1)) if match else 0
-                
-                return GameRequirements(
-                    game_name=game_name,
-                    minimum_cpu=minimum.get('processor', 'Unknown'),
-                    minimum_gpu=minimum.get('graphics', 'Unknown'),
-                    minimum_ram_gb=parse_ram(minimum.get('memory', '0')),
-                    minimum_vram_gb=0,
-                    minimum_storage_gb=parse_storage(minimum.get('storage', '0')),
-                    minimum_directx=minimum.get('directx', 'DirectX 11'),
-                    minimum_os=minimum.get('os', 'Windows 10'),
-                    recommended_cpu=recommended.get('processor', 'Unknown'),
-                    recommended_gpu=recommended.get('graphics', 'Unknown'),
-                    recommended_ram_gb=parse_ram(recommended.get('memory', '0')),
-                    recommended_vram_gb=0,
-                    recommended_storage_gb=parse_storage(recommended.get('storage', '0')),
-                    recommended_directx=recommended.get('directx', 'DirectX 12'),
-                    recommended_os=recommended.get('os', 'Windows 11'),
-                    source='Local Cache',
-                    last_updated=str(int(time.time()))
-                )
-            
-            # Use optimized fuzzy matching
-            cache_candidates = list(games.keys())
-            match_result = game_fuzzy_matcher.find_best_match(game_name, cache_candidates, steam_priority=False)
-            
-            if match_result:
-                matched_name, confidence = match_result
-                game_data = games[matched_name]
-                self.logger.info(f"Fuzzy matched '{game_name}' to '{matched_name}' (confidence: {confidence:.3f})")
-                
-                minimum = game_data.get('minimum', {})
-                recommended = game_data.get('recommended', {})
-                
-                # Parse storage values
-                def parse_storage(value: str) -> int:
-                    if not value:
-                        return 0
-                    match = re.search(r'(\d+\.?\d*)', str(value))
-                    return int(float(match.group(1))) if match else 0
-                
-                # Parse RAM values
-                def parse_ram(value: str) -> int:
-                    if not value:
-                        return 0
-                    match = re.search(r'(\d+)', str(value))
-                    return int(match.group(1)) if match else 0
-                
-                return GameRequirements(
-                    game_name=matched_name,
-                    minimum_cpu=minimum.get('processor', 'Unknown'),
-                    minimum_gpu=minimum.get('graphics', 'Unknown'),
-                    minimum_ram_gb=parse_ram(minimum.get('memory', '0')),
-                    minimum_vram_gb=0,
-                    minimum_storage_gb=parse_storage(minimum.get('storage', '0')),
-                    minimum_directx=minimum.get('directx', 'DirectX 11'),
-                    minimum_os=minimum.get('os', 'Windows 10'),
-                    recommended_cpu=recommended.get('processor', 'Unknown'),
-                    recommended_gpu=recommended.get('graphics', 'Unknown'),
-                    recommended_ram_gb=parse_ram(recommended.get('memory', '0')),
-                    recommended_vram_gb=0,
-                    recommended_storage_gb=parse_storage(recommended.get('storage', '0')),
-                    recommended_directx=recommended.get('directx', 'DirectX 12'),
-                    recommended_os=recommended.get('os', 'Windows 11'),
-                    source='Local Cache',
-                    last_updated=str(int(time.time()))
-                )
+            normalized_query = game_name.lower()
+
+            for cache_game_name, game_data in games.items():
+                if cache_game_name.lower() == normalized_query:
+                    self.logger.info(f"Exact cache match found for '{game_name}' as '{cache_game_name}'")
+                    minimum = game_data.get('minimum', {})
+                    recommended = game_data.get('recommended', {})
+
+                    def parse_storage(value: str) -> int:
+                        if not value: return 0
+                        match = re.search(r'(\d+\.?\d*)', str(value))
+                        return int(float(match.group(1))) if match else 0
+
+                    def parse_ram(value: str) -> int:
+                        if not value: return 0
+                        match = re.search(r'(\d+)', str(value))
+                        return int(match.group(1)) if match else 0
+
+                    return GameRequirements(
+                        game_name=cache_game_name,
+                        minimum_cpu=minimum.get('processor', 'Unknown'),
+                        minimum_gpu=minimum.get('graphics', 'Unknown'),
+                        minimum_ram_gb=parse_ram(minimum.get('memory', '0')),
+                        minimum_vram_gb=0,
+                        minimum_storage_gb=parse_storage(minimum.get('storage', '0')),
+                        minimum_directx=minimum.get('directx', 'DirectX 11'),
+                        minimum_os=minimum.get('os', 'Windows 10'),
+                        recommended_cpu=recommended.get('processor', 'Unknown'),
+                        recommended_gpu=recommended.get('graphics', 'Unknown'),
+                        recommended_ram_gb=parse_ram(recommended.get('memory', '0')),
+                        recommended_vram_gb=0,
+                        recommended_storage_gb=parse_storage(recommended.get('storage', '0')),
+                        recommended_directx=recommended.get('directx', 'DirectX 12'),
+                        recommended_os=recommended.get('os', 'Windows 11'),
+                        source='Local Cache',
+                        last_updated=str(int(time.time()))
+                    )
             
             return None
         except Exception as e:
@@ -646,61 +683,59 @@ class GameRequirementsFetcher:
     
     async def fetch_requirements(self, game_name: str) -> Optional[GameRequirements]:
         """
-        Fetch game requirements with improved timeout handling and fallback strategies.
-        Steam API is primary source with quick timeout, then local cache fallback.
+        Fetch game requirements directly from Steam API using the exact game name.
+        Preserves both the original user query and the Steam API game name.
         """
-        
         try:
-            self.logger.info(f"Fetching requirements for '{game_name}' - trying Steam API with timeout")
+            # Force logging to be more verbose about Steam API usage
+            self.logger.info(f"DIRECT STEAM API: Attempting to fetch '{game_name}' from Steam API.")
             
-            # Step 1: Try Steam API first with quick timeout to prevent G-Assist hanging
+            # Use the exact game name for Steam API search
             try:
+                self.logger.info(f"Using exact game name: '{game_name}'")
                 steam_requirements = await asyncio.wait_for(
                     self.steam_source.fetch(game_name),
-                    timeout=15.0  # 15 second timeout for Steam API
+                    timeout=15.0
                 )
                 if steam_requirements:
-                    self.logger.info(f"Successfully fetched '{game_name}' from Steam API")
+                    self.logger.info(f"SUCCESS: Fetched '{game_name}' from Steam API.")
+                    
+                    # Explicitly save both the Steam API name and the original query
+                    steam_api_name = steam_requirements.game_name
+                    self.logger.info(f"Steam API returned game name: '{steam_api_name}', original query: '{game_name}'")
+                    
+                    # Cache the successfully fetched data before modifying it
                     await self._cache_requirements(steam_requirements)
+                    
+                    # Set steam_api_name field to the name returned by Steam
+                    steam_requirements.steam_api_name = steam_api_name
+                    
+                    # Restore original user query as the game_name
+                    steam_requirements.game_name = game_name
+                    
+                    # Log the final result for debugging
+                    self.logger.info(f"Final requirements: game_name='{steam_requirements.game_name}', "
+                                     f"steam_api_name='{steam_requirements.steam_api_name}'")
+                    
                     return steam_requirements
             except asyncio.TimeoutError:
-                self.logger.warning(f"Steam API timeout for '{game_name}', using cache fallback")
+                self.logger.warning(f"Steam API timed out for '{game_name}'.")
             except Exception as e:
                 self.logger.warning(f"Steam API failed for '{game_name}': {e}")
             
-            # Step 2: Immediate fallback to local cache
-            self.logger.info(f"Steam API failed/timeout, checking local cache for '{game_name}'")
+            # All Steam API attempts failed, try local cache as fallback
+            self.logger.info(f"All Steam API attempts failed. Falling back to local cache for '{game_name}'.")
             cache_requirements = await self.cache_source.fetch(game_name)
             if cache_requirements:
-                self.logger.info(f"Found '{game_name}' in local cache")
+                self.logger.info(f"Found '{game_name}' in local cache.")
                 return cache_requirements
-                
-            # Step 3: Use LLM to intelligently search local cache data
-            if self.llm_analyzer:
-                self.logger.info(f"Using LLM to interpret local cache data for '{game_name}'")
-                llm_cache_result = await self._llm_enhanced_cache_search(game_name)
-                if llm_cache_result:
-                    self.logger.info(f"LLM successfully found '{game_name}' in local cache")
-                    return llm_cache_result
-            
-            # Step 4: Special handling for Diablo 4 <-> Diablo IV mapping (fallback)
-            if game_name.lower() == "diablo 4":
-                diablo_iv = await self.cache_source.fetch("Diablo IV")
-                if diablo_iv:
-                    self.logger.info(f"Mapped 'Diablo 4' to 'Diablo IV' in cache")
-                    return diablo_iv
-            elif game_name.lower() == "diablo iv":
-                diablo_4 = await self.cache_source.fetch("Diablo 4")
-                if diablo_4:
-                    self.logger.info(f"Mapped 'Diablo IV' to 'Diablo 4' in cache")
-                    return diablo_4
-            
-            # Step 5: If all else fails, return None for clear error handling
-            self.logger.warning(f"No requirements found for '{game_name}' after trying all sources")
+
+            # 3. If all sources fail, return None
+            self.logger.warning(f"Could not find requirements for '{game_name}' from any source.")
             return None
-            
+
         except Exception as e:
-            self.logger.error(f"fetch_requirements failed for '{game_name}': {e}")
+            self.logger.error(f"An unexpected error occurred in fetch_requirements for '{game_name}': {e}")
             return None
     
     async def _llm_enhanced_steam_search(self, game_name: str) -> Optional[GameRequirements]:
@@ -864,13 +899,12 @@ class GameRequirementsFetcher:
         """Add a new data source."""
         self.sources.append(source)
     
-    def get_supported_games(self) -> List[str]:
-        """Get list of games that have cached requirements."""
+    def get_all_cached_game_names(self) -> List[str]:
+        """Returns a list of all game names from the local cache."""
         try:
-            cache_source = LocalCacheSource()
-            return list(cache_source._cache.get('games', {}).keys())
+            return list(self.cache_source._cache.get('games', {}).keys())
         except Exception as e:
-            self.logger.error(f"Failed to get supported games: {e}")
+            self.logger.error(f"Failed to get all cached game names: {e}")
             return []
 
 

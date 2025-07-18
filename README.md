@@ -1,6 +1,6 @@
 <table> <tr> <td width="110" valign="middle"> <img width="100" height="100" alt="canrun_logo" src="https://github.com/user-attachments/assets/239082bd-d5ca-427b-b235-5326299f3104" /> </td> <td valign="middle"> <h1 style="display:inline-block; vertical-align:middle; margin:0; padding:0;">  CanRun - G-Assist Game Compatibility Checker </h1> </td> </tr> </table>
   
-  [![Version](https://img.shields.io/badge/version-6.0.0-blue.svg)](https://github.com/canrun/canrun)
+  [![Version](https://img.shields.io/badge/version-7.0.0-blue.svg)](https://github.com/canrun/canrun)
   [![Python](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/downloads/)
   [![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
   [![G-Assist](https://img.shields.io/badge/G--Assist-Official%20Protocol%20Verified-brightgreen.svg)](https://www.nvidia.com/en-us/geforce/technologies/g-assist/)
@@ -341,7 +341,15 @@ pyinstaller --onefile --name g-assist-plugin-canrun --distpath . --add-data "src
 
 ## 📈 Version History
 
-### v6.0.0 (Current) - Unicode Compatibility & Production Ready
+### v7.0.0 (Current) - Enhanced Game Display and Hardware Analysis
+- ✅ **Improved Game Identification**: Clear display of both user query and Steam API matched game
+- ✅ **VRAM Estimation**: Added automatic VRAM requirement estimation based on GPU models
+- ✅ **RAM Tolerance**: Implemented 5% tolerance for RAM comparison to handle theoretical vs actual values
+- ✅ **UI Enhancement**: Removed redundant status message and improved title format
+- ✅ **Framework Updates**: Updated Gradio interface to use newer flagging_mode parameter
+- ✅ **New Executable**: Regenerated plugin.exe with all latest improvements
+
+### v6.0.0 (Previous) - Unicode Compatibility & Production Ready
 - ✅ **Unicode Fixes**: Removed all emoji characters from main source files for Windows console compatibility
 - ✅ **Import Organization**: Moved all imports to top of files and removed unused imports
 - ✅ **New Executable**: Fresh `plugin.exe` built with Unicode fixes and optimized for G-Assist
@@ -376,6 +384,13 @@ pyinstaller --onefile --name g-assist-plugin-canrun --distpath . --add-data "src
 - **Performance Assessment**: Dynamic prediction with NVIDIA focus
 - **Error Handling**: Comprehensive asyncio and timeout handling
 
+### ✅ Latest Improvements (v7.0.0)
+- **Enhanced Game Display**: Clearly shows both searched game and matched game from Steam API
+- **Accurate VRAM Analysis**: GPU-based VRAM estimation for precise requirement checking
+- **Improved RAM Assessment**: 5% tolerance for better real-world hardware compatibility
+- **Cleaner UI**: Streamlined output format with improved title style
+- **Modern Framework**: Updated to latest Gradio interface standards
+
 ### 🔄 Pending (Requires G-Assist Environment)
 - **Live G-Assist Testing**: Requires NVIDIA G-Assist installation for final verification
 - **Function Trigger Validation**: Test "canrun diablo4?" voice commands
@@ -389,10 +404,12 @@ pyinstaller --onefile --name g-assist-plugin-canrun --distpath . --add-data "src
 
 ### Key Achievements:
 - ✅ **Official G-Assist Protocol**: Verified compliance with NVIDIA standards
-- ✅ Steam API integration working (Diablo 4 ID: 2344520)
-- ✅ Dynamic performance prediction (RTX 3080 = A-tier)
-- ✅ Robust error handling and timeout management
-- ✅ All core functionality verified in CLI mode
+- ✅ **Enhanced Game Display**: Clear identification of both search query and matched game
+- ✅ **Accurate Hardware Analysis**: VRAM estimation and RAM tolerance for better compatibility assessment
+- ✅ **Steam API Integration**: Real-time game requirements with accurate name matching
+- ✅ **Dynamic Performance Prediction**: RTX 3080 = A-tier with comprehensive GPU/CPU models
+- ✅ **Robust Error Handling**: Comprehensive timeout and error management
+- ✅ **Modern UI Standards**: Updated Gradio interface with improved formatting
 
 **Ready to see if your system can run any game? CanRun delivers A-tier performance analysis with official G-Assist protocol support!**
 

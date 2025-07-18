@@ -161,9 +161,16 @@ class CanRunGAssistPlugin:
         )
         logging.info("CanRun engine initialized with complete feature set")
     
-    def check_game_compatibility(self, params: Dict[str, str]) -> Dict[str, Any]:
-        """Perform simplified CanRun analysis focused on immediate response."""
+    async def check_game_compatibility(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Perform CanRun analysis using the full CanRun engine."""
         game_name = params.get("game_name", "").strip()
+        
+        # Handle force_refresh as either boolean or string
+        force_refresh_param = params.get("force_refresh", False)
+        if isinstance(force_refresh_param, str):
+            force_refresh = force_refresh_param.lower() == "true"
+        else:
+            force_refresh = bool(force_refresh_param)
         
         if not game_name:
             return {
@@ -171,32 +178,32 @@ class CanRunGAssistPlugin:
                 "message": "Game name is required for CanRun analysis"
             }
         
-        logging.info(f"Starting simplified CanRun analysis for: {game_name}")
+        logging.info(f"Starting CanRun analysis for: {game_name} (force_refresh: {force_refresh})")
         
-        # Provide immediate, useful response without complex async operations
-        response_message = f"""🎮 CANRUN ANALYSIS: {game_name}
-
-🏆 COMPATIBILITY STATUS: ✅ LIKELY COMPATIBLE
-
-💻 SYSTEM ASSESSMENT:
-• RTX/GTX GPU: ✅ Detected
-• Modern Gaming System: ✅ Compatible
-• G-Assist Ready: ✅ Verified
-
-🎯 QUICK ANALYSIS:
-• Performance Tier: A-B Tier Expected
-• DLSS Support: ✅ Available (RTX GPUs)
-• Ray Tracing: ✅ Supported
-• Recommended Settings: High-Ultra
-
-🔧 OPTIMIZATION TIPS:
-• Enable DLSS for performance boost
-• Update GPU drivers for best compatibility
-• Consider RTX features for enhanced visuals
-
-🎯 CANRUN VERDICT: ✅ CAN RUN
-
-For detailed Steam API analysis and precise hardware matching, use the full CanRun desktop application."""
+        try:
+            # Use the same CanRun engine to get the actual game-specific result
+            # If force_refresh is True, don't use cache
+            result = await self.canrun_engine.check_game_compatibility(game_name, use_cache=not force_refresh)
+            
+            if result:
+                # Format the result directly - this ensures the game-specific performance tier is used
+                formatted_result = self.format_canrun_response(result)
+                return {
+                    "success": True,
+                    "message": formatted_result
+                }
+            else:
+                return {
+                    "success": False,
+                    "message": f"Could not analyze game: {game_name}. Please check the game name and try again."
+                }
+                
+        except Exception as e:
+            logging.error(f"Error in game compatibility analysis: {e}")
+            return {
+                "success": False,
+                "message": f"Error analyzing game: {str(e)}"
+            }
 
         return {
             "success": True,
@@ -260,12 +267,38 @@ Hardware detection completed successfully. For detailed specifications, use the 
             exceeds_recommended = result.exceeds_recommended_requirements()
             
             # Format comprehensive response
-            response = f"""🎮 CANRUN ANALYSIS: {result.game_name}
+            original_query = result.game_name
+            matched_name = result.game_requirements.game_name
+            
+            # Get actual Steam API game name if available
+            steam_api_name = result.game_requirements.steam_api_name if hasattr(result.game_requirements, 'steam_api_name') and result.game_requirements.steam_api_name else matched_name
+            
+            # Determine if game name was matched differently from user query
+            steam_api_info = ""
+            if original_query.lower() != steam_api_name.lower():
+                steam_api_info = f"(Steam found: {steam_api_name})"
+            
+            title_line = ""
+            if result.can_run_game():
+                if exceeds_recommended:
+                    title_line = f"✅ CANRUN: {original_query.upper()} will run EXCELLENTLY {steam_api_info}!"
+                else:
+                    title_line = f"✅ CANRUN: {original_query.upper()} will run {steam_api_info}!"
+            else:
+                title_line = f"❌ CANNOT RUN {original_query.upper()} {steam_api_info}!"
+
+            status_message = result.get_runnable_status_message()
+
+            # Skip the status_message as it's redundant with the title line
+            response = f"""{title_line}
+
+🎮 YOUR SEARCH: {original_query}
+🎮 STEAM MATCHED GAME: {steam_api_name}
 
 🏆 PERFORMANCE TIER: {tier} ({score}/100)
 
 💻 SYSTEM SPECIFICATIONS:
-• CPU: {result.hardware_specs.cpu_name}
+• CPU: {result.hardware_specs.cpu_model}
 • GPU: {result.hardware_specs.gpu_model} ({result.hardware_specs.gpu_vram_gb}GB VRAM)
 • RAM: {result.hardware_specs.ram_total_gb}GB
 • RTX Features: {'✅ Supported' if result.hardware_specs.supports_rtx else '❌ Not Available'}
@@ -302,19 +335,16 @@ Hardware detection completed successfully. For detailed specifications, use the 
                 if hasattr(result.compatibility_analysis, 'bottlenecks') and result.compatibility_analysis.bottlenecks:
                     response += f"\n\n⚠️ POTENTIAL BOTTLENECKS:"
                     for bottleneck in result.compatibility_analysis.bottlenecks[:2]:
-                        response += f"\n• {bottleneck}"
+                        response += f"\n• {bottleneck.value}"
 
             # Add final verdict
             response += f"\n\n🎯 CANRUN VERDICT: {can_run}"
             
-            # Add analysis metadata
-            response += f"\n\nAnalysis completed in {result.analysis_time_ms}ms using complete CanRun pipeline:"
-            response += f"\n• PrivacyAwareHardwareDetector: ✅"
-            response += f"\n• GameRequirementsFetcher: ✅"
-            response += f"\n• OptimizedGameFuzzyMatcher: ✅"
-            response += f"\n• CompatibilityAnalyzer: ✅"
-            response += f"\n• DynamicPerformancePredictor: ✅"
-            response += f"\n• GAssistLLMAnalyzer: {'✅' if result.llm_analysis else '⚠️'}"
+            
+            # Make it clear if the Steam API returned something different than what was requested
+            if steam_api_name.lower() != original_query.lower():
+                response += f"\n\n🎮 NOTE: Steam found '{steam_api_name}' instead of '{original_query}'"
+                response += f"\n    Results shown are for '{steam_api_name}'"
             
             return response
             

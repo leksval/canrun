@@ -108,23 +108,39 @@ class CanRunEngine:
         
         start_time = datetime.now()
         self.logger.info(f"Starting compatibility check for: {game_name}")
-        
-        # Check cache first
+
+        # Step 1: Centralized Game Name Correction
+        all_known_games = self.requirements_fetcher.get_all_cached_game_names()
+        if not all_known_games:
+            self.logger.warning("No games in local cache. Matching will rely on external sources.")
+
+        match_result = await self.fuzzy_matcher.find_best_match(game_name, all_known_games)
+
+        if not match_result:
+            # If no match is found, we proceed with the original game name and let the fetcher handle it.
+            self.logger.warning(f"No confident match for '{game_name}'. Proceeding with original name.")
+            corrected_game_name = game_name
+        else:
+            corrected_game_name, match_confidence = match_result
+            self.logger.info(f"Query '{game_name}' matched to '{corrected_game_name}' with confidence {match_confidence:.2f}")
+
+        # Step 2: Check Cache with Corrected Name
         if use_cache:
-            cached_result = self._get_cached_result(game_name)
+            normalized_name = self.fuzzy_matcher.normalize_game_name(corrected_game_name)
+            cache_file = os.path.join(self.cache_dir, f"{normalized_name}.json")
+            cached_result = self._load_cache_file(cache_file)
             if cached_result:
-                self.logger.info(f"Returning cached result for {game_name}")
+                self.logger.info(f"Returning cached result for '{corrected_game_name}'")
                 return cached_result
-        
-        # Step 1: Get hardware specifications
+
+        # Step 3: Fetch Requirements with Corrected Name
+        game_requirements = await self._fetch_game_requirements(corrected_game_name)
+        if game_requirements is None:
+            raise ValueError(f"Game requirements not found for '{corrected_game_name}'.")
+
+        # Step 4: Get Hardware Specifications
         hardware_specs = await self._get_hardware_specs()
         assert hardware_specs is not None, "Hardware detection failed"
-        
-        # Step 2: Fetch game requirements
-        game_requirements = await self._fetch_game_requirements(game_name)
-        if game_requirements is None:
-            # Instead of using LLM fallback or raising error, create a more helpful message
-            raise ValueError(f"Game requirements not found for '{game_name}'. The game may not be in our database or might be known by another name. For Diablo 4, try 'Diablo IV' instead.")
         
         # Step 3: Analyze compatibility
         compatibility_analysis = await self._analyze_compatibility(
@@ -168,7 +184,7 @@ class CanRunEngine:
         
         # Create result
         result = CanRunResult(
-            game_name=game_name,
+            game_name=corrected_game_name,
             timestamp=datetime.now().isoformat(),
             hardware_specs=hardware_specs,
             game_requirements=game_requirements,
@@ -181,7 +197,7 @@ class CanRunEngine:
         
         # Cache result
         if use_cache:
-            self._save_cached_result(game_name, result)
+            self._save_cached_result(corrected_game_name, result)
         
         self.logger.info(f"Analysis completed for {game_name} in {analysis_time}ms")
         return result
@@ -298,43 +314,13 @@ class CanRunEngine:
         }
 
     def _get_cached_result(self, game_name: str) -> Optional[CanRunResult]:
-        """Retrieve cached result for a game if available and not expired using fuzzy matching."""
-
-        # First try exact match
-        cache_file = os.path.join(self.cache_dir, f"{game_name}.json")
-        if os.path.isfile(cache_file):
-            return self._load_cache_file(cache_file)
-
-        # If no exact match, try fuzzy matching against all cached games
-        if not os.path.isdir(self.cache_dir):
-            return None
-            
-        cached_games = []
-        for filename in os.listdir(self.cache_dir):
-            if filename.endswith('.json'):
-                cached_game_name = filename[:-5]  # Remove .json extension
-                cache_path = os.path.join(self.cache_dir, filename)
-                
-                # Check if cache file is not expired
-                mtime = os.path.getmtime(cache_path)
-                if (datetime.now().timestamp() - mtime) <= self.cache_duration.total_seconds():
-                    cached_games.append(cached_game_name)
-        
-        if not cached_games:
-            return None
-            
-        # Use fuzzy matcher to find best match
-        match_result = self.fuzzy_matcher.find_best_match(game_name, cached_games)
-        
-        # Only use fuzzy match if confidence is high enough (80%+)
-        if match_result and len(match_result) >= 2:
-            best_match, confidence = match_result
-            if confidence >= 0.8:
-                self.logger.info(f"Fuzzy cache match: '{game_name}' -> '{best_match}' (confidence: {confidence:.2f})")
-                cache_file = os.path.join(self.cache_dir, f"{best_match}.json")
-                return self._load_cache_file(cache_file)
-        
-        return None
+        """DEPRECATED: This method is no longer the primary way to get cached results.
+        It is kept for potential direct cache inspection but should not be used in the main workflow.
+        The main workflow now fetches requirements first, then checks the cache with the corrected name.
+        """
+        normalized_name = self.fuzzy_matcher.normalize_game_name(game_name)
+        cache_file = os.path.join(self.cache_dir, f"{normalized_name}.json")
+        return self._load_cache_file(cache_file)
     
     def _load_cache_file(self, cache_file: str) -> Optional[CanRunResult]:
         """Load and validate a single cache file."""
@@ -375,7 +361,10 @@ class CanRunEngine:
                         # Handle both "ComponentType.GPU" and "GPU" formats
                         if '.' in component_value:
                             component_value = component_value.split('.')[-1]  # Extract "GPU" from "ComponentType.GPU"
-                        component_type = ComponentType(component_value)
+                        try:
+                            component_type = ComponentType[component_value]
+                        except KeyError:
+                            component_type = ComponentType(component_value)
                     else:
                         component_type = component_value
                     
@@ -406,7 +395,10 @@ class CanRunEngine:
                     # Handle both "ComponentType.GPU" and "GPU" formats
                     if '.' in bottleneck:
                         bottleneck = bottleneck.split('.')[-1]  # Extract "GPU" from "ComponentType.GPU"
-                    bottlenecks.append(ComponentType(bottleneck))
+                    try:
+                        bottlenecks.append(ComponentType[bottleneck])
+                    except KeyError:
+                        bottlenecks.append(ComponentType(bottleneck))
                 else:
                     bottlenecks.append(bottleneck)
             compat_data['bottlenecks'] = bottlenecks
