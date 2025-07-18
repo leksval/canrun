@@ -1,59 +1,106 @@
+"""
+CanRun Game Compatibility Checker - Simple MCP Server Implementation
+"""
+
 import gradio as gr
-from src.canrun_engine import CanRunEngine, CanRunResult
+import logging
+import os
+import signal
+import sys
+import time
+import asyncio
+from src.canrun_engine import CanRunEngine
 from plugin import CanRunGAssistPlugin
 
-# Store previously requested game names to detect changes
-previous_game_requests = set()
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)]
+)
+logger = logging.getLogger(__name__)
 
-async def analyze_game(game_name: str) -> str:
-    """
-    Analyzes the compatibility of a game and returns the formatted result
-    using the official G-Assist plugin formatter.
-    """
-    global previous_game_requests
-    
+def signal_handler(signum, frame):
+    """Handle shutdown signals gracefully."""
+    logger.info(f"Received signal {signum}, shutting down gracefully...")
+    sys.exit(0)
+
+async def analyze_game(game_name):
+    """Analyze game compatibility using the CanRun engine"""
     if not game_name:
         return "Please enter a game name to begin the analysis."
-
+    
     try:
-        # Initialize the plugin - create a fresh instance for each request
         plugin = CanRunGAssistPlugin()
+        params = {"game_name": game_name, "force_refresh": True}
+        # Properly await the async method
+        response = await plugin.check_game_compatibility(params)
         
-        # Check if this is a new game request or a repeat
-        is_new_game = game_name not in previous_game_requests
-        
-        # For numbered game sequels (like "diablo 3"), always treat as new
-        has_number = any(c.isdigit() for c in game_name)
-        
-        # If it's a new game or has numbers, clear the cache to force fresh analysis
-        if is_new_game or has_number:
-            # Force engine to look for latest Steam data
-            plugin_params = {"game_name": game_name, "force_refresh": True}
-            previous_game_requests.add(game_name)
+        if response.get("success", False):
+            return response.get("message", "Analysis completed successfully.")
         else:
-            # Use normal caching for repeat requests of the same game
-            plugin_params = {"game_name": game_name, "force_refresh": False}
-        
-        # Use the plugin to perform the analysis
-        plugin_response = await plugin.check_game_compatibility(plugin_params)
-        
-        # Return the plugin response
-        if plugin_response.get("success", False):
-            return plugin_response.get("message", "Analysis completed successfully.")
-        else:
-            return plugin_response.get("message", "Could not analyze the game. Please check the game name and try again.")
-
+            return response.get("message", "Could not analyze the game. Please check the game name and try again.")
     except Exception as e:
+        logger.error(f"Error analyzing game: {e}")
         return f"An error occurred during analysis: {e}"
 
-iface = gr.Interface(
-    fn=analyze_game,
-    inputs=gr.Textbox(lines=1, placeholder="Enter Game Name..."),
-    outputs=gr.Textbox(label="Analysis Result", lines=25, interactive=False),
-    title="CanRun Game Compatibility Checker",
-    description="Enter the name of a game to see if your PC can run it.",
-    flagging_mode="never"  # Updated from allow_flagging to flagging_mode
-)
+def detect_hardware():
+    """Detect hardware specifications"""
+    try:
+        plugin = CanRunGAssistPlugin()
+        response = plugin.detect_hardware({})
+        
+        if response.get("success", False):
+            return response.get("message", "Hardware detection successful.")
+        else:
+            return response.get("message", "Could not detect hardware specifications.")
+    except Exception as e:
+        logger.error(f"Error detecting hardware: {e}")
+        return f"An error occurred during hardware detection: {e}"
+
+def create_gradio_interface():
+    """Create a simple Gradio interface"""
+    with gr.Blocks() as demo:
+        gr.Markdown("# CanRun Game Compatibility Checker")
+        
+        with gr.Row():
+            with gr.Column():
+                game_input = gr.Textbox(label="Game Name", placeholder="Enter game name (e.g., Diablo 4)")
+                check_btn = gr.Button("Check Compatibility")
+                hw_btn = gr.Button("Detect Hardware")
+            
+            with gr.Column():
+                result_output = gr.Textbox(label="Results", lines=20)
+        
+        # For async functions, we need to use .click(fn=..., inputs=..., outputs=...)
+        check_btn.click(fn=analyze_game, inputs=game_input, outputs=result_output)
+        hw_btn.click(fn=detect_hardware, inputs=None, outputs=result_output)
+    
+    return demo
+
+def main():
+    """Main application entry point"""
+    # Set up signal handlers
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+    
+    logger.info("Starting CanRun Game Compatibility Checker")
+    
+    # Create Gradio interface
+    demo = create_gradio_interface()
+    
+    # Launch with auto port discovery
+    demo.queue().launch(server_name="0.0.0.0", share=False)
+    
+    # Keep the main thread alive
+    logger.info("Press Ctrl+C to stop the server")
+    if hasattr(signal, 'pause'):
+        # Unix systems
+        signal.pause()
+    else:
+        # Windows systems
+        while True:
+            time.sleep(1)
 
 if __name__ == "__main__":
-    iface.launch()
+    main()
