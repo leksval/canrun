@@ -859,7 +859,22 @@ Functions:
         help='Include Steam Compare UI data in compatibility check'
     )
     
-    args = parser.parse_args()
+    # Temporarily redirect stderr to suppress duplicate error messages
+    import io
+    old_stderr = sys.stderr
+    sys.stderr = io.StringIO()
+    
+    try:
+        args = parser.parse_args()
+    except SystemExit as e:
+        # Restore stderr
+        sys.stderr = old_stderr
+        # If argument parsing fails, exit with error
+        if e.code != 0:
+            sys.exit(e.code)
+    finally:
+        # Always restore stderr
+        sys.stderr = old_stderr
     
     # Initialize enhanced plugin
     init_result = initialize_enhanced_plugin()
@@ -966,6 +981,13 @@ def main():
     Command-line mode: Used when arguments are provided (e.g., --function, --game)
     G-Assist mode: Used when no arguments are provided or stdin has data
     """
+    # Add plugin discovery logging
+    logging.info("🚀 CanRun G-Assist Plugin starting...")
+    logging.info(f"📁 Plugin started from: {os.path.abspath(__file__)}")
+    logging.info(f"📂 Working directory: {os.getcwd()}")
+    logging.info(f"🔧 Python executable: {sys.executable}")
+    logging.info(f"📋 Command line args: {sys.argv}")
+    
     # Check if command-line arguments are provided
     if len(sys.argv) > 1:
         # Run in command-line interface mode
