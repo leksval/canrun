@@ -306,7 +306,7 @@ class CompatibilityAnalyzer:
             upgrade_suggestion=upgrade_suggestion
         )
     
-    def _analyze_ram(self, hardware: PrivacyAwareHardwareSpecs, 
+    def _analyze_ram(self, hardware: PrivacyAwareHardwareSpecs,
                     requirements: GameRequirements) -> ComponentAnalysis:
         """Analyze RAM compatibility."""
         assert hardware.ram_total_gb > 0, "RAM must be greater than 0"
@@ -315,11 +315,21 @@ class CompatibilityAnalyzer:
         min_ram = requirements.minimum_ram_gb
         rec_ram = requirements.recommended_ram_gb
         
-        # Check compatibility
-        meets_minimum = hardware.ram_total_gb >= min_ram
-        meets_recommended = hardware.ram_total_gb >= rec_ram
+        # Apply tolerance for RAM comparison (theoretical vs actual)
+        # For high RAM amounts, a 5% tolerance is reasonable
+        min_ram_with_tolerance = min_ram * 0.95  # 5% tolerance
+        rec_ram_with_tolerance = rec_ram * 0.95  # 5% tolerance
+        
+        # Log the RAM comparison with tolerance
+        self.logger.info(f"RAM comparison: System has {hardware.ram_total_gb}GB, min required: {min_ram}GB "
+                        f"(with tolerance: {min_ram_with_tolerance:.1f}GB), "
+                        f"recommended: {rec_ram}GB (with tolerance: {rec_ram_with_tolerance:.1f}GB)")
+        
+        # Check compatibility with tolerance
+        meets_minimum = hardware.ram_total_gb >= min_ram_with_tolerance
+        meets_recommended = hardware.ram_total_gb >= rec_ram_with_tolerance
 
-        # Calculate metrics
+        # Calculate metrics (use original values for score calculation)
         score = min(1.0, hardware.ram_total_gb / max(rec_ram, 1))
         bottleneck_factor = max(0.0, (min_ram - hardware.ram_total_gb) / max(min_ram, 1))
 

@@ -445,7 +445,7 @@ class DynamicPerformancePredictor:
         
         Args:
             hardware_specs: Optional pre-detected hardware specs
-            game_requirements: Optional game requirements
+            game_requirements: Optional game requirements from Steam API
             
         Returns:
             PerformanceAssessment with tier, score, FPS, and recommendations
@@ -478,7 +478,7 @@ class DynamicPerformancePredictor:
                 }
             }
         
-        # Calculate individual scores
+        # Calculate individual component scores
         scores = {
             'cpu': self.calculator.calculate_cpu_score(hardware['cpu'], game_requirements or {}),
             'gpu': self.calculator.calculate_gpu_score(hardware['gpu'], game_requirements or {}),
@@ -487,18 +487,133 @@ class DynamicPerformancePredictor:
         
         self.logger.debug(f"Component scores: {scores}")
         
-        # Calculate weighted total score
-        total_score = int(
+        # Calculate base weighted total score
+        base_score = int(
             scores['gpu'] * self.weights['gpu'] +
             scores['cpu'] * self.weights['cpu'] +
             scores['ram'] * self.weights['ram']
         )
         
-        # Determine tier
-        tier = self._get_tier(total_score)
+        # Apply adjustments based on minimum vs recommended specs comparison
+        total_score = base_score
+        if game_requirements:
+            # Extract minimum and recommended specs
+            min_gpu = game_requirements.get('minimum_gpu', '')
+            rec_gpu = game_requirements.get('recommended_gpu', '')
+            min_cpu = game_requirements.get('minimum_cpu', '')
+            rec_cpu = game_requirements.get('recommended_cpu', '')
+            min_ram = game_requirements.get('minimum_ram_gb', 8)
+            rec_ram = game_requirements.get('recommended_ram_gb', 16)
+            
+            # Calculate how much user's hardware exceeds minimum and approaches recommended specs
+            min_exceeded_factor = 0
+            rec_approach_factor = 0
+            
+            # GPU comparison - get benchmark scores
+            user_gpu_score = scores['gpu']
+            min_gpu_benchmark = self._estimate_gpu_benchmark(min_gpu)
+            rec_gpu_benchmark = self._estimate_gpu_benchmark(rec_gpu)
+            
+            if min_gpu_benchmark > 0 and rec_gpu_benchmark > 0:
+                # Calculate factors based on how much user's GPU exceeds minimum and approaches recommended
+                if user_gpu_score > min_gpu_benchmark:
+                    min_exceeded_factor += (user_gpu_score - min_gpu_benchmark) / min_gpu_benchmark
+                
+                if rec_gpu_benchmark > min_gpu_benchmark:
+                    rec_range = rec_gpu_benchmark - min_gpu_benchmark
+                    user_in_range = user_gpu_score - min_gpu_benchmark
+                    if user_in_range > 0:
+                        rec_approach_factor += min(1.0, user_in_range / rec_range)
+            
+            # Adjust total score based on how hardware compares to game-specific requirements
+            # If exceeding minimum by a lot, boost score
+            if min_exceeded_factor > 1.5:
+                total_score = min(100, int(total_score * 1.1))
+            elif min_exceeded_factor > 0.5:
+                total_score = min(100, int(total_score * 1.05))
+                
+            # If approaching or exceeding recommended specs, boost score further
+            if rec_approach_factor > 0.8:
+                total_score = min(100, int(total_score * 1.1))
+            elif rec_approach_factor > 0.5:
+                total_score = min(100, int(total_score * 1.05))
+            
+            # If barely meeting minimum, reduce score
+            if min_exceeded_factor < 0.2:
+                total_score = max(0, int(total_score * 0.9))
+            
+            # Apply more game-specific adjustments based on the actual game requirements
+            game_name = None
+            if game_requirements:
+                game_name = (
+                    game_requirements.get('game_name', '') or
+                    game_requirements.get('minimum_game', '') or
+                    game_requirements.get('recommended_game', '') or
+                    game_requirements.get('name', '')
+                )
+                
+                # Analyze game requirements vs hardware for dynamic scoring
+                if game_name:
+                    self.logger.info(f"Applying game-specific adjustments for {game_name}")
+                    
+                    # Get specs for calculations
+                    min_gpu = game_requirements.get('minimum_gpu', '')
+                    rec_gpu = game_requirements.get('recommended_gpu', '')
+                    gpu_model = hardware['gpu']['cards'][0]['name'] if hardware['gpu']['cards'] else ''
+                    
+                    # Calculate more precise hardware vs requirements comparison
+                    min_gpu_score = self._estimate_gpu_benchmark(min_gpu)
+                    rec_gpu_score = self._estimate_gpu_benchmark(rec_gpu)
+                    user_gpu_score = 0
+                    
+                    # Find benchmark of user's GPU
+                    for pattern, benchmark in self.calculator.gpu_benchmarks.items():
+                        if re.search(pattern, gpu_model, re.IGNORECASE):
+                            user_gpu_score = benchmark
+                            break
+                    
+                    # Log the scores for transparency
+                    self.logger.info(f"Game: {game_name}, Min GPU Score: {min_gpu_score}, Rec GPU Score: {rec_gpu_score}, User GPU Score: {user_gpu_score}")
+                    
+                    # Apply sophisticated tiering based on real hardware comparison
+                    if min_gpu_score > 0 and user_gpu_score > 0:
+                        # If below minimum requirements
+                        if user_gpu_score < min_gpu_score:
+                            # Set to F tier for below minimum
+                            total_score = max(30, int(total_score * 0.65))
+                            self.logger.info(f"Hardware below minimum requirements, reducing score to {total_score}")
+                        
+                        # If between minimum and recommended
+                        elif rec_gpu_score > min_gpu_score and user_gpu_score < rec_gpu_score:
+                            # Set to C-B tier based on where in the range they fall
+                            position = (user_gpu_score - min_gpu_score) / (rec_gpu_score - min_gpu_score)
+                            tier_score = 60 + int(position * 20)  # C to B range (60-80)
+                            total_score = min(tier_score, total_score)
+                            self.logger.info(f"Hardware between min and rec, setting score to {total_score}")
+                        
+                        # If above recommended
+                        elif user_gpu_score >= rec_gpu_score:
+                            # How much above recommended?
+                            exceed_factor = user_gpu_score / rec_gpu_score
+                            if exceed_factor >= 1.5:
+                                # Significantly above recommended - S tier
+                                total_score = max(total_score, 90)
+                                self.logger.info(f"Hardware well above rec, setting to S tier ({total_score})")
+                            elif exceed_factor >= 1.2:
+                                # Moderately above recommended - A tier
+                                total_score = max(total_score, 80)
+                                self.logger.info(f"Hardware above rec, setting to A tier ({total_score})")
+                            else:
+                                # Just above recommended - B tier
+                                total_score = max(total_score, 70)
+                                self.logger.info(f"Hardware meets rec, setting to B tier ({total_score})")
+            
+            # Determine tier
+            tier = self._get_tier(total_score)
+            self.logger.info(f"Final performance tier: {tier.name} with score {total_score}")
         
-        # Calculate expected FPS
-        expected_fps = self._calculate_expected_fps(tier, scores['gpu'], scores['cpu'])
+        # Calculate expected FPS with game-specific adjustments
+        expected_fps = self._calculate_expected_fps(tier, scores['gpu'], scores['cpu'], game_requirements)
         
         # Determine settings and resolution
         recommended_settings, recommended_resolution = self._determine_recommendations(tier, total_score)
@@ -532,8 +647,20 @@ class DynamicPerformancePredictor:
                 return tier
         return PerformanceTier.F
     
-    def _calculate_expected_fps(self, tier: PerformanceTier, gpu_score: float, cpu_score: float) -> int:
-        """Calculate expected FPS based on tier and component scores"""
+    def _calculate_expected_fps(self, tier: PerformanceTier, gpu_score: float, cpu_score: float, game_requirements: Dict = None) -> int:
+        """
+        Calculate expected FPS based on tier, component scores, and game-specific requirements
+        
+        Args:
+            tier: Performance tier classification
+            gpu_score: GPU score (0-100)
+            cpu_score: CPU score (0-100)
+            game_requirements: Optional game requirements from Steam API
+            
+        Returns:
+            Expected FPS value
+        """
+        # Base FPS by tier - starting point
         base_fps = {
             PerformanceTier.S: 90,
             PerformanceTier.A: 75,
@@ -545,6 +672,112 @@ class DynamicPerformancePredictor:
         
         fps = base_fps.get(tier, 30)
         
+        # Game-specific adjustments if available
+        if game_requirements:
+            game_name = (
+                game_requirements.get('game_name', '') or
+                game_requirements.get('minimum_game', '') or
+                game_requirements.get('recommended_game', '') or
+                game_requirements.get('name', '')
+            )
+            
+            if game_name:
+                self.logger.info(f"Calculating game-specific FPS for {game_name}")
+                
+                # Check if the game is known to be well-optimized or demanding
+                fps_modifier = 1.0  # Default modifier
+                
+                # List of known well-optimized games
+                well_optimized_games = [
+                    'fortnite', 'valorant', 'apex legends', 'rocket league',
+                    'league of legends', 'counter-strike', 'counter strike', 'cs2',
+                    'overwatch', 'minecraft', 'dota 2', 'rainbow six siege'
+                ]
+                
+                # List of known demanding games
+                demanding_games = [
+                    'cyberpunk 2077', 'cyberpunk', 'red dead redemption 2', 'red dead redemption',
+                    'assassin\'s creed valhalla', 'assassin\'s creed', 'flight simulator',
+                    'control', 'metro exodus', 'crysis', 'star citizen', 'elden ring'
+                ]
+                
+                # Apply game-specific adjustments
+                game_lower = game_name.lower()
+                
+                if any(optimized_game in game_lower for optimized_game in well_optimized_games):
+                    fps_modifier = 1.2  # 20% FPS boost for well-optimized games
+                    self.logger.info(f"Well-optimized game detected, applying 20% FPS boost")
+                elif any(demanding_game in game_lower for demanding_game in demanding_games):
+                    fps_modifier = 0.8  # 20% FPS reduction for demanding games
+                    self.logger.info(f"Demanding game detected, reducing FPS by 20%")
+                
+                # Modify the base FPS by game optimization factor
+                fps = int(fps * fps_modifier)
+                
+                # Check for specific game engines
+                if 'unreal engine' in game_lower or 'unreal' in game_lower:
+                    # Unreal Engine games tend to be more GPU-bound
+                    if gpu_score < 60:
+                        fps = int(fps * 0.9)  # Further reduce for low-end GPUs
+                    elif gpu_score > 85:
+                        fps = int(fps * 1.1)  # Boost for high-end GPUs
+                elif 'unity' in game_lower:
+                    # Unity games are often more balanced between CPU and GPU
+                    if min(cpu_score, gpu_score) < 60:
+                        fps = int(fps * 0.9)  # Reduce for balanced bottleneck
+                
+                # Compare user's hardware to game requirements
+                min_gpu = game_requirements.get('minimum_gpu', '')
+                rec_gpu = game_requirements.get('recommended_gpu', '')
+                
+                # Get benchmark scores
+                min_gpu_score = self._estimate_gpu_benchmark(min_gpu)
+                rec_gpu_score = self._estimate_gpu_benchmark(rec_gpu)
+                
+                # Find user's GPU benchmark - use the actual hardware info, not from game_requirements
+                gpu_model = ""
+                if 'user_gpu_model' in game_requirements:
+                    gpu_model = game_requirements.get('user_gpu_model', '')
+                else:
+                    # Get from hardware data structure
+                    gpu_model = hardware['gpu']['cards'][0]['name'] if hardware['gpu']['cards'] else ''
+                    
+                user_gpu_benchmark = 0
+                
+                for pattern, benchmark in self.calculator.gpu_benchmarks.items():
+                    if re.search(pattern, gpu_model, re.IGNORECASE):
+                        user_gpu_benchmark = benchmark
+                        break
+                
+                # Calculate performance ratio if we have valid benchmarks
+                if min_gpu_score > 0 and rec_gpu_score > 0 and user_gpu_benchmark > 0:
+                    # How much the user exceeds minimum requirements
+                    min_ratio = user_gpu_benchmark / min_gpu_score if min_gpu_score > 0 else 1.0
+                    
+                    # How close the user is to recommended requirements
+                    rec_ratio = user_gpu_benchmark / rec_gpu_score if rec_gpu_score > 0 else 0.5
+                    
+                    # Apply precise adjustments based on hardware vs requirements
+                    if min_ratio < 1.0:
+                        # Below minimum requirements - significant FPS reduction
+                        fps = int(fps * min_ratio * 0.8)
+                        self.logger.info(f"Below minimum requirements, reducing FPS to {fps}")
+                    elif rec_ratio >= 1.5:
+                        # Far exceeds recommended - significant FPS boost
+                        fps = int(fps * 1.3)
+                        self.logger.info(f"Far exceeds recommended requirements, boosting FPS to {fps}")
+                    elif rec_ratio >= 1.0:
+                        # Meets or exceeds recommended - moderate FPS boost
+                        fps = int(fps * 1.15)
+                        self.logger.info(f"Exceeds recommended requirements, boosting FPS to {fps}")
+                    else:
+                        # Between minimum and recommended - proportional adjustment
+                        position = (min_ratio - 1.0) / (1.0 - rec_ratio)
+                        fps_factor = 1.0 + (position * 0.15)  # 0-15% boost
+                        fps = int(fps * fps_factor)
+                        self.logger.info(f"Between min and rec requirements, adjusted FPS to {fps}")
+        
+        # Standard adjustments based on component scores
         # Adjust based on GPU performance
         if gpu_score >= 90:
             fps += 20
@@ -559,6 +792,7 @@ class DynamicPerformancePredictor:
         elif cpu_score <= 50:
             fps -= 5
         
+        # Return with reasonable lower bound
         return max(15, fps)
     
     def _determine_recommendations(self, tier: PerformanceTier, score: int) -> Tuple[str, str]:
@@ -620,3 +854,62 @@ class DynamicPerformancePredictor:
                 suggestions.append("Consider enabling RTX ray tracing for enhanced visuals")
         
         return suggestions
+        
+    def _estimate_gpu_benchmark(self, gpu_name: str) -> int:
+        """
+        Estimate GPU benchmark score from name string using pattern matching.
+        
+        Args:
+            gpu_name: Name of the GPU from requirements
+            
+        Returns:
+            Estimated benchmark score (0 if can't estimate)
+        """
+        if not gpu_name or not isinstance(gpu_name, str):
+            return 0
+        
+        gpu_name = gpu_name.lower()
+        
+        # First try exact pattern matching using the calculator's benchmarks
+        for pattern, benchmark in self.calculator.gpu_benchmarks.items():
+            if re.search(pattern, gpu_name, re.IGNORECASE):
+                self.logger.debug(f"GPU requirement '{gpu_name}' matched pattern '{pattern}' with score {benchmark}")
+                return benchmark
+        
+        # If no exact match, use simplified estimation based on series detection
+        if 'rtx' in gpu_name:
+            if '4090' in gpu_name or '4080' in gpu_name:
+                return 40000  # High-end RTX 40 series
+            elif '40' in gpu_name:
+                return 30000  # Mid-range RTX 40 series
+            elif '3090' in gpu_name or '3080' in gpu_name:
+                return 35000  # High-end RTX 30 series
+            elif '30' in gpu_name:
+                return 25000  # Mid-range RTX 30 series
+            elif '20' in gpu_name:
+                return 18000  # RTX 20 series
+            else:
+                return 20000  # Generic RTX
+        elif 'gtx' in gpu_name:
+            if '16' in gpu_name:
+                return 8000   # GTX 16 series
+            elif '1080' in gpu_name or '1070' in gpu_name:
+                return 10000  # High-end GTX 10 series
+            elif '10' in gpu_name:
+                return 6000   # Mid-range GTX 10 series
+            else:
+                return 5000   # Generic GTX
+        elif 'nvidia' in gpu_name:
+            return 10000      # Generic NVIDIA
+        elif 'amd' in gpu_name or 'radeon' in gpu_name:
+            if 'rx 7' in gpu_name:
+                return 30000  # High-end AMD RX 7000
+            elif 'rx 6' in gpu_name:
+                return 20000  # AMD RX 6000
+            elif 'rx' in gpu_name:
+                return 10000  # Generic AMD RX
+            else:
+                return 8000   # Generic AMD
+        
+        # Fallback for unknown GPU
+        return 5000

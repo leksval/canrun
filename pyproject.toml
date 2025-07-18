@@ -53,6 +53,7 @@ dependencies = [
     "tqdm>=4.65.0",
     "torch>=2.5.1",
     "rise>=5.7.1",
+    "gradio>=4.0.0",
 ]
 
 [project.optional-dependencies]

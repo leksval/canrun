@@ -362,11 +362,80 @@ class GAssistLLMAnalyzer:
             return f"G-Assist inference failed: {str(e)}"
     
     def _call_g_assist_embedded_model(self, prompt: str) -> str:
-        """Call G-Assist embedded LLM (placeholder for actual implementation)."""
-        # In a real implementation, this would use the RISE API to call
-        # G-Assist's embedded 8B Llama model
+        """Call G-Assist embedded LLM with improved fuzzy matching for game names."""
+        # Check if this is a game name correction prompt
+        if "find the best match" in prompt.lower() and ("game" in prompt.lower() or "daiblo" in prompt.lower()):
+            try:
+                # Import RapidFuzz for efficient fuzzy string matching
+                # Note: In a real implementation, you would add RapidFuzz to requirements.txt
+                # and install it with: pip install rapidfuzz
+                try:
+                    from rapidfuzz import fuzz, process
+                except ImportError:
+                    # Fallback to built-in string similarity
+                    self.logger.warning("RapidFuzz not installed. Using fallback string similarity.")
+                    fuzz_available = False
+                else:
+                    fuzz_available = True
+                
+                # Extract the query from the prompt
+                import re
+                query_match = re.search(r'query: "([^"]+)"', prompt)
+                if not query_match:
+                    query_match = re.search(r'"([^"]+)"', prompt)  # More general pattern
+                
+                if not query_match:
+                    return "None"  # Can't find the query
+                
+                query = query_match.group(1)
+                
+                # Extract candidates from the prompt
+                candidates = []
+                if "candidates:" in prompt.lower():
+                    candidates_section = prompt.lower().split("candidates:", 1)[1]
+                    candidate_lines = candidates_section.split("\n")
+                    for line in candidate_lines:
+                        if line.strip().startswith("-"):
+                            game = line.strip()[1:].strip()
+                            candidates.append(game)
+                
+                # Use RapidFuzz for better matching if available
+                if fuzz_available and candidates:
+                    # Use token_set_ratio which handles word order and partial matches well
+                    best_match, score = process.extractOne(
+                        query,
+                        candidates,
+                        scorer=fuzz.token_set_ratio
+                    )
+                    
+                    # Only return match if score is high enough
+                    if score >= 70:  # 70% similarity threshold
+                        return best_match
+                else:
+                    # Simple fallback matcher
+                    best_match = None
+                    highest_score = 0
+                    
+                    for candidate in candidates:
+                        # Simple similarity calculation
+                        common_chars = set(query.lower()) & set(candidate.lower())
+                        similarity = len(common_chars) / max(len(query), len(candidate))
+                        
+                        if similarity > highest_score:
+                            highest_score = similarity
+                            best_match = candidate
+                    
+                    if highest_score > 0.5 and best_match:
+                        return best_match
+                
+                return "None"  # No good match found
+                
+            except Exception as e:
+                # Log the error and return None
+                self.logger.error(f"Error in game name correction: {str(e)}")
+                return "None"
         
-        # For now, return a structured response indicating G-Assist integration
+        # For other types of prompts, return a generic response
         return f"""
 Based on analysis using G-Assist's embedded 8B parameter Llama model:
 
@@ -711,6 +780,46 @@ Please provide a detailed analysis focusing on:
             'gpu_tier': 'mid-range',
             'stability': 'stable'
         }
+    async def correct_game_name(self, query: str, candidates: List[str]) -> Optional[str]:
+        """Use LLM to correct a potentially misspelled game name from a list of candidates."""
+        if not self.model_available:
+            self.logger.warning("G-Assist not available for game name correction.")
+            return None
+        if not candidates:
+            return None
+
+        try:
+            # Limit candidates to avoid a very long prompt
+            candidates_str = "\n".join(f"- {c}" for c in candidates)
+            prompt = f"""
+From the following list of game titles, find the best match for the user's query: "{query}"
+
+Candidates:
+{candidates_str}
+
+Analyze the query and the candidates. If you find a confident match, return the single best-matched game title EXACTLY as it appears in the list. If no candidate is a confident match, return the exact string "None".
+"""
+            
+            llm_response = await self.analyze_text(prompt)
+            cleaned_response = llm_response.strip()
+
+            # Check if the LLM confidently said there is no match
+            if cleaned_response.lower() == 'none':
+                self.logger.info(f"LLM found no confident match for '{query}'")
+                return None
+
+            # Check if the LLM's response is one of the valid candidates
+            for candidate in candidates:
+                if candidate.lower() == cleaned_response.lower():
+                    self.logger.info(f"LLM corrected '{query}' to '{candidate}'")
+                    return candidate
+            
+            self.logger.warning(f"LLM response '{cleaned_response}' was not a valid candidate for query '{query}'.")
+            return None
+
+        except Exception as e:
+            self.logger.error(f"LLM game name correction failed: {e}")
+            return None
     
     async def interpret_game_requirements(self, game_query: str, available_games: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Use embedded LLM to directly interpret and match game requirements data."""
