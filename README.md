@@ -44,7 +44,7 @@ tags:
 
 ---
 ## Live Demo, download and test locally for real hardvare evaluation
-[HF Space Demo](https://huggingface.co/spaces/grasant/canrun)
+[LINK](https://huggingface.co/spaces/grasant/canrun)
 ![HF Space Demo](image.png)
 
 ---
