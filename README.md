@@ -25,7 +25,7 @@ tags:
 
 ## 🚀 Overview
 
-**CanRun** is an RTX/GTX-exclusive G-Assist plugin that instantly tells you if your PC can run any game with an advanced **S-A-B-C-D-F tier system**. Now featuring **Official G-Assist Protocol v5.1** with verified NVIDIA communication standards and enhanced Steam integration.
+**CanRun** is an RTX/GTX-exclusive G-Assist plugin that instantly tells you if your PC can run any game with an advanced **S-A-B-C-D-F tier system**.and enhanced Steam integration.
 
 ## ✨ Key Features
 
