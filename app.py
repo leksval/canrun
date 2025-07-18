@@ -9,6 +9,7 @@ import signal
 import sys
 import time
 import asyncio
+import base64
 from src.canrun_engine import CanRunEngine
 from plugin import CanRunGAssistPlugin
 
@@ -58,25 +59,80 @@ def detect_hardware():
         logger.error(f"Error detecting hardware: {e}")
         return f"An error occurred during hardware detection: {e}"
 
-def create_gradio_interface():
-    """Create a simple Gradio interface"""
-    with gr.Blocks() as demo:
-        gr.Markdown("# CanRun Game Compatibility Checker")
+def get_logo_html():
+    """Get HTML that displays the logo"""
+    logo_path = os.path.join(os.path.dirname(__file__), "logo.png")
+    
+    if os.path.exists(logo_path):
+        # Read the logo file and encode it as base64
+        with open(logo_path, "rb") as image_file:
+            encoded_image = base64.b64encode(image_file.read()).decode("utf-8")
         
+        # Return HTML that displays the logo
+        return f"""
+        <div style="display: flex; align-items: center; margin-bottom: 0.5em">
+            <img src="data:image/png;base64,{encoded_image}" alt="CanRun Logo" style="height: 4em; margin-right: 1em;">
+            <div>
+                <h1 style="margin: 0; padding: 0">CanRun Game Compatibility Checker</h1>
+                <p style="margin: 0; padding: 0">Check if your PC can run any game with an advanced tier system and Steam API integration</p>
+            </div>
+        </div>
+        """
+    else:
+        logger.warning(f"Logo file not found at {logo_path}")
+        return """
+        <div>
+            <h1>CanRun Game Compatibility Checker</h1>
+            <p>Check if your PC can run any game with an advanced tier system and Steam API integration</p>
+        </div>
+        """
+
+def create_gradio_interface():
+    """Create a simple Gradio interface with logo and favicon"""
+    # Set custom theme with brand color matching the logo
+    theme = gr.themes.Default(
+        primary_hue="green",
+        secondary_hue="gray",
+    )
+    
+    # Define file paths
+    favicon_path = os.path.join(os.path.dirname(__file__), "logo.png")
+    
+    with gr.Blocks(theme=theme, title="CanRun - Game Compatibility Checker", css="") as demo:
+        # Header with logo
+        gr.HTML(get_logo_html())
+        
+        # Main content
         with gr.Row():
             with gr.Column():
                 game_input = gr.Textbox(label="Game Name", placeholder="Enter game name (e.g., Diablo 4)")
-                check_btn = gr.Button("Check Compatibility")
-                hw_btn = gr.Button("Detect Hardware")
+                check_btn = gr.Button("Check Compatibility", variant="primary")
+                hw_btn = gr.Button("Detect Hardware", variant="secondary")
             
             with gr.Column():
                 result_output = gr.Textbox(label="Results", lines=20)
+        
+        # Footer
+        gr.HTML("""
+        <div style="margin-top: 20px; text-align: center; padding: 10px; border-top: 1px solid #ddd;">
+            <p>CanRun - Advanced Game Compatibility Checker with MCP Server Support</p>
+            <p>Powered by G-Assist Integration</p>
+        </div>
+        """)
         
         # For async functions, we need to use .click(fn=..., inputs=..., outputs=...)
         check_btn.click(fn=analyze_game, inputs=game_input, outputs=result_output)
         hw_btn.click(fn=detect_hardware, inputs=None, outputs=result_output)
     
     return demo
+
+def is_mcp_available():
+    """Check if the MCP package is available"""
+    try:
+        import mcp
+        return True
+    except ImportError:
+        return False
 
 def main():
     """Main application entry point"""
@@ -89,8 +145,26 @@ def main():
     # Create Gradio interface
     demo = create_gradio_interface()
     
+    # Check if MCP support is available
+    mcp_enabled = is_mcp_available()
+    if mcp_enabled:
+        logger.info("MCP server functionality is enabled")
+    else:
+        logger.info("MCP server functionality is disabled. Install with 'pip install \"gradio[mcp]\"' to enable")
+    
     # Launch with auto port discovery
-    demo.queue().launch(server_name="0.0.0.0", share=False)
+    launch_kwargs = {
+        "server_name": "0.0.0.0", 
+        "share": False,
+        "favicon_path": os.path.join(os.path.dirname(__file__), "logo.png"),
+    }
+    
+    # Only enable MCP server if the package is available
+    if mcp_enabled:
+        launch_kwargs["mcp_server"] = True
+    
+    # Launch the server
+    demo.queue().launch(**launch_kwargs)
     
     # Keep the main thread alive
     logger.info("Press Ctrl+C to stop the server")
