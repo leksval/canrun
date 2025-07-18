@@ -8,50 +8,96 @@ import sys
 import logging
 import hashlib
 import secrets
-import ctypes
+import platform
 from datetime import datetime, timedelta
 from typing import Dict, Optional, List, Any
 from dataclasses import dataclass
 from pathlib import Path
 import re
 
+# Platform detection
+IS_WINDOWS = platform.system() == "Windows"
+IS_LINUX = platform.system() == "Linux"
+IS_MACOS = platform.system() == "Darwin"
+
 # Import required dependencies (specified in requirements.txt)
 import psutil
-import cpuinfo
-import pynvml
-import winreg
-import wmi
+import cpuinfo  # py-cpuinfo package
 
-# Handle GPUtil import with distutils compatibility for PyInstaller
-try:
-    import GPUtil
-    GPUTIL_AVAILABLE = True
-except ImportError as e:
-    if "distutils" in str(e):
-        # GPUtil requires distutils which was removed in Python 3.12
-        # Create a compatibility shim for PyInstaller
-        import sys
-        import shutil
+# Set feature flags
+PYNVML_AVAILABLE = False
+WINREG_AVAILABLE = False
+WMI_AVAILABLE = False
+
+# Platform-specific imports with proper fallbacks - only attempt to import on Windows
+if IS_WINDOWS:
+    # Import ctypes for Windows API access
+    try:
+        import ctypes
+        CTYPES_AVAILABLE = True
+    except ImportError:
+        CTYPES_AVAILABLE = False
         
-        class DistutilsSpawn:
-            @staticmethod
-            def find_executable(name):
-                return shutil.which(name)
-        
-        # Inject distutils.spawn compatibility
-        if 'distutils' not in sys.modules:
-            import types
-            distutils_module = types.ModuleType('distutils')
-            distutils_module.spawn = DistutilsSpawn()
-            sys.modules['distutils'] = distutils_module
-            sys.modules['distutils.spawn'] = DistutilsSpawn()
-        
+    # Attempt to import NVIDIA ML library
+    try:
+        import pynvml
+        PYNVML_AVAILABLE = True
+    except ImportError:
+        PYNVML_AVAILABLE = False
+    
+    # Attempt to import registry access
+    try:
+        import winreg
+        WINREG_AVAILABLE = True
+    except ImportError:
+        WINREG_AVAILABLE = False
+    
+    # Attempt to import WMI
+    try:
+        import wmi
+        WMI_AVAILABLE = True
+    except ImportError:
+        WMI_AVAILABLE = False
+
+# Set more feature flags
+GPUTIL_AVAILABLE = False
+CTYPES_AVAILABLE = IS_WINDOWS  # Default assumption
+
+# Handle GPUtil import with platform compatibility
+if IS_WINDOWS:  # Only try to import on Windows platforms
+    try:
+        # First check if distutils is available (needed for GPUtil)
         try:
-            import GPUtil
-            GPUTIL_AVAILABLE = True
+            import distutils.spawn
+            distutils_available = True
         except ImportError:
-            GPUTIL_AVAILABLE = False
-    else:
+            # GPUtil requires distutils which was removed in Python 3.12
+            # Create a compatibility shim for PyInstaller
+            import shutil
+            
+            class DistutilsSpawn:
+                @staticmethod
+                def find_executable(name):
+                    return shutil.which(name)
+            
+            # Inject distutils.spawn compatibility
+            if 'distutils' not in sys.modules:
+                import types
+                distutils_module = types.ModuleType('distutils')
+                distutils_module.spawn = DistutilsSpawn()
+                sys.modules['distutils'] = distutils_module
+                sys.modules['distutils.spawn'] = DistutilsSpawn()
+            
+            distutils_available = True
+        
+        # Now try to import GPUtil
+        if distutils_available:
+            try:
+                import GPUtil
+                GPUTIL_AVAILABLE = True
+            except ImportError:
+                GPUTIL_AVAILABLE = False
+    except Exception:
         GPUTIL_AVAILABLE = False
 
 
@@ -254,52 +300,91 @@ class PrivacyAwareHardwareDetector:
         self.logger.info("Privacy-aware hardware detector initialized for RTX/GTX systems")
     
     def _initialize_nvidia_libraries(self) -> None:
-        """Initialize NVIDIA-specific libraries."""
-        try:
-            pynvml.nvmlInit()
-            self.logger.info("NVIDIA ML library initialized")
-        except Exception as e:
-            self.logger.warning(f"NVIDIA ML library initialization failed: {e}")
+        """Initialize NVIDIA-specific libraries with cross-platform support."""
+        if IS_WINDOWS and PYNVML_AVAILABLE:
+            try:
+                pynvml.nvmlInit()
+                self.logger.info("NVIDIA ML library initialized")
+            except Exception as e:
+                self.logger.warning(f"NVIDIA ML library initialization failed: {e}")
+        else:
+            self.logger.debug("NVIDIA ML library not available on this platform")
     
     def _validate_system_compatibility(self) -> None:
         """Validate system compatibility with NVIDIA requirements."""
-        # Check for Windows OS (required for G-Assist)
-        if os.name != 'nt':
-            self.logger.warning("Windows OS recommended for full G-Assist compatibility")
+        # Check platform compatibility
+        if not IS_WINDOWS:
+            self.logger.info(f"Running on {platform.system()} - cross-platform mode enabled")
     
     def has_nvidia_gpu(self) -> bool:
-        """Check if NVIDIA RTX/GTX GPU is available for G-Assist compatibility."""
-        try:
-            # Try NVIDIA ML library first
-            pynvml.nvmlInit()
-            device_count = pynvml.nvmlDeviceGetCount()
-            if device_count > 0:
-                # Check if any device is NVIDIA RTX/GTX
-                handle = pynvml.nvmlDeviceGetHandleByIndex(0)
-                gpu_name = pynvml.nvmlDeviceGetName(handle).decode('utf-8')
-                return 'RTX' in gpu_name.upper() or 'GTX' in gpu_name.upper()
-        except Exception:
-            pass
+        """Check if NVIDIA RTX/GTX GPU is available with cross-platform support."""
+        # For Windows - try multiple detection methods
+        if IS_WINDOWS:
+            # Try NVIDIA ML library first if available
+            if PYNVML_AVAILABLE:
+                try:
+                    pynvml.nvmlInit()
+                    device_count = pynvml.nvmlDeviceGetCount()
+                    if device_count > 0:
+                        # Check if any device is NVIDIA RTX/GTX
+                        handle = pynvml.nvmlDeviceGetHandleByIndex(0)
+                        gpu_name = pynvml.nvmlDeviceGetName(handle)
+                        if isinstance(gpu_name, bytes):
+                            gpu_name = gpu_name.decode('utf-8')
+                        return 'RTX' in gpu_name.upper() or 'GTX' in gpu_name.upper()
+                except Exception:
+                    pass
+            
+            # Try GPUtil as fallback if available
+            if GPUTIL_AVAILABLE:
+                try:
+                    gpus = GPUtil.getGPUs()
+                    for gpu in gpus:
+                        if 'NVIDIA' in gpu.name.upper():
+                            gpu_name = gpu.name.upper()
+                            return 'RTX' in gpu_name or 'GTX' in gpu_name
+                except Exception:
+                    pass
+            
+            # Try registry detection as Windows-specific fallback
+            if WINREG_AVAILABLE:
+                try:
+                    gpu_name = self._detect_gpu_from_registry()
+                    if gpu_name:
+                        gpu_upper = gpu_name.upper()
+                        return 'NVIDIA' in gpu_upper and ('RTX' in gpu_upper or 'GTX' in gpu_upper)
+                except Exception:
+                    pass
         
-        # Try GPUtil as fallback if available
-        if GPUTIL_AVAILABLE:
+        # For Linux - try lspci command
+        elif IS_LINUX:
             try:
-                gpus = GPUtil.getGPUs()
-                for gpu in gpus:
-                    if 'NVIDIA' in gpu.name.upper():
-                        gpu_name = gpu.name.upper()
-                        return 'RTX' in gpu_name or 'GTX' in gpu_name
-            except Exception:
+                import subprocess
+                try:
+                    output = subprocess.check_output(['lspci', '-vnn'], text=True)
+                    nvidia_lines = [line for line in output.split('\n') if 'NVIDIA' in line]
+                    for line in nvidia_lines:
+                        line_upper = line.upper()
+                        if 'RTX' in line_upper or 'GTX' in line_upper:
+                            return True
+                except (subprocess.SubprocessError, FileNotFoundError):
+                    pass
+            except:
                 pass
         
-        # Try registry detection as final fallback
-        try:
-            gpu_name = self._detect_gpu_from_registry()
-            if gpu_name:
-                gpu_upper = gpu_name.upper()
-                return 'NVIDIA' in gpu_upper and ('RTX' in gpu_upper or 'GTX' in gpu_upper)
-        except Exception:
-            pass
+        # For macOS - NVIDIA GPUs are less common but check anyway
+        elif IS_MACOS:
+            try:
+                import subprocess
+                try:
+                    output = subprocess.check_output(['system_profiler', 'SPDisplaysDataType'], text=True)
+                    if 'NVIDIA' in output:
+                        output_upper = output.upper()
+                        return 'RTX' in output_upper or 'GTX' in output_upper
+                except (subprocess.SubprocessError, FileNotFoundError):
+                    pass
+            except:
+                pass
         
         return False
     
@@ -457,7 +542,7 @@ class PrivacyAwareHardwareDetector:
             self.logger.warning("GPUtil not available - skipping GPUtil detection")
         
         # Windows Registry fallback
-        if os.name == 'nt':
+        if IS_WINDOWS and WINREG_AVAILABLE:
             try:
                 gpu_name = self._detect_gpu_from_registry()
                 if gpu_name and 'NVIDIA' in gpu_name.upper():
@@ -588,75 +673,141 @@ class PrivacyAwareHardwareDetector:
         return None
     
     def _detect_os(self) -> Dict[str, Any]:
-        """Detect OS information."""
+        """Detect OS information with cross-platform support."""
         os_info = {
             'name': 'Unknown OS',
-            'directx_version': 'DirectX 12'
+            'directx_version': 'N/A'  # Default for non-Windows
         }
         
         try:
-            if os.name == 'nt':
-                # Windows
-                import platform
+            if IS_WINDOWS:
+                # Windows detection
                 os_name = f"Windows {platform.release()}"
                 
-                # Try to get more specific version from registry
-                try:
-                    key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
-                                       r"SOFTWARE\Microsoft\Windows NT\CurrentVersion")
-                    
-                    # Prioritize build number detection over ProductName
-                    # (Microsoft hasn't updated ProductName properly for Windows 11)
+                # Try to get more specific version from registry if available
+                if WINREG_AVAILABLE:
                     try:
-                        current_build = winreg.QueryValueEx(key, "CurrentBuild")[0]
+                        key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
+                                           r"SOFTWARE\Microsoft\Windows NT\CurrentVersion")
                         
-                        # Windows 11 detection based on build number (most reliable)
-                        if int(current_build) >= 22000:
-                            os_name = "Windows 11"
-                            # Try to get edition
-                            try:
-                                edition = winreg.QueryValueEx(key, "EditionID")[0]
-                                if edition.lower() == "professional":
-                                    os_name = "Windows 11 Pro"
-                                elif edition.lower() == "home":
-                                    os_name = "Windows 11 Home"
-                                elif edition.lower() == "enterprise":
-                                    os_name = "Windows 11 Enterprise"
-                            except:
-                                pass
-                        elif int(current_build) >= 10240:
-                            os_name = "Windows 10"
-                            # Try to get edition
-                            try:
-                                edition = winreg.QueryValueEx(key, "EditionID")[0]
-                                if edition.lower() == "professional":
-                                    os_name = "Windows 10 Pro"
-                                elif edition.lower() == "home":
-                                    os_name = "Windows 10 Home"
-                                elif edition.lower() == "enterprise":
-                                    os_name = "Windows 10 Enterprise"
-                            except:
-                                pass
-                    except FileNotFoundError:
-                        # Fallback to ProductName if build number not available
+                        # Prioritize build number detection over ProductName
                         try:
-                            product_name = winreg.QueryValueEx(key, "ProductName")[0]
-                            os_name = product_name
+                            current_build = winreg.QueryValueEx(key, "CurrentBuild")[0]
+                            
+                            # Windows 11 detection based on build number
+                            if int(current_build) >= 22000:
+                                os_name = "Windows 11"
+                                # Try to get edition
+                                try:
+                                    edition = winreg.QueryValueEx(key, "EditionID")[0]
+                                    if edition.lower() == "professional":
+                                        os_name = "Windows 11 Pro"
+                                    elif edition.lower() == "home":
+                                        os_name = "Windows 11 Home"
+                                    elif edition.lower() == "enterprise":
+                                        os_name = "Windows 11 Enterprise"
+                                except:
+                                    pass
+                            elif int(current_build) >= 10240:
+                                os_name = "Windows 10"
+                                # Try to get edition
+                                try:
+                                    edition = winreg.QueryValueEx(key, "EditionID")[0]
+                                    if edition.lower() == "professional":
+                                        os_name = "Windows 10 Pro"
+                                    elif edition.lower() == "home":
+                                        os_name = "Windows 10 Home"
+                                    elif edition.lower() == "enterprise":
+                                        os_name = "Windows 10 Enterprise"
+                                except:
+                                    pass
                         except FileNotFoundError:
-                            pass
-                    
-                    winreg.CloseKey(key)
-                except Exception as e:
-                    self.logger.debug(f"Registry access failed: {e}")
-                    pass
+                            # Fallback to ProductName if build number not available
+                            try:
+                                product_name = winreg.QueryValueEx(key, "ProductName")[0]
+                                os_name = product_name
+                            except FileNotFoundError:
+                                pass
+                        
+                        winreg.CloseKey(key)
+                    except Exception as e:
+                        self.logger.debug(f"Registry access failed: {e}")
                 
                 os_info.update({
                     'name': os_name,
-                    'directx_version': 'DirectX 12'
+                    'directx_version': 'DirectX 12'  # Windows-specific
                 })
                 
                 self.logger.info(f"OS detected: {os_info['name']}")
                 return os_info
+            
+            elif IS_LINUX:
+                # Linux detection
+                try:
+                    # Get distribution info
+                    import distro
+                    dist_name = distro.name(pretty=True)
+                    if not dist_name:
+                        dist_name = f"Linux {platform.release()}"
+                except ImportError:
+                    # Fallback for older systems
+                    try:
+                        with open('/etc/os-release', 'r') as f:
+                            lines = f.readlines()
+                            pretty_name = [l for l in lines if l.startswith('PRETTY_NAME=')]
+                            if pretty_name:
+                                dist_name = pretty_name[0].split('=')[1].strip().strip('"')
+                            else:
+                                dist_name = f"Linux {platform.release()}"
+                    except:
+                        dist_name = f"Linux {platform.release()}"
+                
+                os_info.update({
+                    'name': dist_name,
+                    'directx_version': 'Vulkan/OpenGL'  # Linux graphics APIs
+                })
+                
+                self.logger.info(f"OS detected: {os_info['name']}")
+                return os_info
+                
+            elif IS_MACOS:
+                # macOS detection
+                try:
+                    mac_ver = platform.mac_ver()[0]
+                    # Map version to macOS name
+                    mac_names = {
+                        '10.15': 'Catalina',
+                        '11.0': 'Big Sur',
+                        '12.0': 'Monterey',
+                        '13.0': 'Ventura',
+                        '14.0': 'Sonoma'
+                    }
+                    
+                    # Find the closest matching version
+                    mac_name = None
+                    for ver, name in mac_names.items():
+                        if mac_ver.startswith(ver.split('.')[0]):
+                            mac_name = name
+                            break
+                    
+                    if mac_name:
+                        os_name = f"macOS {mac_name} ({mac_ver})"
+                    else:
+                        os_name = f"macOS {mac_ver}"
+                    
+                    os_info.update({
+                        'name': os_name,
+                        'directx_version': 'Metal'  # macOS graphics API
+                    })
+                    
+                    self.logger.info(f"OS detected: {os_info['name']}")
+                    return os_info
+                except:
+                    os_info.update({
+                        'name': f"macOS {platform.mac_ver()[0]}",
+                        'directx_version': 'Metal'
+                    })
+                    return os_info
                 
         except Exception as e:
             self.logger.warning(f"OS detection failed: {e}")
@@ -671,26 +822,78 @@ class PrivacyAwareHardwareDetector:
         }
         
         try:
-            if os.name == 'nt':
+            if IS_WINDOWS:
                 # Windows display detection using ctypes
-                # Get display resolution and refresh rate
-                user32 = ctypes.windll.user32
-                screensize = user32.GetSystemMetrics(0), user32.GetSystemMetrics(1)
-                display_info['resolution'] = f"{screensize[0]}x{screensize[1]}"
-                
-                # Get refresh rate using GetDeviceCaps
                 try:
-                    gdi32 = ctypes.windll.gdi32
-                    hdc = user32.GetDC(0)
-                    if hdc:
-                        refresh_rate = gdi32.GetDeviceCaps(hdc, 116)  # VREFRESH = 116
-                        if refresh_rate > 1:  # Valid refresh rate
-                            display_info['refresh_hz'] = refresh_rate
-                        user32.ReleaseDC(0, hdc)
+                    user32 = ctypes.windll.user32
+                    screensize = user32.GetSystemMetrics(0), user32.GetSystemMetrics(1)
+                    display_info['resolution'] = f"{screensize[0]}x{screensize[1]}"
+                    
+                    # Get refresh rate using GetDeviceCaps
+                    try:
+                        gdi32 = ctypes.windll.gdi32
+                        hdc = user32.GetDC(0)
+                        if hdc:
+                            refresh_rate = gdi32.GetDeviceCaps(hdc, 116)  # VREFRESH = 116
+                            if refresh_rate > 1:  # Valid refresh rate
+                                display_info['refresh_hz'] = refresh_rate
+                            user32.ReleaseDC(0, hdc)
+                    except Exception as e:
+                        self.logger.debug(f"Refresh rate detection failed: {e}")
+                    
+                    self.logger.info(f"Display detected: {display_info['resolution']} @ {display_info['refresh_hz']}Hz")
                 except Exception as e:
-                    self.logger.debug(f"Refresh rate detection failed: {e}")
-                
-                self.logger.info(f"Display detected: {display_info['resolution']} @ {display_info['refresh_hz']}Hz")
+                    self.logger.debug(f"Windows display detection failed: {e}")
+                    display_info = {
+                        'resolution': '1920x1080',  # Reasonable default
+                        'refresh_hz': 60
+                    }
+            elif IS_LINUX:
+                # Linux display detection
+                try:
+                    # Common resolutions on Linux
+                    display_info = {
+                        'resolution': '1920x1080',  # Reasonable default
+                        'refresh_hz': 60
+                    }
+                    
+                    # Try using xrandr if available
+                    import subprocess
+                    try:
+                        output = subprocess.check_output(['xrandr'], text=True)
+                        # Parse xrandr output for primary display
+                        pattern = r'(\d+x\d+)\s+(\d+\.\d+)\*'
+                        match = re.search(pattern, output)
+                        if match:
+                            display_info['resolution'] = match.group(1)
+                            display_info['refresh_hz'] = int(float(match.group(2)))
+                    except (subprocess.SubprocessError, FileNotFoundError):
+                        pass
+                except Exception as e:
+                    self.logger.debug(f"Linux display detection failed: {e}")
+            elif IS_MACOS:
+                # macOS display detection
+                try:
+                    # Common resolutions on macOS
+                    display_info = {
+                        'resolution': '2560x1600',  # Common MacBook resolution
+                        'refresh_hz': 60
+                    }
+                    
+                    # Try getting resolution with subprocess
+                    import subprocess
+                    try:
+                        output = subprocess.check_output(['system_profiler', 'SPDisplaysDataType'], text=True)
+                        # Parse for resolution
+                        resolution_pattern = r'Resolution: (\d+) x (\d+)'
+                        match = re.search(resolution_pattern, output)
+                        if match:
+                            width, height = match.groups()
+                            display_info['resolution'] = f"{width}x{height}"
+                    except (subprocess.SubprocessError, FileNotFoundError):
+                        pass
+                except Exception as e:
+                    self.logger.debug(f"macOS display detection failed: {e}")
                 
         except Exception as e:
             self.logger.warning(f"Display detection failed: {e}")
@@ -698,15 +901,49 @@ class PrivacyAwareHardwareDetector:
         return display_info
     
     def _detect_gpu_from_registry(self) -> Optional[str]:
-        """Detect GPU from Windows registry."""
-        try:
-            key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, 
-                               r"SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}\0000")
-            gpu_name = winreg.QueryValueEx(key, "DriverDesc")[0]
-            winreg.CloseKey(key)
-            return gpu_name
-        except:
+        """Detect GPU from Windows registry or alternative methods on other platforms."""
+        if IS_WINDOWS and WINREG_AVAILABLE:
+            try:
+                key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
+                                  r"SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}\0000")
+                gpu_name = winreg.QueryValueEx(key, "DriverDesc")[0]
+                winreg.CloseKey(key)
+                return gpu_name
+            except:
+                return None
+        elif IS_LINUX:
+            # Linux GPU detection
+            try:
+                import subprocess
+                try:
+                    # Try lspci for NVIDIA GPU
+                    output = subprocess.check_output(['lspci', '-vnn'], text=True)
+                    for line in output.split('\n'):
+                        if 'NVIDIA' in line and ('VGA' in line or '3D' in line):
+                            match = re.search(r'NVIDIA.*\[(.*?)\]', line)
+                            if match:
+                                return f"NVIDIA {match.group(1)}"
+                except (subprocess.SubprocessError, FileNotFoundError):
+                    pass
+            except:
+                pass
             return None
+        elif IS_MACOS:
+            # macOS GPU detection
+            try:
+                import subprocess
+                try:
+                    output = subprocess.check_output(['system_profiler', 'SPDisplaysDataType'], text=True)
+                    if 'NVIDIA' in output:
+                        match = re.search(r'Chipset Model: (NVIDIA.*?)($|\n)', output)
+                        if match:
+                            return match.group(1)
+                except (subprocess.SubprocessError, FileNotFoundError):
+                    pass
+            except:
+                pass
+            return None
+        return None
     
     def _clean_gpu_name(self, gpu_name: str) -> str:
         """Clean GPU name for privacy and consistency."""
@@ -892,9 +1129,8 @@ class PrivacyAwareHardwareDetector:
             # Analyze complete system for missing specs
             try:
                 # Try to detect actual RAM speed
-                if os.name == 'nt':
+                if IS_WINDOWS and WMI_AVAILABLE:
                     try:
-                        import wmi
                         c = wmi.WMI()
                         for memory in c.Win32_PhysicalMemory():
                             if memory.Speed:
@@ -908,10 +1144,9 @@ class PrivacyAwareHardwareDetector:
                 
                 # Try to detect all storage drives (for systems with multiple drives)
                 try:
-                    if os.name == 'nt':
+                    if IS_WINDOWS and WMI_AVAILABLE:
                         # Windows storage detection via WMI
                         try:
-                            import wmi
                             c = wmi.WMI()
                             drives = []
                             total_storage_gb = 0
@@ -971,8 +1206,45 @@ class PrivacyAwareHardwareDetector:
                             specs['storage_type'] = 'NVMe SSD'
                         except Exception:
                             specs['storage_type'] = 'NVMe SSD'  # Default for modern gaming systems
+                    elif IS_LINUX:
+                        # Linux storage detection
+                        try:
+                            import subprocess
+                            try:
+                                # Try lsblk to detect NVMe drives
+                                output = subprocess.check_output(['lsblk', '-d', '-o', 'NAME,TYPE,TRAN'], text=True)
+                                if 'nvme' in output.lower():
+                                    specs['storage_type'] = 'NVMe SSD'
+                                elif 'ssd' in output.lower() or 'sata' in output.lower():
+                                    specs['storage_type'] = 'SSD'
+                                else:
+                                    specs['storage_type'] = 'HDD'
+                            except (subprocess.SubprocessError, FileNotFoundError):
+                                specs['storage_type'] = 'NVMe SSD'  # Default assumption
+                        except:
+                            specs['storage_type'] = 'NVMe SSD'  # Default assumption
+                    elif IS_MACOS:
+                        # macOS storage detection
+                        try:
+                            import subprocess
+                            try:
+                                # Try system_profiler to detect SSD
+                                output = subprocess.check_output(['system_profiler', 'SPNVMeDataType'], text=True)
+                                if output.strip():  # If NVMe data is returned
+                                    specs['storage_type'] = 'NVMe SSD'
+                                else:
+                                    # Try SATA SSD detection
+                                    output = subprocess.check_output(['system_profiler', 'SPSerialATADataType'], text=True)
+                                    if 'SSD' in output:
+                                        specs['storage_type'] = 'SSD'
+                                    else:
+                                        specs['storage_type'] = 'HDD'
+                            except (subprocess.SubprocessError, FileNotFoundError):
+                                specs['storage_type'] = 'NVMe SSD'  # Default assumption
+                        except:
+                            specs['storage_type'] = 'NVMe SSD'  # Default assumption
                     else:
-                        # Non-Windows systems
+                        # Other platforms
                         specs['storage_type'] = 'NVMe SSD'  # Default assumption
                 except Exception:
                     specs['storage_type'] = 'NVMe SSD'  # Default assumption for modern systems
