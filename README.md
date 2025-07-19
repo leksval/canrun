@@ -42,6 +42,9 @@ tags:
 - **🏃 Zero Setup**: Drop-in plugin with automatic RTX/GTX validation
 - **🤖 MCP Server**: Official Model Context Protocol (MCP) server for G-Assist integration
 
+
+https://github.com/user-attachments/assets/5e75a2ab-7ce3-4dcc-af02-6bc33fafd102
+
 ---
 ## Live Demo, download and test locally for real hardvare evaluation
 [LINK](https://huggingface.co/spaces/grasant/canrun)
