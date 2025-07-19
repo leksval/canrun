@@ -384,3 +384,4 @@ pyinstaller --onefile --name g-assist-plugin-canrun --distpath . --add-data "src
 **Ready to see if your system can run any game? CanRun delivers A-tier performance analysis with official G-Assist protocol support!**
 
 For technical support, feature requests, or contributions, visit [GitHub repository](https://github.com/leksval/canrun).
+#AIonRTXHackathon
