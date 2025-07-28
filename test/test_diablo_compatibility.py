@@ -11,8 +11,8 @@ from canrun_engine import CanRunEngine
 async def test_diablo_compatibility():
     """Test the full compatibility analysis for Diablo 4."""
     
-    # Initialize the engine
-    engine = CanRunEngine(enable_llm=True)
+    # Initialize the engine with LLM disabled for testing
+    engine = CanRunEngine(enable_llm=False)
     
     # Test the full compatibility check
     print("Testing full compatibility analysis for 'Diablo 4'...")

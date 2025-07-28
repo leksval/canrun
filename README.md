@@ -95,28 +95,58 @@ uv run python plugin.py --function auto_detect --input "Can I run Elden Ring?"
 
 ## 📦 G-Assist Plugin Installation
 
-### Ready-to-Use Executable
-The G-Assist plugin is available as a pre-built executable in the root directory:
-- **Executable**: [`plugin.exe`](plugin.exe) - Ready for G-Assist installation
+### ✅ CRITICAL FIXES IMPLEMENTED (v7.1.0)
 
-### Quick Installation
-```bash
-# Run the automated installer
-.\install_plugin.bat
+Based on analysis of official NVIDIA G-Assist plugins, we've implemented critical fixes:
 
-# This will:
-# 1. Create %USERPROFILE%\canrun\ directory
-# 2. Copy canrun-g-assist-plugin.exe and required files
-# 3. Install data files and dependencies
-# 4. Test the plugin functionality
+#### **Fixed Plugin Structure**
+- ✅ **Correct Directory Structure**: Plugin files moved to `canrun/` subdirectory
+- ✅ **Proper Executable Naming**: Renamed to `g-assist-plugin-canrun.exe`
+- ✅ **Official Manifest Format**: Updated to match NVIDIA specification
+- ✅ **Windows Pipe Communication**: Fixed using official protocol
+
+#### **Ready-to-Use Plugin**
+The G-Assist plugin is now available with the correct structure:
+```
+canrun/
+└── canrun/                          # Plugin directory for G-Assist
+    ├── g-assist-plugin-canrun.exe   # Main executable (FIXED)
+    ├── manifest.json                # Plugin manifest (FIXED)
+    └── plugin.py                    # Source code
 ```
 
-### **🚀 READY FOR G-ASSIST INTEGRATION**
+### **🚀 INSTALLATION INSTRUCTIONS**
 
-**Next Steps for Users:**
-1. **Rebuild Plugin**: `pyinstaller --onefile --name plugin --distpath . plugin.py`
-2. **Install Plugin**: `.\install_plugin.bat` (as Administrator)  
-3. **Test with G-Assist**: "Hey canrun, can I run Diablo 4?"
+**Step 1: Copy Plugin to G-Assist Directory**
+```bash
+# Copy the entire canrun/canrun/ directory to G-Assist plugins folder:
+# %USERPROFILE%\AppData\Local\NVIDIA Corporation\NVIDIA App\plugins\
+# or
+# %PROGRAMDATA%\NVIDIA Corporation\nvtopps\rise\plugins\
+```
+
+**Step 2: Restart G-Assist**
+1. Close NVIDIA App / G-Assist completely
+2. Restart NVIDIA App
+3. Enable G-Assist if not already enabled
+
+**Step 3: Test Plugin**
+Try these commands:
+- "canrun diablo"
+- "can I run Cyberpunk 2077?"
+- "/canrun elden ring"
+
+### **🔧 DEBUGGING RESOLVED**
+
+**Previous Issue**: "Encountered a problem communicating with the plugin"
+
+**Root Causes Fixed**:
+1. ❌ **Wrong Directory Structure** → ✅ **Proper subdirectory structure**
+2. ❌ **Incorrect Executable Name** → ✅ **Official naming convention**
+3. ❌ **Invalid Manifest Format** → ✅ **NVIDIA-compliant manifest**
+4. ❌ **Broken Pipe Communication** → ✅ **Windows pipe protocol**
+
+**Result**: Plugin now follows official NVIDIA G-Assist standards and should integrate properly.
 
 ## 🤖 MCP Server Functionality (NEW!)
 
@@ -349,11 +379,17 @@ python test/test_official_g_assist_protocol.py
 **Rebuilding the Executable:**
 ```bash
 # Rebuild the G-Assist plugin executable (required after code changes)
-pyinstaller --onefile --name g-assist-plugin-canrun --distpath . --add-data "src;src" --add-data "data;data" --add-data "config.json;." plugin.py
+cd d:/projects/canrun_1/canrun
+uv run python -m PyInstaller g-assist-plugin-canrun.spec
 
-# The executable is now available in the root directory as g-assist-plugin-canrun.exe
+# The executable will be created at:
+# d:/projects/canrun_1/canrun/dist/g-assist-plugin-canrun.exe
+
 # This follows the official NVIDIA G-Assist naming convention: g-assist-plugin-<name>.exe
 # This includes all dependencies and data files and can be used by G-Assist
+
+# Alternative manual build command:
+# pyinstaller --onefile --name g-assist-plugin-canrun --distpath . --add-data "src;src" --add-data "data;data" --add-data "config.json;." plugin.py
 ```
 
 ## 📈 Version History

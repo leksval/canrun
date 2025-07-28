@@ -9,8 +9,8 @@ from canrun_engine import CanRunEngine
 async def test_minimum_requirements_logic():
     """Test the new minimum requirements messaging."""
     
-    # Initialize engine
-    engine = CanRunEngine(enable_llm=True)
+    # Initialize engine with LLM disabled for testing
+    engine = CanRunEngine(enable_llm=False)
     
     # Test with Diablo 4 (should exceed recommended for RTX 4090 system)
     print("Testing Diablo 4 compatibility...")

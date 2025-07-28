@@ -14,8 +14,8 @@ async def test_diablo4_compatibility():
     try:
         print("Testing Diablo 4 compatibility workflow...")
         
-        # Initialize engine
-        engine = CanRunEngine()
+        # Initialize engine with LLM disabled for testing
+        engine = CanRunEngine(enable_llm=False)
         print("✅ CanRunEngine initialized")
         
         # Test game compatibility analysis

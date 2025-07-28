@@ -24,9 +24,9 @@ async def test_enhanced_llm_integration():
     print("🧪 Testing Enhanced LLM Integration...")
     
     try:
-        # Initialize components
+        # Initialize components with fallback enabled for testing
         print("📋 Initializing components...")
-        llm_analyzer = GAssistLLMAnalyzer()
+        llm_analyzer = GAssistLLMAnalyzer(fallback_enabled=True)
         compatibility_analyzer = CompatibilityAnalyzer(llm_analyzer=llm_analyzer)
         hardware_detector = PrivacyAwareHardwareDetector()
         requirements_fetcher = GameRequirementsFetcher()

@@ -210,9 +210,36 @@ uv.lock
 
 # PyInstaller build files
 g-assist-plugin-python.spec
+g-assist-plugin-canrun.spec
+g-assist-plugin-canrun-diagnostic.spec
+
+# Build directories
+build/
+dist/
 
 # Large executables (>95MB) - GitHub has a 100MB file size limit
 # Allow optimized executables under 95MB for G-Assist plugin deployment
-# Note: If g-assist-plugin-python.exe exceeds 95MB, it will be blocked by this rule
 *.exe
 !g-assist-plugin-python.exe
+!g-assist-plugin-canrun.exe
+
+# G-Assist plugin development files
+plugin_diagnostic.py
+BUILD_README.md
+canrun_diagnostic.log
+
+# Debug and testing files
+*_DEBUG_*
+*_TEST_GUIDE.md
+*_ROADMAP.md
+*_CRITICAL_FIX.md
+INSTALLATION_GUIDE.md
+CLEAN_DEPLOYMENT.md
+SYSTEM_PLUGIN_TEST_GUIDE.md
+MINIMAL_PLUGIN_TEST_GUIDE.md
+FINAL_TEST_GUIDE.md
+
+# Plugin subdirectories (development artifacts)
+canrun/plugin_minimal*.py
+canrun/manifest_minimal.json
+canrun/plugin_minimal_system*.py
