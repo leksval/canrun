@@ -14,8 +14,8 @@ async def test_diablo4_detailed():
     try:
         print("=== Testing Diablo 4 compatibility workflow with detailed debugging ===")
         
-        # Initialize engine
-        engine = CanRunEngine()
+        # Initialize engine with LLM disabled for testing
+        engine = CanRunEngine(enable_llm=False)
         print("✅ CanRunEngine initialized")
         
         # Test hardware detection first

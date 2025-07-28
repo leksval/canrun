@@ -124,7 +124,8 @@ class TestLLMAnalysis(unittest.TestCase):
     
     def setUp(self):
         """Set up test fixtures."""
-        self.analyzer = GAssistLLMAnalyzer()
+        # Initialize LLM analyzer with fallback enabled for testing
+        self.analyzer = GAssistLLMAnalyzer(fallback_enabled=True)
         self.plugin = CanRunGAssistPlugin()
         
         # Mock hardware specs for testing
@@ -588,7 +589,7 @@ class TestPrivacyAwareLLMIntegration(unittest.TestCase):
     
     def setUp(self):
         """Set up test fixtures."""
-        self.engine = CanRunEngine()
+        self.engine = CanRunEngine(enable_llm=False)
         self.plugin = CanRunGAssistPlugin()
     
     def test_privacy_aware_hardware_integration(self):

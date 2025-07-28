@@ -20,20 +20,20 @@
     },
     "diablo 3": {
       "minimum": {
-        "processor": "1.2Ghz+",
-        "graphics": "256MB",
-        "memory": "1 GB",
-        "storage": "256 GB",
-        "directx": "Version 11",
+        "processor": "2.0 Ghz",
+        "graphics": "Intel HD 4000",
+        "memory": "2 GB",
+        "storage": "3000 GB",
+        "directx": "Version 9.0",
         "os": "Windows 10"
       },
       "recommended": {
-        "processor": "2.0Ghz+",
-        "graphics": "512MB",
-        "memory": "2 GB",
-        "storage": "256 GB",
-        "directx": "Version 11",
-        "os": "Windows 10"
+        "processor": "2.0 Ghz Dual Core CPU",
+        "graphics": "Any GPU with 256mb Memory",
+        "memory": "4 GB",
+        "storage": "3000 GB",
+        "directx": "Version 9.0",
+        "os": "Windows 11"
       }
     },
     "diablo 2": {
@@ -55,6 +55,114 @@
       }
     },
     "diablo 4": {
+      "minimum": {
+        "processor": "Intel\u00ae Core\u2122 i5-2500K or AMD\u2122 FX-8350",
+        "graphics": "NVIDIA\u00ae GeForce\u00ae GTX 660 or Intel\u00ae Arc\u2122 A380 or AMD Radeon\u2122 R9 280",
+        "memory": "8 GB",
+        "storage": "90 GB",
+        "directx": "Version 12 Network: Broadband Internet connection",
+        "os": "64-bit Windows\u00ae 10 version 1909 or newer"
+      },
+      "recommended": {
+        "processor": "Intel\u00ae Core\u2122 i5-4670K or AMD Ryzen\u2122 1300X",
+        "graphics": "NVIDIA\u00ae GeForce\u00ae GTX 970 or Intel\u00ae Arc\u2122 A750 or AMD Radeon\u2122 RX 470",
+        "memory": "16 GB",
+        "storage": "90 GB",
+        "directx": "Version 12 Network: Broadband Internet connection",
+        "os": "64-bit Windows\u00ae 10 version 1909 or newer"
+      }
+    },
+    "Can I run Cyberpunk 2077": {
+      "minimum": {
+        "processor": "1 GHz processor or faster",
+        "graphics": "Unknown",
+        "memory": "1 GB",
+        "storage": "500 GB",
+        "directx": "DirectX 11",
+        "os": "Windows 10"
+      },
+      "recommended": {
+        "processor": "2 GHz processor or faster",
+        "graphics": "Unknown",
+        "memory": "1 GB",
+        "storage": "10 GB",
+        "directx": "DirectX 12",
+        "os": "Windows 11"
+      }
+    },
+    "Cyberpunk 2077": {
+      "minimum": {
+        "processor": "Core i7-6700 or Ryzen 5 1600",
+        "graphics": "GeForce GTX 1060 6GB or Radeon RX 580 8GB or Arc A380",
+        "memory": "12 GB",
+        "storage": "70 GB",
+        "directx": "Version 12",
+        "os": "64-bit Windows 10"
+      },
+      "recommended": {
+        "processor": "Core i7-12700 or Ryzen 7 7800X3D",
+        "graphics": "GeForce RTX 2060 SUPER or Radeon RX 5700 XT or Arc A770",
+        "memory": "16 GB",
+        "storage": "70 GB",
+        "directx": "Version 12",
+        "os": "64-bit Windows 10"
+      }
+    },
+    "Diablo 4": {
+      "minimum": {
+        "processor": "Intel\u00ae Core\u2122 i5-2500K or AMD\u2122 FX-8350",
+        "graphics": "NVIDIA\u00ae GeForce\u00ae GTX 660 or Intel\u00ae Arc\u2122 A380 or AMD Radeon\u2122 R9 280",
+        "memory": "8 GB",
+        "storage": "90 GB",
+        "directx": "Version 12 Network: Broadband Internet connection",
+        "os": "64-bit Windows\u00ae 10 version 1909 or newer"
+      },
+      "recommended": {
+        "processor": "Intel\u00ae Core\u2122 i5-4670K or AMD Ryzen\u2122 1300X",
+        "graphics": "NVIDIA\u00ae GeForce\u00ae GTX 970 or Intel\u00ae Arc\u2122 A750 or AMD Radeon\u2122 RX 470",
+        "memory": "16 GB",
+        "storage": "90 GB",
+        "directx": "Version 12 Network: Broadband Internet connection",
+        "os": "64-bit Windows\u00ae 10 version 1909 or newer"
+      }
+    },
+    "Hogwarts Legacy": {
+      "minimum": {
+        "processor": "Intel Core i5-6600 (3.3Ghz) or AMD Ryzen 5 1400 (3.2Ghz)",
+        "graphics": "NVIDIA GeForce GTX 960 4GB or AMD Radeon RX 470 4GB",
+        "memory": "16 GB",
+        "storage": "85 GB",
+        "directx": "Version 12",
+        "os": "64-bit Windows 10"
+      },
+      "recommended": {
+        "processor": "Intel Core i7-8700 (3.2Ghz) or AMD Ryzen 5 3600 (3.6 Ghz)",
+        "graphics": "NVIDIA GeForce 1080 Ti or AMD Radeon RX 5700 XT or INTEL Arc A770",
+        "memory": "16 GB",
+        "storage": "85 GB",
+        "directx": "Version 12",
+        "os": "64-bit Windows 10"
+      }
+    },
+    "Call of Duty: Modern Warfare II": {
+      "minimum": {
+        "processor": "Intel Pentium 4 3.2 GHz or AMD Athlon 64 3200+ processor or better supported",
+        "graphics": "256 MB NVIDIA GeForce 6600GT or better or ATI Radeon 1600XT or better",
+        "memory": "1 GB",
+        "storage": "0 GB",
+        "directx": "DirectX 11",
+        "os": "Windows 10"
+      },
+      "recommended": {
+        "processor": "Unknown",
+        "graphics": "Unknown",
+        "memory": "0 GB",
+        "storage": "0 GB",
+        "directx": "DirectX 12",
+        "os": "Windows 11"
+      }
+    },
+    "Diablo IV": {
       "minimum": {
         "processor": "Intel\u00ae Core\u2122 i5-2500K or AMD\u2122 FX-8350",
         "graphics": "NVIDIA\u00ae GeForce\u00ae GTX 660 or Intel\u00ae Arc\u2122 A380 or AMD Radeon\u2122 R9 280",

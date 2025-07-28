@@ -23,8 +23,8 @@ async def test_canrun_integration():
     print("CanRun Integration Test")
     print("=" * 50)
     
-    # Initialize CanRun engine
-    engine = CanRunEngine()
+    # Initialize CanRun engine with LLM disabled for testing
+    engine = CanRunEngine(enable_llm=False)
     
     try:
         print("\n[TEST 1] CanRun engine ready for testing...")

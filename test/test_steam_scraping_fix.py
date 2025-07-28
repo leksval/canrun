@@ -176,8 +176,8 @@ class TestSteamScrapingFix(unittest.TestCase):
             mock_hardware.ram_total_gb = 32
             mock_detector.return_value.get_hardware_specs = AsyncMock(return_value=mock_hardware)
             
-            # Create engine with LLM enabled
-            engine = CanRunEngine(enable_llm=True)
+            # Create engine with LLM disabled for testing
+            engine = CanRunEngine(enable_llm=False)
             
             # Verify LLM analyzer is passed to requirements fetcher
             self.assertIsNotNone(engine.requirements_fetcher.llm_analyzer)

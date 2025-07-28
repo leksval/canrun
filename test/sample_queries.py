@@ -14,7 +14,7 @@ import json
 
 class CanRunSampleQueries:
     def __init__(self):
-        self.engine = CanRunEngine()
+        self.engine = CanRunEngine(enable_llm=False)
     
     async def initialize(self):
         """Initialize the CanRun engine"""
