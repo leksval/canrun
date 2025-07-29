@@ -290,18 +290,6 @@ copy "dist\g-assist-plugin-canrun.exe" "C:\ProgramData\NVIDIA Corporation\nvtopp
 
 ---
 
-## 📋 Technical Summary
-
-**CanRun has been successfully transformed from F-tier (49/100) to A-tier (92/100) performance and now implements the official NVIDIA G-Assist communication protocol and MCP server functionality. The plugin is ready for G-Assist integration testing.**
-
-### Key Achievements:
-- ✅ **Enhanced Game Display**: Clear identification of both search query and matched game
-- ✅ **Accurate Hardware Analysis**: VRAM estimation and RAM tolerance for better compatibility assessment
-- ✅ **Steam API Integration**: Real-time game requirements with accurate name matching
-- ✅ **Dynamic Performance Prediction**: RTX 3080 = A-tier with comprehensive GPU/CPU models
-- ✅ **Robust Error Handling**: Comprehensive timeout and error management
-- ✅ **Modern UI Standards**: Updated Gradio interface with improved formatting
-- ✅ **MCP Server Implementation**: Official Model Context Protocol support for AI agent integration
 
 **Ready to see if your system can run any game? CanRun delivers A-tier performance analysis with official G-Assist protocol support!**
 
