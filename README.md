@@ -37,7 +37,7 @@ tags:
 - **🔒 Privacy-by-Design**: All processing happens locally on your RTX GPU—no data leaves your system
 - **🎯 Steam-First Data**: Prioritizes Steam API for most up-to-date game requirements
 - **🎯 Intelligent Game Matching**: Advanced fuzzy matching handles game name variations
-- **📊 Smart Performance Prediction**: Comprehensive hardware hierarchies with RTX 30/20 series support
+- **📊 Smart Performance Prediction**: Comprehensive hardware hierarchies
 - **💡 Intelligent Recommendations**: AI-generated optimization tips, DLSS strategies, upgrade suggestions
 - **🏃 Zero Setup**: Drop-in plugin with automatic RTX/GTX validation
 - **🤖 MCP Server**: Official Model Context Protocol (MCP) server for G-Assist integration
