@@ -1,4 +1,4 @@
-"""
+r"""
 CanRun Engine - Main orchestration module for Universal Game Compatibility Checker
 Privacy-focused game compatibility analysis for NVIDIA RTX/GTX systems.
 """
@@ -109,32 +109,20 @@ class CanRunEngine:
         start_time = datetime.now()
         self.logger.info(f"Starting compatibility check for: {game_name}")
 
-        # Step 1: Centralized Game Name Correction
-        all_known_games = self.requirements_fetcher.get_all_cached_game_names()
-        if not all_known_games:
-            self.logger.warning("No games in local cache. Matching will rely on external sources.")
-
-        match_result = await self.fuzzy_matcher.find_best_match(game_name, all_known_games)
-
-        if not match_result:
-            # If no match is found, we proceed with the original game name and let the fetcher handle it.
-            self.logger.warning(f"No confident match for '{game_name}'. Proceeding with original name.")
-            corrected_game_name = game_name
-        else:
-            corrected_game_name, match_confidence = match_result
-            self.logger.info(f"Query '{game_name}' matched to '{corrected_game_name}' with confidence {match_confidence:.2f}")
-
-        # Step 2: Check Cache with Corrected Name
+        # Step 1: Skip local cache matching - go directly to Steam API
+        self.logger.info(f"Bypassing local cache matching, using Steam API directly for: {game_name}")
+        
+        # Step 2: Check Cache with Original Name (only for exact matches)
         if use_cache:
-            normalized_name = self.fuzzy_matcher.normalize_game_name(corrected_game_name)
+            normalized_name = self.fuzzy_matcher.normalize_game_name(game_name)
             cache_file = os.path.join(self.cache_dir, f"{normalized_name}.json")
             cached_result = self._load_cache_file(cache_file)
             if cached_result:
-                self.logger.info(f"Returning cached result for '{corrected_game_name}'")
+                self.logger.info(f"Returning cached result for '{game_name}'")
                 return cached_result
 
-        # Step 3: Fetch Requirements with Corrected Name
-        game_requirements = await self._fetch_game_requirements(corrected_game_name)
+        # Step 3: Fetch Requirements Directly from Steam API
+        game_requirements = await self._fetch_game_requirements(game_name)
         if game_requirements is None:
             raise ValueError(f"Game requirements not found for '{corrected_game_name}'.")
 
@@ -184,7 +172,7 @@ class CanRunEngine:
         
         # Create result
         result = CanRunResult(
-            game_name=corrected_game_name,
+            game_name=game_name,  # Use original game name, not corrected
             timestamp=datetime.now().isoformat(),
             hardware_specs=hardware_specs,
             game_requirements=game_requirements,
@@ -197,7 +185,7 @@ class CanRunEngine:
         
         # Cache result
         if use_cache:
-            self._save_cached_result(corrected_game_name, result)
+            self._save_cached_result(game_name, result)  # Use original game name
         
         self.logger.info(f"Analysis completed for {game_name} in {analysis_time}ms")
         return result

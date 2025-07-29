@@ -23,23 +23,18 @@ class OptimizedGameFuzzyMatcher:
         self.logger = logging.getLogger(__name__)
         self.llm_analyzer = GAssistLLMAnalyzer()
         
-        # Direct game name mapping with numbers preserved
-        self.game_map = {
-            # Diablo games with numbers preserved
+        # Simple query preferences - let Steam API provide actual game names
+        self.query_preferences = {
             'diablo': 'diablo',
-            'diablo i': 'diablo',
-            'diablo 2': 'diablo ii',
-            'diablo 3': 'diablo iii',
-            'diablo 4': 'diablo iv',
-            
-            'grand theft auto': 'grand theft auto',
-            'gta': 'grand theft auto',
-            'gta 3': 'grand theft auto 3',
-            'gta iii': 'grand theft auto 3',
-            'gta 4': 'grand theft auto 4',
-            'gta iv': 'grand theft auto 4',
-            'gta 5': 'grand theft auto 5',
-            'gta v': 'grand theft auto 5',           
+            'gta': 'grand theft auto 5',  # Most recent GTA
+            'call of duty': 'call of duty modern warfare',
+        }
+        
+        # Disambiguation messages for ambiguous queries - let Steam API determine best match
+        self.disambiguation_messages = {
+            'diablo': "Multiple Diablo games found. Using Steam's most relevant result. Try 'diablo 2', 'diablo 4', or 'diablo iv' for specific versions.",
+            'gta': "Multiple GTA games found. Using Steam's most relevant result. Try 'gta 3', 'gta 4', or 'gta 5' for specific versions.",
+            'call of duty': "Multiple Call of Duty games found. Try being more specific like 'call of duty modern warfare'.",
         }
 
         # Expanded game-specific mappings for common abbreviations
@@ -259,10 +254,36 @@ class OptimizedGameFuzzyMatcher:
         tokens = self.preprocess_title(game_name)
         return ' '.join(tokens)
 
-    async def find_best_match(self, query: str, candidates: List[str],
-                       steam_priority: bool = True) -> Optional[Tuple[str, float]]:
+    def should_show_disambiguation(self, query: str, candidates: List[str]) -> bool:
         """
-        Find the best match with Steam API prioritization and simplified mapping.
+        Determine if a query should show disambiguation message.
+        
+        Args:
+            query: The game query
+            candidates: Available game candidates from Steam search
+            
+        Returns:
+            True if disambiguation message should be shown
+        """
+        query_lower = query.lower().strip()
+        
+        # Check if this is a known ambiguous query
+        if query_lower in self.disambiguation_messages:
+            # Count how many candidates contain the base query
+            matching_candidates = []
+            for candidate in candidates:
+                if query_lower in candidate.lower():
+                    matching_candidates.append(candidate)
+            
+            # Show disambiguation if multiple matches found
+            return len(matching_candidates) > 1
+        
+        return False
+
+    async def find_best_match(self, query: str, candidates: List[str],
+                       steam_priority: bool = True) -> Optional[Tuple[str, float, str]]:
+        """
+        Find the best match with Steam API prioritization and disambiguation support.
         
         Args:
             query: Game name to search for
@@ -270,34 +291,75 @@ class OptimizedGameFuzzyMatcher:
             steam_priority: Whether to prioritize results that look like Steam data
             
         Returns:
-            Tuple of (best_match, confidence_score) or None
+            Tuple of (best_match, confidence_score, message) or None
+            message can contain disambiguation info or be empty
         """
         if not candidates:
             return None
             
-        # First, try direct mapping using the game_map
-        query_lower = query.lower()
-        if query_lower in self.game_map:
-            mapped_name = self.game_map[query_lower]
-            self.logger.info(f"Direct game map match: '{query}' -> '{mapped_name}'")
+        # For ambiguous queries, find the most similar match to what user typed
+        query_lower = query.lower().strip()
+        if query_lower in self.disambiguation_messages:
+            # Find all relevant candidates
+            relevant_candidates = []
+            for candidate in candidates:
+                candidate_lower = candidate.lower()
+                if query_lower in candidate_lower:
+                    relevant_candidates.append(candidate)
             
-            # Find this mapped name in the candidates (case-insensitive)
-            # First, try exact match
-            for candidate in candidates:
-                if candidate.lower() == mapped_name.lower():
-                    # For 'diablo 3', return 'Diablo III' from candidates with proper capitalization
-                    return candidate, 1.0
+            if len(relevant_candidates) > 1:
+                # For "diablo" specifically, prefer the most recent/popular version
+                # Steam API returns results in order of relevance/popularity
+                if query_lower == "diablo":
+                    # Take the first Steam result which is most relevant
+                    best_match = relevant_candidates[0]
+                    self.logger.info(f"Diablo disambiguation: Steam returned {len(relevant_candidates)} results, selecting first: {best_match}")
                     
-            # Then try contains - needed for games like "Diablo III" which might be "Diablo III: Reaper of Souls" in candidates
-            for candidate in candidates:
-                if mapped_name.lower() in candidate.lower().split():
-                    self.logger.info(f"Partial match for mapped name: '{mapped_name}' found in '{candidate}'")
-                    return candidate, 0.95
+                    options_text = ", ".join(relevant_candidates[:3])
+                    if len(relevant_candidates) > 3:
+                        options_text += f" and {len(relevant_candidates) - 3} more"
+                    
+                    disambiguation_msg = f"Multiple Diablo games found: {options_text}. Selected most relevant: {best_match}."
+                    return best_match, 1.0, disambiguation_msg
+                
+                # For other games, find the most similar match to the user's query
+                best_match = None
+                best_similarity = 0.0
+                
+                for candidate in relevant_candidates:
+                    candidate_lower = candidate.lower()
+                    # Calculate similarity - prefer shorter, more exact matches
+                    if candidate_lower == query_lower:
+                        # Exact match (e.g., "diablo" matches "diablo")
+                        similarity = 1.0
+                    elif candidate_lower.startswith(query_lower + " "):
+                        # Direct prefix match (e.g., "diablo" matches "diablo 2")
+                        # Shorter titles get higher scores
+                        word_count = len(candidate_lower.split())
+                        similarity = 0.9 / word_count  # Prefer shorter titles
+                    else:
+                        # Contains match but not prefix
+                        similarity = 0.5
+                    
+                    if similarity > best_similarity:
+                        best_similarity = similarity
+                        best_match = candidate
+                
+                if best_match:
+                    options_text = ", ".join(relevant_candidates[:3])
+                    if len(relevant_candidates) > 3:
+                        options_text += f" and {len(relevant_candidates) - 3} more"
+                    
+                    disambiguation_msg = f"Multiple {query.title()} games found: {options_text}. Selected most similar: {best_match}."
+                    return best_match, best_similarity, disambiguation_msg
+        
+        # Simple direct matching - let Steam API results speak for themselves
+        query_lower = query.lower()
                     
         # Look for exact match in candidates
         for candidate in candidates:
             if candidate.lower() == query_lower:
-                return candidate, 1.0
+                return candidate, 1.0, ""
                 
         # For games with numbers, preserve the exact numbered version from the query
         query_words = query_lower.split()
@@ -310,7 +372,7 @@ class OptimizedGameFuzzyMatcher:
                 candidate_lower = candidate.lower()
                 # Check if candidate contains all words from the query
                 if all(word in candidate_lower for word in query_words):
-                    return candidate, 1.0
+                    return candidate, 1.0, ""
                 
             # Do NOT strip numbers for partial matching - numbered games are distinct entries
             # Instead, try to find candidates that have at least the base name
@@ -335,11 +397,11 @@ class OptimizedGameFuzzyMatcher:
             matches.sort(key=lambda x: x[1], reverse=True)
             best_match, best_score = matches[0]
             if best_score > 0.6:
-                return best_match, best_score
+                return best_match, best_score, ""
                 
         # If all else fails, return the first candidate
         if candidates:
-            return candidates[0], 0.5
+            return candidates[0], 0.5, ""
             
         return None
 
@@ -352,28 +414,28 @@ class OptimizedGameFuzzyMatcher:
             ':' not in title  # Steam tends to use cleaner formatting
         )
 
-    async def match_with_steam_fallback(self, query: str, steam_candidates: List[str], 
-                                      cache_candidates: List[str]) -> Optional[Tuple[str, float, str]]:
+    async def match_with_steam_fallback(self, query: str, steam_candidates: List[str],
+                                      cache_candidates: List[str]) -> Optional[Tuple[str, float, str, str]]:
         """
-        Match with Steam API prioritization and local cache fallback.
+        Match with Steam as default source and local cache as fallback only.
         
         Returns:
-            Tuple of (matched_name, confidence_score, source) or None
+            Tuple of (matched_name, confidence_score, source, message) or None
         """
-        # First try Steam API candidates
+        # Steam is the default - try Steam search results first
         if steam_candidates:
             steam_match = await self.find_best_match(query, steam_candidates, steam_priority=True)
             if steam_match and steam_match[1] >= self.threshold:
-                return steam_match[0], steam_match[1], "Steam API"
+                return steam_match[0], steam_match[1], "Steam", steam_match[2]
 
-        # Fallback to local cache
+        # Only fallback to local cache if Steam completely fails
         if cache_candidates:
             cache_match = await self.find_best_match(query, cache_candidates, steam_priority=False)
             if cache_match and cache_match[1] >= self.threshold:
-                return cache_match[0], cache_match[1], "Local Cache"
+                return cache_match[0], cache_match[1], "Cache", cache_match[2]
 
         # Log failed match for debugging
-        self.logger.warning(f"No fuzzy match found for '{query}' in {len(steam_candidates)} Steam + {len(cache_candidates)} cache candidates")
+        self.logger.warning(f"No match found for '{query}' - Steam returned {len(steam_candidates)} candidates, cache has {len(cache_candidates)} candidates")
         return None
 
 
