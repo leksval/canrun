@@ -249,23 +249,6 @@ canrun/
 - G-Assist direct integration capability
 ```
 
-## 📊 Performance Tier Benchmarks
-
-### GPU Tier Classifications
-- **S-Tier (95-100)**: RTX 5090, RTX 4080, RTX 3090 Ti
-- **A-Tier (85-94)**: RTX 3080, RTX 3070 Ti, RX 6800 XT
-- **B-Tier (75-84)**: RTX 3070, RTX 2080 Ti, RX 6700 XT
-- **C-Tier (65-74)**: RTX 3060 Ti, RTX 2070, GTX 1080 Ti
-- **D-Tier (55-64)**: RTX 3060, GTX 1660 Ti, RX 5600 XT
-- **F-Tier (0-54)**: GTX 1050, GTX 960, older hardware
-
-### CPU Tier Classifications
-- **S-Tier (95-100)**: Ryzen 9 5950X, Intel i9-12900K, Ryzen 7 5800X3D
-- **A-Tier (85-94)**: Intel i7-12700K, Ryzen 7 5800X, Intel i9-11900K
-- **B-Tier (75-84)**: Ryzen 5 5600X, Intel i5-12600K, Ryzen 7 3700X
-- **C-Tier (65-74)**: Intel i5-11600K, Ryzen 5 3600, Intel i7-10700K
-- **D-Tier (55-64)**: Intel i5-10400, Ryzen 5 2600, Intel i7-9700K
-- **F-Tier (0-54)**: Intel i3 processors, older quad-cores
 
 ## 🛠️ Development and Contributing
 
