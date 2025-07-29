@@ -9,9 +9,12 @@ import re
 import requests
 import platform
 import psutil
+import json
+import os
 from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass
 from enum import Enum
+from pathlib import Path
 
 try:
     import GPUtil
@@ -60,7 +63,8 @@ class HardwareDetector:
             'cpu': self._detect_cpu(),
             'gpu': self._detect_gpu(),
             'ram': self._detect_ram(),
-            'os': self._detect_os()
+            'os': self._detect_os(),
+            'display': self._detect_display()
         }
         return self.system_info
     
@@ -140,6 +144,65 @@ class HardwareDetector:
             'version': platform.version(),
             'architecture': platform.machine()
         }
+    
+    def _detect_display(self) -> Dict:
+        """Detect display resolution information"""
+        display_info = {
+            'primary_resolution': {'width': 1920, 'height': 1080},  # Default fallback
+            'all_displays': []
+        }
+        
+        try:
+            if platform.system() == 'Windows':
+                # Windows-specific resolution detection
+                try:
+                    import tkinter as tk
+                    root = tk.Tk()
+                    width = root.winfo_screenwidth()
+                    height = root.winfo_screenheight()
+                    root.destroy()
+                    
+                    display_info['primary_resolution'] = {'width': width, 'height': height}
+                    display_info['all_displays'].append({'width': width, 'height': height, 'primary': True})
+                    
+                    self.logger.debug(f"Detected primary resolution: {width}x{height}")
+                except Exception as e:
+                    self.logger.debug(f"Tkinter resolution detection failed: {e}")
+                
+                # Try WMI for more detailed display info
+                if wmi and not display_info['all_displays']:
+                    try:
+                        c = wmi.WMI()
+                        for monitor in c.Win32_VideoController():
+                            if monitor.CurrentHorizontalResolution and monitor.CurrentVerticalResolution:
+                                width = monitor.CurrentHorizontalResolution
+                                height = monitor.CurrentVerticalResolution
+                                display_info['primary_resolution'] = {'width': width, 'height': height}
+                                display_info['all_displays'].append({'width': width, 'height': height, 'primary': True})
+                                self.logger.debug(f"WMI detected resolution: {width}x{height}")
+                                break
+                    except Exception as e:
+                        self.logger.debug(f"WMI display detection failed: {e}")
+            
+            # Cross-platform fallback using pygame if available
+            if not display_info['all_displays']:
+                try:
+                    import pygame
+                    pygame.init()
+                    info = pygame.display.Info()
+                    width, height = info.current_w, info.current_h
+                    pygame.quit()
+                    
+                    display_info['primary_resolution'] = {'width': width, 'height': height}
+                    display_info['all_displays'].append({'width': width, 'height': height, 'primary': True})
+                    self.logger.debug(f"Pygame detected resolution: {width}x{height}")
+                except Exception as e:
+                    self.logger.debug(f"Pygame display detection failed: {e}")
+                    
+        except Exception as e:
+            self.logger.debug(f"Display detection failed: {e}")
+        
+        return display_info
 
 
 class PerformanceCalculator:
@@ -147,151 +210,117 @@ class PerformanceCalculator:
     
     def __init__(self):
         self.logger = logging.getLogger(__name__)
-        # CPU benchmark scores (approximate PassMark scores)
-        self.cpu_benchmarks = self._load_cpu_benchmarks()
-        # GPU benchmark scores (approximate PassMark G3D scores) - NVIDIA only
-        self.gpu_benchmarks = self._load_gpu_benchmarks()
+        # CPU data from JSON config file
+        self.cpu_benchmark_data = self._load_cpu_benchmark_data()
+        # CPU benchmark scores converted from JSON data
+        self.cpu_benchmarks = self._convert_cpu_data_to_benchmarks()
+        # GPU data from JSON config file
+        self.gpu_hierarchy = self._load_gpu_hierarchy()
+        # GPU benchmark scores converted from hierarchy data
+        self.gpu_benchmarks = self._convert_gpu_hierarchy_to_benchmarks()
         
-    def _load_cpu_benchmarks(self) -> Dict[str, int]:
-        """Load CPU benchmark data dynamically using pattern matching"""
+    def _load_cpu_benchmark_data(self) -> Dict:
+        """Load CPU benchmark data from JSON config file"""
+        try:
+            # Get the directory where this file is located
+            current_dir = Path(__file__).parent
+            # Go up one level to canrun directory, then into data
+            cpu_benchmarks_path = current_dir.parent / "data" / "cpu_benchmarks.json"
+            
+            if cpu_benchmarks_path.exists():
+                with open(cpu_benchmarks_path, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            else:
+                self.logger.warning(f"CPU benchmarks file not found at {cpu_benchmarks_path}")
+                return {}
+        except Exception as e:
+            self.logger.error(f"Failed to load CPU benchmarks: {e}")
+            return {}
+    
+    def _convert_cpu_data_to_benchmarks(self) -> Dict[str, int]:
+        """Convert CPU benchmark data from JSON to pattern-based benchmarks"""
+        benchmarks = {}
+        
+        if not self.cpu_benchmark_data or 'cpu_patterns' not in self.cpu_benchmark_data:
+            self.logger.warning("No CPU pattern data found in JSON, using fallback")
+            return self._get_fallback_cpu_benchmarks()
+        
+        cpu_patterns = self.cpu_benchmark_data['cpu_patterns']
+        
+        # Flatten all pattern groups into a single dictionary
+        for group_name, patterns in cpu_patterns.items():
+            for pattern, score in patterns.items():
+                benchmarks[pattern] = score
+        
+        self.logger.info(f"Loaded {len(benchmarks)} CPU benchmark patterns from JSON data")
+        return benchmarks
+    
+    def _get_fallback_cpu_benchmarks(self) -> Dict[str, int]:
+        """Emergency fallback if JSON completely fails to load"""
+        self.logger.error("Using emergency CPU fallback - JSON config failed to load")
         return {
-            # Intel 13th Gen
-            r'i9-1[3-4]\d{3}[A-Z]*': 35000,
-            r'i7-1[3-4]\d{3}[A-Z]*': 25000,
-            r'i5-1[3-4]\d{3}[A-Z]*': 15000,
-            r'i3-1[3-4]\d{3}[A-Z]*': 8000,
-            
-            # Intel 12th Gen
-            r'i9-12\d{3}[A-Z]*': 32000,
-            r'i7-12\d{3}[A-Z]*': 22000,
-            r'i5-12\d{3}[A-Z]*': 13000,
-            r'i3-12\d{3}[A-Z]*': 7000,
-            
-            # AMD Ryzen 7000
-            r'Ryzen 9 7\d{3}[A-Z]*': 35000,
-            r'Ryzen 7 7800X3D': 38000,  # Special case for 3D V-Cache
-            r'Ryzen 7 7\d{3}[A-Z]*': 25000,
-            r'Ryzen 5 7\d{3}[A-Z]*': 15000,
-            r'Ryzen 3 7\d{3}[A-Z]*': 8000,
-            
-            # AMD Ryzen 5000
-            r'Ryzen 9 5\d{3}[A-Z]*': 30000,
-            r'Ryzen 7 5800X3D': 32000,  # Special case for 3D V-Cache
-            r'Ryzen 7 5\d{3}[A-Z]*': 22000,
-            r'Ryzen 5 5\d{3}[A-Z]*': 13000,
-            r'Ryzen 3 5\d{3}[A-Z]*': 7000,
-            
-            # Apple Silicon
-            r'Apple M[1-4]': 20000,
-            r'Apple M[1-4] Pro': 30000,
-            r'Apple M[1-4] Max': 40000,
+            r'i9|Ryzen 9': 30000,
+            r'i7|Ryzen 7': 20000,
+            r'i5|Ryzen 5': 12000,
+            r'i3|Ryzen 3': 6000,
         }
     
-    def _load_gpu_benchmarks(self) -> Dict[str, int]:
-        """Load NVIDIA GPU benchmark data with RTX 5000 series and laptop variants"""
-        return {
-            # NVIDIA RTX 50 Series (Future-proofing)
-            r'RTX 5090': 55000,
-            r'RTX 5080': 48000,
-            r'RTX 507[0-9]': 40000,
-            r'RTX 506[0-9]': 32000,
+    def _load_gpu_hierarchy(self) -> Dict:
+        """Load GPU hierarchy data from JSON config file"""
+        try:
+            # Get the directory where this file is located
+            current_dir = Path(__file__).parent
+            # Go up one level to canrun directory, then into data
+            gpu_hierarchy_path = current_dir.parent / "data" / "gpu_hierarchy.json"
             
-            # NVIDIA RTX 40 Series Desktop
-            r'RTX 4090': 45000,
-            r'RTX 4080 Super': 40000,
-            r'RTX 4080': 38000,
-            r'RTX 4070 Ti Super': 35000,
-            r'RTX 4070 Ti': 32000,
-            r'RTX 4070 Super': 30000,
-            r'RTX 4070': 28000,
-            r'RTX 4060 Ti': 22000,
-            r'RTX 4060': 18000,
+            if gpu_hierarchy_path.exists():
+                with open(gpu_hierarchy_path, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            else:
+                self.logger.warning(f"GPU hierarchy file not found at {gpu_hierarchy_path}")
+                return {}
+        except Exception as e:
+            self.logger.error(f"Failed to load GPU hierarchy: {e}")
+            return {}
+    
+    def _convert_gpu_hierarchy_to_benchmarks(self) -> Dict[str, int]:
+        """Convert GPU hierarchy data to benchmark patterns for compatibility"""
+        benchmarks = {}
+        
+        if not self.gpu_hierarchy or 'nvidia' not in self.gpu_hierarchy:
+            self.logger.warning("No NVIDIA GPU data found in hierarchy, using fallback")
+            return self._get_fallback_gpu_benchmarks()
+        
+        nvidia_gpus = self.gpu_hierarchy['nvidia']
+        
+        for gpu_name, gpu_data in nvidia_gpus.items():
+            # Convert score (0-1000 range) to benchmark score (multiply by appropriate factor)
+            score = gpu_data.get('score', 500)
+            # Convert to approximate PassMark G3D score range (multiply by ~45 for high-end cards)
+            benchmark_score = int(score * 45)
             
-            # NVIDIA RTX 40 Series Laptop
-            r'RTX 4090 Laptop': 38000,
-            r'RTX 4080 Laptop': 32000,
-            r'RTX 4070 Laptop': 24000,
-            r'RTX 4060 Laptop': 16000,
-            r'RTX 4050 Laptop': 12000,
+            # Create regex pattern for the GPU name
+            # Escape special regex characters and make it flexible
+            pattern = gpu_name.replace(' ', r'\s*').replace('(', r'\(').replace(')', r'\)')
+            benchmarks[pattern] = benchmark_score
             
-            # NVIDIA RTX 30 Series Desktop
-            r'RTX 3090 Ti': 39000,
-            r'RTX 3090': 35000,
-            r'RTX 3080 Ti': 32000,
-            r'RTX 3080': 28000,
-            r'RTX 3070 Ti': 25000,
-            r'RTX 3070': 22000,
-            r'RTX 3060 Ti': 18000,
-            r'RTX 3060': 15000,
-            r'RTX 3050': 10000,
-            
-            # NVIDIA RTX 30 Series Laptop
-            r'RTX 3080 Ti Laptop': 26000,
-            r'RTX 3080 Laptop': 22000,
-            r'RTX 3070 Ti Laptop': 20000,
-            r'RTX 3070 Laptop': 18000,
-            r'RTX 3060 Laptop': 13000,
-            r'RTX 3050 Ti Laptop': 9000,
-            r'RTX 3050 Laptop': 8000,
-            
-            # NVIDIA RTX 20 Series Desktop
-            r'RTX 2080 Ti': 20000,
-            r'RTX 2080 Super': 18000,
-            r'RTX 2080': 16000,
-            r'RTX 2070 Super': 15000,
-            r'RTX 2070': 13000,
-            r'RTX 2060 Super': 12000,
-            r'RTX 2060': 10000,
-            
-            # NVIDIA RTX 20 Series Laptop
-            r'RTX 2080 Laptop': 14000,
-            r'RTX 2070 Laptop': 11000,
-            r'RTX 2060 Laptop': 9000,
-            
-            # NVIDIA GTX 16 Series Desktop
-            r'GTX 1660 Ti': 9000,
-            r'GTX 1660 Super': 8500,
-            r'GTX 1660': 8000,
-            r'GTX 1650 Super': 7000,
-            r'GTX 1650': 6000,
-            
-            # NVIDIA GTX 16 Series Laptop
-            r'GTX 1660 Ti Laptop': 7500,
-            r'GTX 1660 Ti Mobile': 7500,
-            r'GTX 1650 Ti Laptop': 5500,
-            r'GTX 1650 Laptop': 5000,
-            
-            # NVIDIA GTX 10 Series Desktop
-            r'GTX 1080 Ti': 12000,
-            r'GTX 1080': 10000,
-            r'GTX 1070 Ti': 9000,
-            r'GTX 1070': 8000,
-            r'GTX 1060 6GB': 6500,
-            r'GTX 1060 3GB': 5500,
-            r'GTX 1060': 6000,
-            r'GTX 1050 Ti': 4000,
-            r'GTX 1050': 3000,
-            
-            # NVIDIA GTX 10 Series Laptop
-            r'GTX 1080 Laptop': 8500,
-            r'GTX 1070 Laptop': 7000,
-            r'GTX 1060 Laptop': 5000,
-            r'GTX 1050 Ti Laptop': 3200,
-            r'GTX 1050 Laptop': 2500,
-            
-            # NVIDIA GTX 9 Series
-            r'GTX 980 Ti': 7000,
-            r'GTX 980': 6000,
-            r'GTX 970': 5000,
-            r'GTX 960': 3500,
-            r'GTX 950': 2500,
-            
-            # Generic patterns for unmatched cards
-            r'GeForce.*RTX': 15000,  # Generic RTX fallback
-            r'GeForce.*GTX': 5000,   # Generic GTX fallback
-            r'NVIDIA.*RTX': 15000,   # Generic NVIDIA RTX
-            r'NVIDIA.*GTX': 5000,    # Generic NVIDIA GTX
-        }
+            # Add common variations
+            if 'RTX' in gpu_name:
+                # Add laptop variants
+                laptop_pattern = pattern.replace('RTX', 'RTX.*(?:Laptop|Mobile)')
+                benchmarks[laptop_pattern] = int(benchmark_score * 0.8)  # Laptop GPUs ~20% slower
+            elif 'GTX' in gpu_name:
+                # Add laptop variants for GTX cards
+                laptop_pattern = pattern.replace('GTX', 'GTX.*(?:Laptop|Mobile)')
+                benchmarks[laptop_pattern] = int(benchmark_score * 0.75)  # Older laptop GPUs ~25% slower
+        
+        self.logger.info(f"Loaded {len(benchmarks)} GPU benchmark patterns from hierarchy data")
+        return benchmarks
+    
+    def _get_fallback_gpu_benchmarks(self) -> Dict[str, int]:
+        """Emergency fallback if JSON completely fails to load"""
+        self.logger.error("Using emergency GPU fallback - JSON config failed to load")
+        return {}
     
     def calculate_cpu_score(self, cpu_info: Dict, requirements: Dict) -> float:
         """Calculate CPU performance score (0-100)"""
@@ -387,21 +416,31 @@ class PerformanceCalculator:
         return score
     
     def _estimate_required_cpu_score(self, cpu_string: str) -> int:
-        """Estimate required CPU score from string"""
-        patterns = {
-            r'i9|Ryzen 9': 30000,
-            r'i7|Ryzen 7': 20000,
-            r'i5|Ryzen 5': 12000,
-            r'i3|Ryzen 3': 6000,
-            r'Core 2 Duo|Dual.?Core': 2000,
-            r'Quad.?Core': 4000,
-        }
+        """Estimate required CPU score from string using JSON config data"""
+        if not self.cpu_benchmark_data or 'cpu_patterns' not in self.cpu_benchmark_data:
+            self.logger.error("CPU benchmark data not available from JSON config")
+            return 8000
         
-        for pattern, score in patterns.items():
-            if re.search(pattern, cpu_string, re.IGNORECASE):
-                return score
+        cpu_patterns = self.cpu_benchmark_data['cpu_patterns']
         
-        return 8000  # Default middle-range requirement
+        # Check generic patterns first
+        if 'generic_patterns' in cpu_patterns:
+            for pattern, score in cpu_patterns['generic_patterns'].items():
+                if re.search(pattern, cpu_string, re.IGNORECASE):
+                    return score
+        
+        # Check all other patterns
+        for group_name, patterns in cpu_patterns.items():
+            if group_name != 'generic_patterns':
+                for pattern, score in patterns.items():
+                    if re.search(pattern, cpu_string, re.IGNORECASE):
+                        return score
+        
+        # Use default from JSON config
+        if 'fallback_estimation' in self.cpu_benchmark_data:
+            return self.cpu_benchmark_data['fallback_estimation'].get('default_middle_range', 8000)
+        
+        return 8000
     
     def _estimate_required_gpu_score(self, gpu_string: str) -> int:
         """Estimate required NVIDIA GPU score from string"""
@@ -475,6 +514,10 @@ class DynamicPerformancePredictor:
                     'total': hardware_specs.get('ram_total_gb', 8),
                     'available': hardware_specs.get('ram_total_gb', 8) * 0.7,
                     'used_percent': 30
+                },
+                'display': {
+                    'primary_resolution': {'width': 1920, 'height': 1080},  # Default fallback
+                    'all_displays': [{'width': 1920, 'height': 1080, 'primary': True}]
                 }
             }
         
@@ -597,7 +640,7 @@ class DynamicPerformancePredictor:
                             exceed_factor = user_gpu_score / rec_gpu_score
                             if exceed_factor >= 1.5:
                                 # Significantly above recommended - S tier
-                                total_score = max(total_score, 90)
+                                total_score = max(total_score, 100)
                                 self.logger.info(f"Hardware well above rec, setting to S tier ({total_score})")
                             elif exceed_factor >= 1.2:
                                 # Moderately above recommended - A tier
@@ -613,7 +656,7 @@ class DynamicPerformancePredictor:
             self.logger.info(f"Final performance tier: {tier.name} with score {total_score}")
         
         # Calculate expected FPS with game-specific adjustments
-        expected_fps = self._calculate_expected_fps(tier, scores['gpu'], scores['cpu'], game_requirements)
+        expected_fps = self._calculate_expected_fps(tier, scores['gpu'], scores['cpu'], game_requirements, hardware)
         
         # Determine settings and resolution
         recommended_settings, recommended_resolution = self._determine_recommendations(tier, total_score)
@@ -647,9 +690,10 @@ class DynamicPerformancePredictor:
                 return tier
         return PerformanceTier.F
     
-    def _calculate_expected_fps(self, tier: PerformanceTier, gpu_score: float, cpu_score: float, game_requirements: Dict = None) -> int:
+    def _calculate_expected_fps(self, tier: PerformanceTier, gpu_score: float, cpu_score: float, game_requirements: Dict = None, hardware: Dict = None) -> int:
         """
-        Calculate expected FPS based on tier, component scores, and game-specific requirements
+        Calculate expected FPS using the research-based formula:
+        Predicted FPS = Base_FPS × (User_GPU_Score / Recommended_GPU_Score) × CPU_Modifier × Resolution_Factor
         
         Args:
             tier: Performance tier classification
@@ -658,19 +702,107 @@ class DynamicPerformancePredictor:
             game_requirements: Optional game requirements from Steam API
             
         Returns:
-            Expected FPS value
+            Expected FPS value calculated using the research formula
         """
-        # Base FPS by tier - starting point
+        # Base FPS by tier - research-based starting points
         base_fps = {
-            PerformanceTier.S: 90,
-            PerformanceTier.A: 75,
-            PerformanceTier.B: 60,
-            PerformanceTier.C: 40,
-            PerformanceTier.D: 30,
-            PerformanceTier.F: 20
+            PerformanceTier.S: 90,   # Ultra settings, 4K@60fps+
+            PerformanceTier.A: 75,   # High settings, 1440p@60fps
+            PerformanceTier.B: 60,   # High settings, 1080p@60fps
+            PerformanceTier.C: 40,   # Medium settings, 1080p@30fps
+            PerformanceTier.D: 30,   # Low settings, 720p@30fps
+            PerformanceTier.F: 20    # Below minimum
         }
         
-        fps = base_fps.get(tier, 30)
+        base_fps_value = base_fps.get(tier, 30)
+        
+        # Research formula implementation: Predicted FPS = Base_FPS × (User_GPU_Score / Recommended_GPU_Score) × CPU_Modifier × Resolution_Factor
+        gpu_ratio = 1.0
+        cpu_modifier = 1.0
+        resolution_factor = 1.0
+        
+        # Calculate GPU performance ratio if game requirements available
+        if game_requirements:
+            rec_gpu = game_requirements.get('recommended_gpu', '')
+            if rec_gpu:
+                rec_gpu_score = self._estimate_gpu_benchmark(rec_gpu)
+                if rec_gpu_score > 0:
+                    # Get user's actual GPU benchmark score
+                    user_gpu_benchmark = self._get_user_gpu_benchmark_score(game_requirements)
+                    if user_gpu_benchmark > 0:
+                        gpu_ratio = user_gpu_benchmark / rec_gpu_score
+                        self.logger.debug(f"GPU ratio: {user_gpu_benchmark} / {rec_gpu_score} = {gpu_ratio}")
+        
+        # Calculate CPU modifier (typically 0.8-1.0 as per research)
+        if cpu_score >= 85:
+            cpu_modifier = 1.0      # No CPU bottleneck
+        elif cpu_score >= 70:
+            cpu_modifier = 0.95     # Slight CPU limitation
+        elif cpu_score >= 60:
+            cpu_modifier = 0.9      # Moderate CPU limitation
+        elif cpu_score >= 50:
+            cpu_modifier = 0.85     # Significant CPU limitation
+        else:
+            cpu_modifier = 0.8      # Severe CPU bottleneck
+        
+        # Calculate resolution factor based on actual current resolution
+        resolution_factor = 1.0
+        if hardware and 'display' in hardware:
+            current_res = hardware['display']['primary_resolution']
+            width = current_res.get('width', 1920)
+            height = current_res.get('height', 1080)
+            
+            # Calculate total pixels
+            current_pixels = width * height
+            
+            # Reference resolutions and their performance impact
+            resolution_benchmarks = {
+                3840 * 2160: 0.6,   # 4K - most demanding
+                2560 * 1440: 0.8,   # 1440p - moderate demand
+                1920 * 1080: 1.0,   # 1080p - baseline
+                1280 * 720: 1.4,    # 720p - performance boost
+            }
+            
+            # Find the closest resolution benchmark
+            closest_pixels = min(resolution_benchmarks.keys(), key=lambda x: abs(x - current_pixels))
+            resolution_factor = resolution_benchmarks[closest_pixels]
+            
+            # Interpolate for resolutions between benchmarks
+            if current_pixels != closest_pixels:
+                sorted_resolutions = sorted(resolution_benchmarks.keys())
+                for i in range(len(sorted_resolutions) - 1):
+                    lower_res = sorted_resolutions[i]
+                    upper_res = sorted_resolutions[i + 1]
+                    
+                    if lower_res <= current_pixels <= upper_res:
+                        # Linear interpolation
+                        lower_factor = resolution_benchmarks[lower_res]
+                        upper_factor = resolution_benchmarks[upper_res]
+                        
+                        position = (current_pixels - lower_res) / (upper_res - lower_res)
+                        resolution_factor = lower_factor + (upper_factor - lower_factor) * position
+                        break
+            
+            self.logger.info(f"Current resolution: {width}x{height} ({current_pixels:,} pixels), factor: {resolution_factor:.2f}")
+        else:
+            # Fallback: use tier-based resolution factor
+            if tier == PerformanceTier.S:
+                resolution_factor = 0.6     # Assume 4K for S tier
+            elif tier == PerformanceTier.A:
+                resolution_factor = 0.8     # Assume 1440p for A tier
+            elif tier in [PerformanceTier.B, PerformanceTier.C]:
+                resolution_factor = 1.0     # Assume 1080p for B/C tier
+            else:
+                resolution_factor = 1.4     # Assume 720p for D/F tier
+            
+            self.logger.info(f"Using tier-based resolution factor: {resolution_factor:.2f}")
+        
+        # Apply the research formula
+        predicted_fps = int(base_fps_value * gpu_ratio * cpu_modifier * resolution_factor)
+        
+        self.logger.info(f"FPS Formula: {base_fps_value} × {gpu_ratio:.2f} × {cpu_modifier:.2f} × {resolution_factor:.2f} = {predicted_fps}")
+        
+        fps = predicted_fps
         
         # Game-specific adjustments if available
         if game_requirements:
@@ -825,39 +957,100 @@ class DynamicPerformancePredictor:
         return bottlenecks
     
     def _generate_upgrade_suggestions(self, hardware: Dict, scores: Dict, tier: PerformanceTier) -> List[str]:
-        """Generate hardware upgrade suggestions for NVIDIA systems"""
+        """Generate tier-aware hardware upgrade suggestions for NVIDIA systems"""
         suggestions = []
         
-        # GPU upgrades
-        if scores['gpu'] < 70:
-            if tier == PerformanceTier.F or tier == PerformanceTier.D:
-                suggestions.append("GPU upgrade essential - Consider RTX 3060 or RTX 4060")
-            elif tier == PerformanceTier.C:
-                suggestions.append("GPU upgrade recommended - Consider RTX 3070 or RTX 4070")
+        # S Tier (90-100): Exceptional performance - focus on optimization, not upgrades
+        if tier == PerformanceTier.S:
+            gpu_name = hardware['gpu']['cards'][0]['name'] if hardware['gpu']['cards'] else ''
+            if 'rtx' in gpu_name.lower():
+                suggestions.append("Enable DLSS Quality mode for even higher framerates")
+                if any(series in gpu_name.lower() for series in ['rtx 20', 'rtx 30', 'rtx 40']):
+                    suggestions.append("Enable RTX ray tracing for enhanced visual quality")
+            suggestions.append("Consider overclocking GPU for maximum performance")
+            suggestions.append("Ensure adequate cooling for sustained peak performance")
+            return suggestions
         
-        # CPU upgrades
-        if scores['cpu'] < 65:
-            suggestions.append("CPU upgrade recommended for better performance")
+        # A Tier (80-89): Excellent performance - minor optimizations
+        elif tier == PerformanceTier.A:
+            gpu_name = hardware['gpu']['cards'][0]['name'] if hardware['gpu']['cards'] else ''
+            if 'rtx' in gpu_name.lower():
+                suggestions.append("Enable DLSS for better performance with RTX cards")
+            if scores['cpu'] < 80:
+                suggestions.append("CPU upgrade could unlock additional performance")
+            ram_gb = hardware['ram']['total']
+            if ram_gb < 32-1: #(publishers adjust ram to pow(2) values)
+                suggestions.append("Consider 32GB RAM for content creation and multitasking")
+            return suggestions
         
-        # RAM upgrades
-        ram_gb = hardware['ram']['total']
-        if ram_gb < 16:
-            suggestions.append("Upgrade to 16GB+ RAM for optimal performance")
-        elif ram_gb < 32 and tier == PerformanceTier.S:
-            suggestions.append("Consider 32GB RAM for maximum performance")
+        # B Tier (70-79): Good performance - targeted improvements
+        elif tier == PerformanceTier.B:
+            # Focus on the lowest scoring component first
+            min_component = min(scores, key=scores.get)
+            min_score = scores[min_component]
+            
+            if min_component == 'gpu' and scores['gpu'] < 75:
+                suggestions.append("GPU upgrade recommended - Consider RTX 4060 Ti or RTX 4070")
+            elif min_component == 'cpu' and scores['cpu'] < 75:
+                suggestions.append("CPU upgrade recommended for better performance")
+            elif min_component == 'ram':
+                ram_gb = hardware['ram']['total']
+                if ram_gb < 16-1:
+                    suggestions.append("Upgrade to 16GB+ RAM for optimal performance")
+            
+            gpu_name = hardware['gpu']['cards'][0]['name'] if hardware['gpu']['cards'] else ''
+            if 'rtx' in gpu_name.lower():
+                suggestions.append("Enable DLSS for better performance")
+            return suggestions
         
-        # DLSS/RTX suggestions
-        gpu_name = hardware['gpu']['cards'][0]['name'] if hardware['gpu']['cards'] else ''
-        if 'rtx' in gpu_name.lower():
-            suggestions.append("Enable DLSS for better performance with RTX cards")
-            if any(series in gpu_name.lower() for series in ['rtx 20', 'rtx 30', 'rtx 40']):
-                suggestions.append("Consider enabling RTX ray tracing for enhanced visuals")
+        # C Tier (60-69): Adequate performance - clear upgrade path needed
+        elif tier == PerformanceTier.C:
+            # Prioritize GPU upgrade for C tier
+            if scores['gpu'] < 70:
+                suggestions.append("GPU upgrade recommended - Consider RTX 4060 or RTX 4070")
+            
+            # Address other bottlenecks
+            if scores['cpu'] < 65:
+                suggestions.append("CPU upgrade needed for better performance")
+            
+            ram_gb = hardware['ram']['total']
+            if ram_gb < 16-1:
+                suggestions.append("Upgrade to 16GB RAM for modern gaming")
+            
+            return suggestions
         
-        return suggestions
+        # D Tier (50-59): Minimum performance - essential upgrades needed
+        elif tier == PerformanceTier.D:
+            suggestions.append("GPU upgrade essential - Consider RTX 3060 or RTX 4060")
+            
+            if scores['cpu'] < 60:
+                suggestions.append("CPU upgrade essential for acceptable performance")
+            
+            ram_gb = hardware['ram']['total']
+            if ram_gb < 16-1:
+                suggestions.append("Upgrade to 16GB RAM essential for modern games")
+            
+            suggestions.append("Consider lowering graphics settings to improve performance")
+            return suggestions
+        
+        # F Tier (0-49): Below minimum - major system upgrade required
+        else:  # PerformanceTier.F
+            suggestions.append("Major system upgrade required - Current hardware below minimum")
+            suggestions.append("GPU upgrade critical - Consider RTX 3060 or newer")
+            
+            if scores['cpu'] < 50:
+                suggestions.append("CPU upgrade critical for any modern gaming")
+            
+            ram_gb = hardware['ram']['total']
+            if ram_gb < 8-1:
+                suggestions.append("RAM upgrade to at least 16GB essential")
+            
+            suggestions.append("Consider building a new gaming system")
+            return suggestions
         
     def _estimate_gpu_benchmark(self, gpu_name: str) -> int:
         """
-        Estimate GPU benchmark score from name string using pattern matching.
+        Estimate GPU benchmark score from name string using JSON hierarchy data.
         
         Args:
             gpu_name: Name of the GPU from requirements
@@ -868,48 +1061,112 @@ class DynamicPerformancePredictor:
         if not gpu_name or not isinstance(gpu_name, str):
             return 0
         
-        gpu_name = gpu_name.lower()
+        gpu_name_clean = gpu_name.strip()
         
-        # First try exact pattern matching using the calculator's benchmarks
+        # First try exact pattern matching using the calculator's benchmarks (from JSON)
         for pattern, benchmark in self.calculator.gpu_benchmarks.items():
-            if re.search(pattern, gpu_name, re.IGNORECASE):
-                self.logger.debug(f"GPU requirement '{gpu_name}' matched pattern '{pattern}' with score {benchmark}")
+            if re.search(pattern, gpu_name_clean, re.IGNORECASE):
+                self.logger.debug(f"GPU requirement '{gpu_name_clean}' matched pattern '{pattern}' with score {benchmark}")
                 return benchmark
         
-        # If no exact match, use simplified estimation based on series detection
-        if 'rtx' in gpu_name:
-            if '4090' in gpu_name or '4080' in gpu_name:
+        # Try direct lookup in GPU hierarchy data
+        if self.calculator.gpu_hierarchy and 'nvidia' in self.calculator.gpu_hierarchy:
+            nvidia_gpus = self.calculator.gpu_hierarchy['nvidia']
+            
+            # Try exact match first
+            for gpu_key, gpu_data in nvidia_gpus.items():
+                if gpu_key.lower() == gpu_name_clean.lower():
+                    score = gpu_data.get('score', 500)
+                    benchmark_score = int(score * 45)  # Convert to PassMark range
+                    self.logger.debug(f"GPU requirement '{gpu_name_clean}' found exact match '{gpu_key}' with score {benchmark_score}")
+                    return benchmark_score
+            
+            # Try partial match
+            for gpu_key, gpu_data in nvidia_gpus.items():
+                if gpu_key.lower() in gpu_name_clean.lower() or gpu_name_clean.lower() in gpu_key.lower():
+                    score = gpu_data.get('score', 500)
+                    benchmark_score = int(score * 45)  # Convert to PassMark range
+                    self.logger.debug(f"GPU requirement '{gpu_name_clean}' found partial match '{gpu_key}' with score {benchmark_score}")
+                    return benchmark_score
+        
+        # Fallback to simplified estimation if no JSON match
+        gpu_lower = gpu_name_clean.lower()
+        if 'rtx' in gpu_lower:
+            if any(model in gpu_lower for model in ['4090', '4080']):
                 return 40000  # High-end RTX 40 series
-            elif '40' in gpu_name:
+            elif '40' in gpu_lower:
                 return 30000  # Mid-range RTX 40 series
-            elif '3090' in gpu_name or '3080' in gpu_name:
+            elif any(model in gpu_lower for model in ['3090', '3080']):
                 return 35000  # High-end RTX 30 series
-            elif '30' in gpu_name:
+            elif '30' in gpu_lower:
                 return 25000  # Mid-range RTX 30 series
-            elif '20' in gpu_name:
+            elif '20' in gpu_lower:
                 return 18000  # RTX 20 series
             else:
                 return 20000  # Generic RTX
-        elif 'gtx' in gpu_name:
-            if '16' in gpu_name:
+        elif 'gtx' in gpu_lower:
+            if '16' in gpu_lower:
                 return 8000   # GTX 16 series
-            elif '1080' in gpu_name or '1070' in gpu_name:
+            elif any(model in gpu_lower for model in ['1080', '1070']):
                 return 10000  # High-end GTX 10 series
-            elif '10' in gpu_name:
+            elif '10' in gpu_lower:
                 return 6000   # Mid-range GTX 10 series
             else:
                 return 5000   # Generic GTX
-        elif 'nvidia' in gpu_name:
+        elif 'nvidia' in gpu_lower:
             return 10000      # Generic NVIDIA
-        elif 'amd' in gpu_name or 'radeon' in gpu_name:
-            if 'rx 7' in gpu_name:
+        elif any(brand in gpu_lower for brand in ['amd', 'radeon']):
+            if 'rx 7' in gpu_lower:
                 return 30000  # High-end AMD RX 7000
-            elif 'rx 6' in gpu_name:
+            elif 'rx 6' in gpu_lower:
                 return 20000  # AMD RX 6000
-            elif 'rx' in gpu_name:
+            elif 'rx' in gpu_lower:
                 return 10000  # Generic AMD RX
             else:
                 return 8000   # Generic AMD
         
         # Fallback for unknown GPU
+        self.logger.debug(f"No match found for GPU '{gpu_name_clean}', using fallback score")
         return 5000
+    
+    def _get_user_gpu_benchmark_score(self, game_requirements: Dict) -> int:
+        """
+        Get the user's actual GPU benchmark score for the research formula.
+        
+        Args:
+            game_requirements: Game requirements dict that may contain user hardware info
+            
+        Returns:
+            User's GPU benchmark score (0 if can't determine)
+        """
+        # Try to get GPU model from various sources
+        gpu_model = ""
+        
+        # Check if user GPU model is provided in game requirements
+        if 'user_gpu_model' in game_requirements:
+            gpu_model = game_requirements.get('user_gpu_model', '')
+        elif hasattr(self, 'hardware') and self.hardware.get('gpu', {}).get('cards'):
+            # Get from hardware data if available
+            gpu_model = self.hardware['gpu']['cards'][0]['name']
+        else:
+            # Fallback: try to get from current hardware detection
+            try:
+                hardware = self.hardware_detector.detect_all()
+                if hardware.get('gpu', {}).get('cards'):
+                    gpu_model = hardware['gpu']['cards'][0]['name']
+            except Exception as e:
+                self.logger.debug(f"Failed to detect GPU for benchmark score: {e}")
+                return 0
+        
+        if not gpu_model:
+            self.logger.debug("No GPU model available for benchmark score calculation")
+            return 0
+        
+        # Find matching benchmark using pattern matching
+        for pattern, benchmark in self.calculator.gpu_benchmarks.items():
+            if re.search(pattern, gpu_model, re.IGNORECASE):
+                self.logger.debug(f"User GPU '{gpu_model}' matched pattern '{pattern}' with score {benchmark}")
+                return benchmark
+        
+        # Fallback estimation if no exact match
+        return self._estimate_gpu_benchmark(gpu_model)

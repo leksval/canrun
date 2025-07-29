@@ -1,0 +1,68 @@
+{
+  "comment": "CPU benchmark scores (approximate PassMark scores) for performance calculations",
+  "cpu_patterns": {
+    "intel_13th_gen": {
+      "i9-1[3-4]\\d{3}[A-Z]*": 35000,
+      "i7-1[3-4]\\d{3}[A-Z]*": 25000,
+      "i5-1[3-4]\\d{3}[A-Z]*": 15000,
+      "i3-1[3-4]\\d{3}[A-Z]*": 8000
+    },
+    "intel_12th_gen": {
+      "i9-12\\d{3}[A-Z]*": 32000,
+      "i7-12\\d{3}[A-Z]*": 22000,
+      "i5-12\\d{3}[A-Z]*": 13000,
+      "i3-12\\d{3}[A-Z]*": 7000
+    },
+    "intel_11th_gen": {
+      "i9-11\\d{3}[A-Z]*": 28000,
+      "i7-11\\d{3}[A-Z]*": 20000,
+      "i5-11\\d{3}[A-Z]*": 12000,
+      "i3-11\\d{3}[A-Z]*": 6500
+    },
+    "intel_10th_gen": {
+      "i9-10\\d{3}[A-Z]*": 25000,
+      "i7-10\\d{3}[A-Z]*": 18000,
+      "i5-10\\d{3}[A-Z]*": 11000,
+      "i3-10\\d{3}[A-Z]*": 6000
+    },
+    "amd_ryzen_7000": {
+      "Ryzen 9 7\\d{3}[A-Z]*": 35000,
+      "Ryzen 7 7800X3D": 38000,
+      "Ryzen 7 7\\d{3}[A-Z]*": 25000,
+      "Ryzen 5 7\\d{3}[A-Z]*": 15000,
+      "Ryzen 3 7\\d{3}[A-Z]*": 8000
+    },
+    "amd_ryzen_5000": {
+      "Ryzen 9 5\\d{3}[A-Z]*": 30000,
+      "Ryzen 7 5800X3D": 32000,
+      "Ryzen 7 5\\d{3}[A-Z]*": 22000,
+      "Ryzen 5 5\\d{3}[A-Z]*": 13000,
+      "Ryzen 3 5\\d{3}[A-Z]*": 7000
+    },
+    "amd_ryzen_3000": {
+      "Ryzen 9 3\\d{3}[A-Z]*": 25000,
+      "Ryzen 7 3\\d{3}[A-Z]*": 18000,
+      "Ryzen 5 3\\d{3}[A-Z]*": 11000,
+      "Ryzen 3 3\\d{3}[A-Z]*": 6000
+    },
+    "apple_silicon": {
+      "Apple M[1-4]": 20000,
+      "Apple M[1-4] Pro": 30000,
+      "Apple M[1-4] Max": 40000,
+      "Apple M[1-4] Ultra": 50000
+    },
+    "generic_patterns": {
+      "i9|Ryzen 9": 30000,
+      "i7|Ryzen 7": 20000,
+      "i5|Ryzen 5": 12000,
+      "i3|Ryzen 3": 6000,
+      "Core 2 Duo|Dual.?Core": 2000,
+      "Quad.?Core": 4000
+    }
+  },
+  "fallback_estimation": {
+    "cores_frequency_multiplier": 2.5,
+    "default_middle_range": 8000
+  },
+  "last_updated": "2025-01-12"
+}

@@ -238,14 +238,14 @@ class CanRunPlugin:
             }
     
     def format_canrun_response(self, result):
-        """Format CanRun result for G-Assist display - same as working root plugin."""
+        """Format CanRun result for G-Assist display with minimal spacing and proper indentation."""
         try:
             # Extract performance tier and score
             tier = result.performance_prediction.tier.name if hasattr(result.performance_prediction, 'tier') else 'Unknown'
             score = int(result.performance_prediction.score) if hasattr(result.performance_prediction, 'score') else 0
             
             # Get compatibility status
-            can_run = "✅ CAN RUN" if result.can_run_game() else "❌ CANNOT RUN"
+            can_run_icon = "✅ CAN RUN" if result.can_run_game() else "❌ CANNOT RUN"
             exceeds_recommended = result.exceeds_recommended_requirements()
             
             # Format comprehensive response
@@ -255,76 +255,56 @@ class CanRunPlugin:
             # Get actual Steam API game name if available
             steam_api_name = result.game_requirements.steam_api_name if hasattr(result.game_requirements, 'steam_api_name') and result.game_requirements.steam_api_name else matched_name
             
-            # Determine if game name was matched differently from user query
-            steam_api_info = ""
-            if original_query.lower() != steam_api_name.lower():
-                steam_api_info = f"(Steam found: {steam_api_name})"
-            
-            title_line = ""
+            # Build response following NVIDIA G-Assist format with icons
             if result.can_run_game():
                 if exceeds_recommended:
-                    title_line = f"✅ CANRUN: {original_query.upper()} will run EXCELLENTLY {steam_api_info}!"
+                    title = f"✅ CANRUN: {original_query.upper()} will run EXCELLENTLY!"
                 else:
-                    title_line = f"✅ CANRUN: {original_query.upper()} will run {steam_api_info}!"
+                    title = f"✅ CANRUN: {original_query.upper()} will run!"
             else:
-                title_line = f"❌ CANNOT RUN {original_query.upper()} {steam_api_info}!"
+                title = f"❌ CANNOT RUN {original_query.upper()}!"
 
-            response = f"""{title_line}
-
-🎮 YOUR SEARCH: {original_query}
-🎮 STEAM MATCHED GAME: {steam_api_name}
-
-🏆 PERFORMANCE TIER: {tier} ({score}/100)
-
-💻 SYSTEM SPECIFICATIONS:
-• CPU: {result.hardware_specs.cpu_model}
-• GPU: {result.hardware_specs.gpu_model} ({result.hardware_specs.gpu_vram_gb}GB VRAM)
-• RAM: {result.hardware_specs.ram_total_gb}GB
-• RTX Features: {'✅ Supported' if result.hardware_specs.supports_rtx else '❌ Not Available'}
-• DLSS Support: {'✅ Available' if result.hardware_specs.supports_dlss else '❌ Not Available'}
-
-🎯 GAME REQUIREMENTS:
-• Minimum GPU: {result.game_requirements.minimum_gpu}
-• Recommended GPU: {result.game_requirements.recommended_gpu}
-• RAM Required: {result.game_requirements.minimum_ram_gb}GB (Min) / {result.game_requirements.recommended_ram_gb}GB (Rec)
-• VRAM Required: {result.game_requirements.minimum_vram_gb}GB (Min) / {result.game_requirements.recommended_vram_gb}GB (Rec)
-
-⚡ PERFORMANCE PREDICTION:
-• Expected FPS: {getattr(result.performance_prediction, 'expected_fps', 'Unknown')}
-• Recommended Settings: {getattr(result.performance_prediction, 'recommended_settings', 'Unknown')}
-• Optimal Resolution: {getattr(result.performance_prediction, 'recommended_resolution', 'Unknown')}
-• Performance Level: {'Exceeds Recommended' if exceeds_recommended else 'Meets Minimum' if result.can_run_game() else 'Below Minimum'}
-
-🔧 OPTIMIZATION SUGGESTIONS:"""
-
-            # Add optimization suggestions
-            if hasattr(result.performance_prediction, 'upgrade_suggestions'):
-                suggestions = result.performance_prediction.upgrade_suggestions[:3]
-                for suggestion in suggestions:
-                    response += f"\n• {suggestion}"
+            # Build message with minimal spacing and proper indentation (4 spaces instead of tabs)
+            lines = [
+                title,
+                f"🎮 YOUR SEARCH: {original_query}",
+                f"🎮 STEAM MATCHED GAME: {steam_api_name}",
+                f"🏆 PERFORMANCE TIER: {tier} ({score}/100)",
+                "💻 SYSTEM SPECIFICATIONS:",
+                f"    • CPU: {result.hardware_specs.cpu_model}",
+                f"    • GPU: {result.hardware_specs.gpu_model} ({result.hardware_specs.gpu_vram_gb}GB VRAM)",
+                f"    • RAM: {result.hardware_specs.ram_total_gb}GB",
+                "🎯 GAME REQUIREMENTS:",
+                f"    • Minimum GPU: {result.game_requirements.minimum_gpu}",
+                f"    • Recommended GPU: {result.game_requirements.recommended_gpu}",
+                f"    • RAM Required: {result.game_requirements.minimum_ram_gb}GB (Min) / {result.game_requirements.recommended_ram_gb}GB (Rec)",
+                "⚡ PERFORMANCE PREDICTION:",
+                f"    • Expected FPS: {getattr(result.performance_prediction, 'expected_fps', 'Unknown')}",
+                f"    • Recommended Settings: {getattr(result.performance_prediction, 'recommended_settings', 'Unknown')}",
+                f"    • Optimal Resolution: {getattr(result.performance_prediction, 'recommended_resolution', 'Unknown')}",
+                "🔧 OPTIMIZATION SUGGESTIONS:"
+            ]
+            
+            # Add optimization suggestions with 4-space indentation
+            if hasattr(result.performance_prediction, 'upgrade_suggestions') and result.performance_prediction.upgrade_suggestions:
+                for suggestion in result.performance_prediction.upgrade_suggestions[:3]:
+                    lines.append(f"    • {suggestion}")
             else:
-                response += "\n• Update GPU drivers for optimal performance"
+                lines.append(f"    • Update GPU drivers for optimal performance")
                 if result.hardware_specs.supports_dlss:
-                    response += "\n• Enable DLSS for significant performance boost"
+                    lines.append(f"    • Enable DLSS for significant performance boost")
                 if result.hardware_specs.supports_rtx:
-                    response += "\n• Consider RTX features for enhanced visuals"
-
-            # Add compatibility analysis
-            if hasattr(result, 'compatibility_analysis') and result.compatibility_analysis:
-                if hasattr(result.compatibility_analysis, 'bottlenecks') and result.compatibility_analysis.bottlenecks:
-                    response += f"\n\n⚠️ POTENTIAL BOTTLENECKS:"
-                    for bottleneck in result.compatibility_analysis.bottlenecks[:2]:
-                        response += f"\n• {bottleneck.value}"
-
+                    lines.append(f"    • Consider RTX features for enhanced visuals")
+            
             # Add final verdict
-            response += f"\n\n🎯 CANRUN VERDICT: {can_run}"
+            lines.append(f"🎯 CANRUN VERDICT: {can_run_icon}")
             
-            # Make it clear if the Steam API returned something different than what was requested
+            # Add note if Steam found different game
             if steam_api_name.lower() != original_query.lower():
-                response += f"\n\n🎮 NOTE: Steam found '{steam_api_name}' instead of '{original_query}'"
-                response += f"\n    Results shown are for '{steam_api_name}'"
+                lines.append(f"🎮 NOTE: Steam found '{steam_api_name}' instead of '{original_query}'")
             
-            return response
+            # Join with simple newlines
+            return "\n".join(lines)
             
         except Exception as e:
             logging.error(f"Error formatting CanRun response: {e}")
