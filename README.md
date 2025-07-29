@@ -46,10 +46,10 @@ tags:
 - **📊 Accurate Memory Reporting**: Shows available RAM/VRAM for precise calculations
 
 
-https://github.com/user-attachments/assets/5e75a2ab-7ce3-4dcc-af02-6bc33fafd102
+![R3](https://github.com/user-attachments/assets/79a68ba5-a4d9-493c-bea5-d455edadf627)
 
 ---
-## Live Demo, download and test locally for real hardvare evaluation
+## Live Demo, download and test locally for real hardvare evaluation as MCP server
 [LINK](https://huggingface.co/spaces/grasant/canrun)
 ![HF Space Demo](image.png)
 
@@ -98,20 +98,9 @@ uv run python plugin.py --function auto_detect --input "Can I run Elden Ring?"
 
 ## 📦 G-Assist Plugin Installation
 
-### ✅ CRITICAL FIXES IMPLEMENTED (v7.1.0)
-
-Based on analysis of official NVIDIA G-Assist plugins, we've implemented critical fixes:
-
-#### **Fixed Plugin Structure**
-- ✅ **Correct Directory Structure**: Plugin files moved to `canrun/` subdirectory
-- ✅ **Proper Executable Naming**: Renamed to `g-assist-plugin-canrun.exe`
-- ✅ **Official Manifest Format**: Updated to match NVIDIA specification
-- ✅ **Windows Pipe Communication**: Fixed using official protocol
-
 #### **Ready-to-Use Plugin**
 The G-Assist plugin is now available with the correct structure:
 ```
-canrun/
 └── canrun/                          # Plugin directory for G-Assist
     ├── g-assist-plugin-canrun.exe   # Main executable (FIXED)
     ├── manifest.json                # Plugin manifest (FIXED)
@@ -219,38 +208,6 @@ uv run python test/test_enhanced_g_assist_communication.py
 - ✅ **Hardware Detection**: Fixed Windows 11, display resolution, NVIDIA driver detection
 - ✅ **MCP Server**: Verified Model Context Protocol implementation
 
-## 🏗️ G-Assist Integration (Official NVIDIA Protocol)
-
-**Current Integration Status: ✅ TESTING**
-
-### Enhanced Plugin Configuration (v5.1)
-```json
-{
-  "manifestVersion": 1,
-  "name": "CanRun Game Compatibility Checker - Enhanced",
-  "version": "5.1.0",
-  "executable": "python",
-  "args": ["plugin.py"],
-  "persistent": true,
-  "functions": [
-    {
-      "name": "check_compatibility",
-      "description": "Enhanced compatibility check with Steam Compare UI and performance analysis",
-      "tags": ["game", "compatibility", "canrun", "can run", "will work", "diablo", "cyberpunk", "steam"]
-    },
-    {
-      "name": "detect_hardware",
-      "description": "Gaming-focused hardware detection with performance assessment",
-      "tags": ["hardware", "specs", "system", "gpu", "cpu", "performance"]
-    },
-    {
-      "name": "auto_detect",
-      "description": "Automatic tool detection from natural language input",
-      "tags": ["auto", "detect", "natural", "language", "smart"]
-    }
-  ]
-}
-```
 
 ### Testing the Enhanced Integration
 ```bash
@@ -289,14 +246,6 @@ canrun/
 │   └── gpu_hierarchy.json     # Comprehensive GPU/CPU performance hierarchies
 │
 ├── test/                       # Comprehensive test suite
-│   ├── test_official_g_assist_protocol.py # Official protocol verification
-│   ├── test_enhanced_g_assist_communication.py # Enhanced communication tests
-│   ├── test_hardware_detection.py
-│   ├── test_compatibility_analysis.py
-│   ├── test_performance_prediction.py
-│   ├── test_llm_analysis.py   # LLM integration tests
-│   └── test_steam_api_integration.py
-│
 ├── LICENSE                     # Apache 2.0 license
 ├── README.md                  # This file
 └── CHANGELOG.md              # Version history and updates
@@ -345,7 +294,7 @@ canrun/
 ## 📊 Performance Tier Benchmarks
 
 ### GPU Tier Classifications
-- **S-Tier (95-100)**: RTX 4090, RTX 4080, RTX 3090 Ti
+- **S-Tier (95-100)**: RTX 5090, RTX 4080, RTX 3090 Ti
 - **A-Tier (85-94)**: RTX 3080, RTX 3070 Ti, RX 6800 XT
 - **B-Tier (75-84)**: RTX 3070, RTX 2080 Ti, RX 6700 XT
 - **C-Tier (65-74)**: RTX 3060 Ti, RTX 2070, GTX 1080 Ti
