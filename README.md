@@ -65,36 +65,7 @@ uv run python plugin.py --function check_compatibility --game "Diablo 4"
 # Performance Tier: A (Previously: F)
 ```
 
-## 🏁 Quick Start (For Judges)
 
-**1-Minute Setup & Verification:**
-
-```bash
-# 1. Clone and enter directory
-git clone https://github.com/leksval/canrun
-cd canrun
-
-# 2. Install dependencies with uv (recommended)
-uv sync
-
-# 3. Test the official G-Assist protocol
-python test/test_official_g_assist_protocol.py
-# Expected: All tests PASSING with official protocol
-
-# 4. Test enhanced G-Assist plugin
-uv run python plugin.py --function check_compatibility --game "Diablo 4" --show-steam
-# Expected: Enhanced G-Assist response with Steam Compare UI
-
-# 5. Test natural language auto-detection
-uv run python plugin.py --function auto_detect --input "Can I run Elden Ring?"
-# Expected: Automatic routing to compatibility check
-```
-
-**Enhanced G-Assist Voice Commands (v5.1 Ready):**
-- "Can my system run Diablo 4?" → Enhanced compatibility check with Steam Compare UI
-- "Check compatibility for Cyberpunk 2077" → Full compatibility analysis with optimization tips
-- "What are my system specs?" → Gaming-focused hardware detection with performance assessment
-- "Compare Cyberpunk vs Elden Ring" → Multi-game performance comparison
 
 ## 📦 G-Assist Plugin Installation
 
@@ -128,17 +99,32 @@ Try these commands:
 - "can I run Cyberpunk 2077?"
 - "/canrun elden ring"
 
-### **🔧 DEBUGGING RESOLVED**
+  
+## 🏁 Quick Start (cmd verion)
 
-**Previous Issue**: "Encountered a problem communicating with the plugin"
+**1-Minute Setup & Verification:**
 
-**Root Causes Fixed**:
-1. ❌ **Wrong Directory Structure** → ✅ **Proper subdirectory structure**
-2. ❌ **Incorrect Executable Name** → ✅ **Official naming convention**
-3. ❌ **Invalid Manifest Format** → ✅ **NVIDIA-compliant manifest**
-4. ❌ **Broken Pipe Communication** → ✅ **Windows pipe protocol**
+```bash
+# 1. Clone and enter directory
+git clone https://github.com/leksval/canrun
+cd canrun
 
-**Result**: Plugin now follows official NVIDIA G-Assist standards and should integrate properly.
+# 2. Install dependencies with uv (recommended)
+uv sync
+
+# 3. Test the official G-Assist protocol
+python test/test_official_g_assist_protocol.py
+# Expected: All tests PASSING with official protocol
+
+# 4. Test enhanced G-Assist plugin
+uv run python plugin.py --function check_compatibility --game "Diablo 4" --show-steam
+# Expected: Enhanced G-Assist response with Steam Compare UI
+
+# 5. Test natural language auto-detection
+uv run python plugin.py --function auto_detect --input "Can I run Elden Ring?"
+# Expected: Automatic routing to compatibility check
+```
+
 
 ## 🤖 MCP Server Functionality (NEW!)
 
@@ -173,19 +159,6 @@ G-Assist can automatically discover and use the CanRun MCP server when both are 
 - "G-Assist, check if my system meets Diablo 4 requirements"
 - "G-Assist, what's my gaming hardware like?"
 
-## ✨ Key Features
-
-- **🎯 RTX/GTX Optimized**: Exclusively designed for RTX/GTX systems with G-Assist integration
-- **🎮 CANRUN! Indicator**: Instant visual feedback when your system meets game requirements
-- **⭐ S-A-B-C-D-F Tier System**: Advanced performance classification with weighted scoring (GPU 60%, CPU 25%, RAM 15%)
-- **🧠 AI-Powered Analysis**: Leverages G-Assist's embedded 8B Llama model for intelligent insights
-- **🔒 Privacy-by-Design**: All processing happens locally on your RTX GPU—no data leaves your system
-- **🎯 Steam-First Data**: Prioritizes Steam API for most up-to-date game requirements
-- **🎯 Intelligent Game Matching**: Advanced fuzzy matching handles game name variations
-- **📊 Smart Performance Prediction**: Comprehensive hardware hierarchies with RTX 30/20 series support
-- **💡 Intelligent Recommendations**: AI-generated optimization tips, DLSS strategies, upgrade suggestions
-- **🏃 Zero Setup**: Drop-in plugin with automatic RTX/GTX validation
-
 ## 🧪 Running Tests
 
 **Primary Test Command (Recommended):**
@@ -207,21 +180,6 @@ uv run python test/test_enhanced_g_assist_communication.py
 - ✅ **Steam API Integration**: 15/15 tests passing - Real-time requirements fetching
 - ✅ **Hardware Detection**: Fixed Windows 11, display resolution, NVIDIA driver detection
 - ✅ **MCP Server**: Verified Model Context Protocol implementation
-
-
-### Testing the Enhanced Integration
-```bash
-# Test enhanced compatibility check with Steam Compare UI
-uv run python plugin.py --function check_compatibility --game "Diablo 4" --show-steam
-
-# Test natural language auto-detection
-uv run python plugin.py --function auto_detect --input "Can I run Elden Ring on my system?"
-
-# Test gaming-focused hardware detection
-uv run python plugin.py --function detect_hardware
-
-# Expected: Enhanced G-Assist responses with rich formatting and Steam data
-```
 
 ## 📁 Project Structure
 
@@ -346,16 +304,6 @@ copy "dist\g-assist-plugin-canrun.exe" "C:\ProgramData\NVIDIA Corporation\nvtopp
 # Alternative manual build command:
 # pyinstaller --onefile --name g-assist-plugin-canrun --distpath . --add-data "src;src" --add-data "data;data" --add-data "config.json;." plugin.py
 ```
-
-## 📈 Version History
-
-## 🎯 Current Status & Next Steps
-
-### 🔄 Pending (Requires G-Assist Environment)
-- **Live G-Assist Testing**: Requires NVIDIA G-Assist installation for final verification
-- **Function Trigger Validation**: Test "canrun diablo4?" voice commands
-- **Plugin Discovery Verification**: Confirm G-Assist finds and loads the plugin
-- **MCP Integration Testing**: Verify G-Assist can discover and use the MCP server
 
 ---
 
