@@ -404,15 +404,22 @@ class PerformanceCalculator:
         return final_score
     
     def calculate_ram_score(self, ram_info: Dict, requirements: Dict) -> float:
-        """Calculate RAM performance score (0-100)"""
-        available_ram = ram_info.get('total', 0)
+        """Calculate RAM performance score (0-100) using available RAM for accurate calculations"""
+        # Use available RAM instead of total RAM for more accurate performance calculations
+        available_ram = ram_info.get('available', ram_info.get('total', 0))
+        
+        # If available RAM is not provided, estimate it as 70% of total (typical OS usage)
+        if available_ram == ram_info.get('total', 0) and available_ram > 0:
+            available_ram = available_ram * 0.7
+            self.logger.debug(f"Estimated available RAM as 70% of total: {available_ram:.1f}GB")
+        
         required_ram = requirements.get('recommended', {}).get('memory', 8)
         
         if required_ram == 0:
             required_ram = requirements.get('minimum', {}).get('memory', 4)
         
         score = min(100, (available_ram / required_ram) * 100)
-        self.logger.debug(f"RAM score: {available_ram}GB / {required_ram}GB = {score}")
+        self.logger.debug(f"RAM score: {available_ram:.1f}GB available / {required_ram}GB required = {score:.1f}")
         return score
     
     def _estimate_required_cpu_score(self, cpu_string: str) -> int:
@@ -512,7 +519,7 @@ class DynamicPerformancePredictor:
                 },
                 'ram': {
                     'total': hardware_specs.get('ram_total_gb', 8),
-                    'available': hardware_specs.get('ram_total_gb', 8) * 0.7,
+                    'available': hardware_specs.get('ram_available_gb', hardware_specs.get('ram_total_gb', 8) * 0.7),
                     'used_percent': 30
                 },
                 'display': {

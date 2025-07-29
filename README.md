@@ -17,7 +17,7 @@ tags:
 ---
 <table> <tr> <td width="110" valign="middle"> <img width="100" height="100" alt="canrun_logo" src="https://github.com/user-attachments/assets/239082bd-d5ca-427b-b235-5326299f3104" /> </td> <td valign="middle"> <h1 style="display:inline-block; vertical-align:middle; margin:0; padding:0;">  CanRun - System Spec Game Compatibility Checker </h1> </td> </tr> </table>
   
-  [![Version](https://img.shields.io/badge/version-7.0.0-blue.svg)](https://github.com/canrun/canrun)
+  [![Version](https://img.shields.io/badge/version-8.0.0-blue.svg)](https://github.com/canrun/canrun)
   [![Python](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/downloads/)
   [![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
   [![G-Assist](https://img.shields.io/badge/G--Assist-Official%20Protocol%20Verified-brightgreen.svg)](https://www.nvidia.com/en-us/geforce/technologies/g-assist/)
@@ -26,7 +26,7 @@ tags:
 
 ## 🚀 Overview
 
-**CanRun** is an RTX/GTX-exclusive G-Assist plugin that instantly tells you if your PC can run any game with an advanced **S-A-B-C-D-F tier system**.and enhanced Steam integration.
+**CanRun** is an RTX/GTX-exclusive G-Assist plugin that instantly tells you if your PC can run any game with an advanced **S-A-B-C-D-F tier system** and enhanced Steam integration.
 
 ## ✨ Key Features
 
@@ -41,6 +41,9 @@ tags:
 - **💡 Intelligent Recommendations**: AI-generated optimization tips, DLSS strategies, upgrade suggestions
 - **🏃 Zero Setup**: Drop-in plugin with automatic RTX/GTX validation
 - **🤖 MCP Server**: Official Model Context Protocol (MCP) server for G-Assist integration
+- **📱 User-Friendly Display**: Optimized formatting with verdict at bottom for scrollable windows
+- **🔄 JSON-Based Configuration**: All benchmark data externalized for easy maintenance
+- **📊 Accurate Memory Reporting**: Shows available RAM/VRAM for precise calculations
 
 
 https://github.com/user-attachments/assets/5e75a2ab-7ce3-4dcc-af02-6bc33fafd102
@@ -379,11 +382,14 @@ python test/test_official_g_assist_protocol.py
 **Rebuilding the Executable:**
 ```bash
 # Rebuild the G-Assist plugin executable (required after code changes)
-cd d:/projects/canrun_1/canrun
+cd canrun
 uv run python -m PyInstaller g-assist-plugin-canrun.spec
 
 # The executable will be created at:
-# d:/projects/canrun_1/canrun/dist/g-assist-plugin-canrun.exe
+# canrun/dist/g-assist-plugin-canrun.exe
+
+# Deploy to G-Assist:
+copy "dist\g-assist-plugin-canrun.exe" "C:\ProgramData\NVIDIA Corporation\nvtopps\rise\plugins\canrun\g-assist-plugin-canrun.exe"
 
 # This follows the official NVIDIA G-Assist naming convention: g-assist-plugin-<name>.exe
 # This includes all dependencies and data files and can be used by G-Assist
