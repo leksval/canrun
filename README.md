@@ -270,24 +270,37 @@ python test/test_official_g_assist_protocol.py
 ```
 
 **Rebuilding the Executable:**
+
+**Build Method:**
 ```bash
-# Rebuild the G-Assist plugin executable (required after code changes)
+# Navigate to canrun directory
 cd canrun
-uv run python -m PyInstaller g-assist-plugin-canrun.spec
 
-# The executable will be created at:
-# canrun/dist/g-assist-plugin-canrun.exe
+# Add PyInstaller dependency (required for building)
+uv add pyinstaller
 
-# Deploy to G-Assist:
-copy "dist\g-assist-plugin-canrun.exe" "C:\ProgramData\NVIDIA Corporation\nvtopps\rise\plugins\canrun\g-assist-plugin-canrun.exe"
+# Build the G-Assist plugin executable in root directory
+uv run python -m PyInstaller --distpath . g-assist-plugin-canrun.spec
+
+# The executable will be created directly at:
+# canrun/g-assist-plugin-canrun.exe
+```
+
+**Deploy to G-Assist:**
+```bash
+# Create the plugin directory first (if it doesn't exist)
+mkdir "C:\ProgramData\NVIDIA Corporation\nvtopps\rise\plugins\canrun"
+
+# Copy to G-Assist plugins directory
+copy "g-assist-plugin-canrun.exe" "C:\ProgramData\NVIDIA Corporation\nvtopps\rise\plugins\canrun\g-assist-plugin-canrun.exe"
+
+# Alternative G-Assist locations (try if above fails):
+# mkdir "%USERPROFILE%\AppData\Local\NVIDIA Corporation\NVIDIA App\plugins\canrun"
+# copy "g-assist-plugin-canrun.exe" "%USERPROFILE%\AppData\Local\NVIDIA Corporation\NVIDIA App\plugins\canrun\g-assist-plugin-canrun.exe"
 
 # This follows the official NVIDIA G-Assist naming convention: g-assist-plugin-<name>.exe
 # This includes all dependencies and data files and can be used by G-Assist
-
-# Alternative manual build command:
-# pyinstaller --onefile --name g-assist-plugin-canrun --distpath . --add-data "src;src" --add-data "data;data" --add-data "config.json;." plugin.py
 ```
-
 ---
 
 
