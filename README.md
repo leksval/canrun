@@ -75,52 +75,6 @@ Our machine learning model has been trained and validated with real-world benchm
 - **3 resolutions** (1080p, 1440p, 4K)
 - **Proper 80/20 train-test split** with feature scaling
 
-## 🚀 **GPU-Accelerated Training**
-
-For developers wanting to retrain the ML model with CUDA acceleration:
-
-### **CUDA Setup (Recommended for RTX/GTX users)**
-
-```bash
-# Step 1: Install CUDA-enabled PyTorch (for RTX 4090 with CUDA 13.0)
-cd canrun
-uv run pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118
-
-# Step 2: Install XGBoost with GPU support
-uv add xgboost
-
-# Step 3: Optional - Install cuML for maximum GPU acceleration
-# conda install -c rapidsai -c conda-forge cuml
-
-# Step 4: Run GPU-accelerated training
-uv run python src/train_fps_predictor_ml_model.py
-```
-
-### **Expected GPU Benefits:**
-- **XGBoost GPU**: `device='cuda'` with `tree_method='hist'` - **3-5x faster** tree training
-- **cuML**: GPU-accelerated RandomForest - **10-50x faster** on RTX cards
-- **PyTorch CUDA**: Tensor operations on GPU for enhanced feature engineering
-- **Automatic Fallback**: CPU training if CUDA unavailable
-
-### **XGBoost CUDA Configuration (Verified Working):**
-```python
-# Modern XGBoost syntax (recommended)
-XGBRegressor(device='cuda', tree_method='hist', n_estimators=500)
-
-# Console output confirms: "XGBoost is running on: cuda:0"
-```
-
-### **CUDA Compatibility Guide:**
-| CUDA Version | PyTorch Index | Compatible GPUs |
-|--------------|---------------|-----------------|
-| CUDA 11.8 | `cu118` | RTX 40/30/20, GTX 16/10 series |
-| CUDA 12.1 | `cu121` | RTX 50/40 series (latest) |
-| CPU Only | Default | All systems (fallback) |
-
-### **Performance Comparison:**
-- **CPU Training**: ~7 seconds (baseline)
-- **XGBoost GPU**: ~3-4 seconds (our current setup)
-- **Full GPU Stack**: ~1-2 seconds (with cuML + PyTorch CUDA)
 
 ![R3](https://github.com/user-attachments/assets/79a68ba5-a4d9-493c-bea5-d455edadf627)
 
@@ -364,6 +318,52 @@ uv run python -m pytest test/ -v
 # Test official G-Assist protocol
 python test/test_official_g_assist_protocol.py
 ```
+## 🚀 **GPU-Accelerated Training**
+
+For developers wanting to retrain the ML model with CUDA acceleration:
+
+### **CUDA Setup (Recommended for RTX/GTX users)**
+
+```bash
+# Step 1: Install CUDA-enabled PyTorch (for RTX 4090 with CUDA 13.0)
+cd canrun
+uv run pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118
+
+# Step 2: Install XGBoost with GPU support
+uv add xgboost
+
+# Step 3: Optional - Install cuML for maximum GPU acceleration
+# conda install -c rapidsai -c conda-forge cuml
+
+# Step 4: Run GPU-accelerated training
+uv run python src/train_fps_predictor_ml_model.py
+```
+
+### **Expected GPU Benefits:**
+- **XGBoost GPU**: `device='cuda'` with `tree_method='hist'` - **3-5x faster** tree training
+- **cuML**: GPU-accelerated RandomForest - **10-50x faster** on RTX cards
+- **PyTorch CUDA**: Tensor operations on GPU for enhanced feature engineering
+- **Automatic Fallback**: CPU training if CUDA unavailable
+
+### **XGBoost CUDA Configuration (Verified Working):**
+```python
+# Modern XGBoost syntax (recommended)
+XGBRegressor(device='cuda', tree_method='hist', n_estimators=500)
+
+# Console output confirms: "XGBoost is running on: cuda:0"
+```
+
+### **CUDA Compatibility Guide:**
+| CUDA Version | PyTorch Index | Compatible GPUs |
+|--------------|---------------|-----------------|
+| CUDA 11.8 | `cu118` | RTX 40/30/20, GTX 16/10 series |
+| CUDA 12.1 | `cu121` | RTX 50/40 series (latest) |
+| CPU Only | Default | All systems (fallback) |
+
+### **Performance Comparison:**
+- **CPU Training**: ~7 seconds (baseline)
+- **XGBoost GPU**: ~3-4 seconds (our current setup)
+- **Full GPU Stack**: ~1-2 seconds (with cuML + PyTorch CUDA)
 
 **Rebuilding the Executable:**
 
