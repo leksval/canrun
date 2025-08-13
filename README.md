@@ -32,22 +32,18 @@ tags:
 
 - **🎯 RTX/GTX Optimized**: Exclusively designed for RTX/GTX systems with G-Assist integration
 - **🎮 CANRUN! Indicator**: Instant visual feedback when your system meets game requirements
-- **⭐ S-A-B-C-D-F Tier System**: Advanced performance classification with weighted scoring (GPU 60%, CPU 25%, RAM 15%)
+- **⭐ S-A-B-C-D-F Tier System**: Advanced performance classification with weighted scoring
 - **🧠 AI-Powered Analysis**: Leverages G-Assist's embedded 8B Llama model for intelligent insights
 - **🔒 Privacy-by-Design**: All processing happens locally on your RTX GPU—no data leaves your system
 - **🎯 Steam-First Data**: Prioritizes Steam API for most up-to-date game requirements
 - **🎯 Intelligent Game Matching**: Advanced fuzzy matching handles game name variations
 - **📊 Smart Performance Prediction**: Comprehensive hardware hierarchies
-- **💡 Intelligent Recommendations**: AI-generated optimization tips, DLSS strategies, upgrade suggestions
+- **💡 Intelligent Recommendations**: AI-generated optimization tips
 - **🏃 Zero Setup**: Drop-in plugin with automatic RTX/GTX validation
 - **🤖 MCP Server**: Official Model Context Protocol (MCP) server for G-Assist integration
-- **📱 User-Friendly Display**: Optimized formatting with verdict at bottom for scrollable windows
 - **🔄 JSON-Based Configuration**: All benchmark data externalized for easy maintenance
-- **📊 Accurate Memory Reporting**: Shows available RAM/VRAM for precise calculations
 - **🧠 ML-Powered FPS Prediction**: Advanced RandomForest model with **90.8% R² accuracy**
-- **🎯 Comprehensive GPU Coverage**: 44 NVIDIA GPUs from GTX 960 to RTX 5090
 - **📊 Multi-Resolution Support**: Validated 1080p, 1440p, and 4K benchmark data
-- **🔍 Research-Based Training**: Real-world benchmark data verified through Tavily web search
 
 
 ## 🧠 **ML Pipeline: Unified_Stacking_Ensemble_2025**
