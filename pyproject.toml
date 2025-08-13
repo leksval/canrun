@@ -5,10 +5,15 @@ description = "CanRun Game Compatibility Analysis System"
 requires-python = ">=3.10"
 dependencies = [
     "aiohttp>=3.12.15",
+    "catboost>=1.2.8",
+    "joblib>=1.5.1",
+    "lightgbm>=4.6.0",
     "matplotlib>=3.10.5",
     "py-cpuinfo>=9.0.0",
     "pytest",
     "pytest-asyncio>=1.1.0",
+    "scikit-learn>=1.7.1",
+    "scipy>=1.15.3",
     "xgboost>=3.0.4",
 ]
 
@@ -42,6 +47,10 @@ dev-dependencies = [
     # RAPIDS GPU acceleration - install separately if needed
     # "cudf>=24.0.0",  # uv add cudf --index https://pypi.nvidia.com
     # "cuml>=24.0.0",  # uv add cuml --index https://pypi.nvidia.com
+    "xgboost>=3.0.4",
+    "lightgbm>=4.6.0",
+    "catboost>=1.2.8",
+    "scipy>=1.15.3",
 ]
 
 [tool.pytest.ini_options]
