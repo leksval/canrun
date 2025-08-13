@@ -20,7 +20,7 @@ sys.modules['winreg'] = MagicMock()
 sys.modules['wmi'] = MagicMock()
 sys.modules['rtx_llm_analyzer'] = MagicMock()
 
-from src.privacy_aware_hardware_detector import (
+from canrun.src.privacy_aware_hardware_detector import (
     PrivacyAwareHardwareDetector,
     PrivacyAwareHardwareSpecs,
     PrivacyAwareCache

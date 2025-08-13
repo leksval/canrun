@@ -223,6 +223,83 @@ dist/
 !g-assist-plugin-python.exe
 !g-assist-plugin-canrun.exe
 
+# Additional large file protections (GitHub 100MB limit)
+# Machine learning models and training data
+*.h5
+*.hdf5
+*.pkl
+*.joblib
+*.model
+*.weights
+*.ckpt
+*.pb
+*.onnx
+*.safetensors
+
+# Exception: Include required ML models for CanRun functionality
+!canrun/src/ml_fps_model.json
+!canrun/canrun/src/ml_fps_model.json
+!data/ml_fps_model_unified_2025.json
+!data/unified_calibrator_2025.pkl
+!data/unified_scaler_2025.pkl
+!data/unified_stacking_model_2025.pkl
+
+# Large data files
+*.parquet
+*.feather
+*.arrow
+*.avro
+*.orc
+
+# Archive files that could be large
+*.tar.gz
+*.tar.bz2
+*.7z
+*.rar
+*.zip
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+*.mdb
+*.accdb
+
+# Video/Audio files
+*.mp4
+*.avi
+*.mkv
+*.mov
+*.wmv
+*.flv
+*.webm
+*.mp3
+*.wav
+*.flac
+*.aac
+
+# Large image files
+*.tiff
+*.tif
+*.bmp
+*.raw
+*.cr2
+*.nef
+*.arw
+*.dng
+
+# Backup files that could be large
+*.bak
+*.backup
+*.old
+*.orig
+*.save
+
+# Any file over 95MB (near GitHub's 100MB limit)
+# Use: git config filter.lfs.clean 'git-lfs clean -- %f'
+# Use: git config filter.lfs.smudge 'git-lfs smudge -- %f'
+# For files that need LFS tracking
+
 # G-Assist plugin development files
 plugin_diagnostic.py
 BUILD_README.md

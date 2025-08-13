@@ -11,14 +11,14 @@ import sys
 from pathlib import Path
 
 def test_plugin_exe_exists():
-    """Test that g-assist-plugin-canrun.exe exists in the canrun directory."""
-    plugin_path = Path(__file__).parent.parent / "g-assist-plugin-canrun.exe"
-    assert plugin_path.exists(), "g-assist-plugin-canrun.exe not found in canrun directory"
+    """Test that g-assist-plugin-canrun.exe exists in the project root."""
+    plugin_path = Path(__file__).parent.parent.parent / "g-assist-plugin-canrun.exe"
+    assert plugin_path.exists(), "g-assist-plugin-canrun.exe not found in project root"
     print("✅ g-assist-plugin-canrun.exe exists")
 
 def test_plugin_exe_shutdown():
     """Test g-assist-plugin-canrun.exe responds to shutdown command with correct G-Assist protocol."""
-    plugin_path = Path(__file__).parent.parent / "g-assist-plugin-canrun.exe"
+    plugin_path = Path(__file__).parent.parent.parent / "g-assist-plugin-canrun.exe"
     
     # Test input following G-Assist protocol
     test_input = '{"tool_calls": [{"func": "shutdown", "params": {}}]}\n'
@@ -30,7 +30,7 @@ def test_plugin_exe_shutdown():
             capture_output=True,
             text=True,
             timeout=10,
-            cwd=str(plugin_path.parent)  # Run from canrun directory
+            cwd=str(plugin_path.parent)  # Run from project root directory
         )
         
         print(f"Return code: {result.returncode}")
@@ -65,7 +65,7 @@ def test_plugin_exe_shutdown():
 
 def test_plugin_exe_compatibility_check():
     """Test g-assist-plugin-canrun.exe compatibility check functionality."""
-    plugin_path = Path(__file__).parent.parent / "g-assist-plugin-canrun.exe"
+    plugin_path = Path(__file__).parent.parent.parent / "g-assist-plugin-canrun.exe"
     
     # Test compatibility check for a popular game
     test_input = '{"tool_calls": [{"func": "canrun", "params": {"game_name": "Diablo 4"}}]}\n'
@@ -77,7 +77,7 @@ def test_plugin_exe_compatibility_check():
             capture_output=True,
             text=True,
             timeout=15,
-            cwd=str(plugin_path.parent)  # Run from canrun directory
+            cwd=str(plugin_path.parent)  # Run from project root directory
         )
         
         if not result.stdout and not result.stderr:
@@ -109,7 +109,7 @@ def test_plugin_exe_compatibility_check():
 
 def test_plugin_exe_hardware_detection():
     """Test g-assist-plugin-canrun.exe hardware detection functionality."""
-    plugin_path = Path(__file__).parent.parent / "g-assist-plugin-canrun.exe"
+    plugin_path = Path(__file__).parent.parent.parent / "g-assist-plugin-canrun.exe"
     
     # Test hardware detection (using initialize function since detect_hardware doesn't exist)
     test_input = '{"tool_calls": [{"func": "initialize", "params": {}}]}\n'
@@ -121,7 +121,7 @@ def test_plugin_exe_hardware_detection():
             capture_output=True,
             text=True,
             timeout=15,
-            cwd=str(plugin_path.parent)  # Run from canrun directory
+            cwd=str(plugin_path.parent)  # Run from project root directory
         )
         
         if not result.stdout and not result.stderr:
@@ -153,7 +153,7 @@ def test_plugin_exe_hardware_detection():
 
 def test_plugin_exe_invalid_input():
     """Test g-assist-plugin-canrun.exe handles invalid input gracefully."""
-    plugin_path = Path(__file__).parent.parent / "g-assist-plugin-canrun.exe"
+    plugin_path = Path(__file__).parent.parent.parent / "g-assist-plugin-canrun.exe"
     
     # Test with invalid JSON
     test_input = 'invalid json input\n'
@@ -165,7 +165,7 @@ def test_plugin_exe_invalid_input():
             capture_output=True,
             text=True,
             timeout=10,
-            cwd=str(plugin_path.parent)  # Run from canrun directory
+            cwd=str(plugin_path.parent)  # Run from project root directory
         )
         
         if not result.stdout and not result.stderr:

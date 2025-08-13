@@ -72,8 +72,8 @@ try:
         X = np.random.rand(100, 10)
         y = np.random.rand(100)
         
-        # Try GPU training
-        model = xgb.XGBRegressor(tree_method='gpu_hist', gpu_id=0)
+        # Try GPU training with XGBoost 2.0+ API
+        model = xgb.XGBRegressor(device='cuda', tree_method='hist')
         model.fit(X, y)
         print("[OK] XGBoost GPU training successful")
     except Exception as e:

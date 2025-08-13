@@ -6,7 +6,7 @@ import os
 # Add src to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
-from game_requirements_fetcher import GameRequirements
+from canrun.src.game_requirements_fetcher import GameRequirements
 
 def test_game_requirements_dataclass():
     """Test that GameRequirements dataclass works with individual fields."""

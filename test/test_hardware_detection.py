@@ -9,7 +9,7 @@ import os
 import pytest
 sys.path.append('.')
 
-from src.hardware_detector import HardwareDetector
+from canrun.src.hardware_detector import HardwareDetector
 import asyncio
 import json
 

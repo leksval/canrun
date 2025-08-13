@@ -23,10 +23,11 @@ def test_canrun_diablo_direct():
     })
     
     try:
-        # Use absolute path to the executable
+        # Use absolute path to the executable (project root)
         current_dir = os.path.dirname(os.path.abspath(__file__))
-        parent_dir = os.path.dirname(current_dir)
-        exe_path = os.path.join(parent_dir, 'g-assist-plugin-canrun.exe')
+        canrun_dir = os.path.dirname(current_dir)  # canrun directory
+        project_root = os.path.dirname(canrun_dir)  # project root
+        exe_path = os.path.join(project_root, 'g-assist-plugin-canrun.exe')
         
         if not os.path.exists(exe_path):
             print(f"❌ Executable not found at: {exe_path}")
@@ -41,7 +42,7 @@ def test_canrun_diablo_direct():
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            cwd=parent_dir  # Run from parent directory
+            cwd=project_root  # Run from project root directory
         )
         
         # Send the test input with timeout

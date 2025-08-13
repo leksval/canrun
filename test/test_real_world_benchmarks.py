@@ -14,7 +14,7 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.dynamic_performance_predictor import StreamlinedPerformancePredictor
+from canrun.src.dynamic_performance_predictor import StreamlinedPerformancePredictor
 
 class TestRealWorldBenchmarks(unittest.TestCase):
     """Test suite validating against real-world benchmark data"""

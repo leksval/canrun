@@ -9,7 +9,7 @@ from pathlib import Path
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.dynamic_performance_predictor import StreamlinedPerformancePredictor, PerformanceTier
+from canrun.src.dynamic_performance_predictor import StreamlinedPerformancePredictor, PerformanceTier
 
 def test_streamlined_predictor():
     """Test the streamlined performance predictor with various GPU classes"""

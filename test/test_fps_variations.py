@@ -7,7 +7,7 @@ import sys
 import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from ml_model_loader import LightweightMLPredictor
+from canrun.src.ml_model_loader import LightweightMLPredictor
 
 def test_fps_variations():
     """Test that different games produce different FPS predictions"""

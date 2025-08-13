@@ -14,7 +14,7 @@ sys.stdout.reconfigure(encoding='utf-8')
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.dynamic_performance_predictor import (
+from canrun.src.dynamic_performance_predictor import (
     DynamicPerformancePredictor,
     PerformanceCalculator,
     PerformanceTier

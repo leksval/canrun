@@ -12,9 +12,9 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 src_dir = os.path.join(current_dir, '..', 'src')
 sys.path.insert(0, src_dir)
 
-from dynamic_performance_predictor import DynamicPerformancePredictor
-from hardware_detector import HardwareDetector
-from game_requirements_fetcher import GameRequirementsFetcher
+from canrun.src.dynamic_performance_predictor import DynamicPerformancePredictor
+from canrun.src.hardware_detector import HardwareDetector
+from canrun.src.game_requirements_fetcher import GameRequirementsFetcher
 import asyncio
 import json
 

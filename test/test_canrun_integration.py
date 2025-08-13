@@ -12,7 +12,7 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 src_dir = os.path.join(current_dir, '..', 'src')
 sys.path.insert(0, src_dir)
 
-from canrun_engine import CanRunEngine
+from canrun.src.canrun_engine import CanRunEngine
 import asyncio
 import json
 

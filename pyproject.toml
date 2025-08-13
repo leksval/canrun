@@ -1,30 +1,47 @@
 [project]
 name = "canrun"
-version = "0.1.0"
+version = "8.0.0"
 description = "CanRun Game Compatibility Analysis System"
 requires-python = ">=3.10"
 dependencies = [
+    # Core runtime dependencies for exe
     "aiohttp>=3.12.15",
-    "catboost>=1.2.8",
-    "joblib>=1.5.1",
-    "lightgbm>=4.6.0",
-    "matplotlib>=3.10.5",
     "py-cpuinfo>=9.0.0",
-    "pytest",
-    "pytest-asyncio>=1.1.0",
-    "scikit-learn>=1.7.1",
-    "scipy>=1.15.3",
-    "xgboost>=3.0.4",
+    "requests>=2.31.0",
+    "beautifulsoup4>=4.12.0",
+    "asyncio-throttle>=1.0.0",
+    "gradio",
+    "psutil>=5.0.0",
+    "joblib>=1.5.1",  # Required to load pre-trained ML models
+    "numpy>=1.24.0",   # Required for ML model inference
+    
+    # Windows-specific dependencies
+    "pynvml; platform_system=='Windows'",
+    "wmi; platform_system=='Windows'",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "scikit-learn>=1.7.0",
-    "joblib>=1.5.0",
-    "numpy>=1.24.0",
+    # ML training and development stack (NOT included in exe)
+    "scikit-learn>=1.7.1",
     "pandas>=2.0.0",
+    "scipy>=1.15.3",
+    "matplotlib>=3.10.5",
+    "torch>=2.0.0",
+    
+    # ML models for training (NOT included in exe)
+    "xgboost>=3.0.4",
+    "lightgbm>=4.6.0",
+    "catboost>=1.2.8",
+    
+    # Testing framework (NOT included in exe)
     "pytest>=7.0.0",
-    # RAPIDS GPU acceleration - install separately
+    "pytest-asyncio>=1.1.0",
+    
+    # Development and build tools (NOT included in exe)
+    "pyinstaller>=6.0.0",
+    
+    # RAPIDS GPU acceleration - install separately if needed
     # "cudf>=24.0.0",  # uv add cudf --index https://pypi.nvidia.com
     # "cuml>=24.0.0",  # uv add cuml --index https://pypi.nvidia.com
 ]
@@ -36,24 +53,17 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["canrun"]
 
-[tool.uv]
-dev-dependencies = [
-    "scikit-learn>=1.7.0",
-    "joblib>=1.5.0",
-    "numpy>=1.24.0",
-    "psutil>=5.0.0",
-    "pandas>=2.0.0",
-    "pytest>=7.0.0",
-    # RAPIDS GPU acceleration - install separately if needed
-    # "cudf>=24.0.0",  # uv add cudf --index https://pypi.nvidia.com
-    # "cuml>=24.0.0",  # uv add cuml --index https://pypi.nvidia.com
-    "xgboost>=3.0.4",
-    "lightgbm>=4.6.0",
-    "catboost>=1.2.8",
-    "scipy>=1.15.3",
-]
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [tool.pytest.ini_options]
 testpaths = ["test", "canrun/test"]
 pythonpath = ["."]
 addopts = "-v --tb=short"
+
+[dependency-groups]
+dev = [
+    "pyinstaller>=6.15.0",
+    "pytest>=8.4.1",
+    "pytest-asyncio>=1.1.0",
+]

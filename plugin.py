@@ -18,12 +18,9 @@ from pathlib import Path
 if platform.system() == "Windows":
     from ctypes import byref, windll, wintypes
 
-# Add src directory to path for CanRun engine imports
-sys.path.insert(0, str(Path(__file__).parent / "src"))
-
-# Import existing tested CanRun components
+# Import existing tested CanRun components using proper package imports
 try:
-    from canrun_engine import CanRunEngine
+    from canrun.src.canrun_engine import CanRunEngine
     CANRUN_AVAILABLE = True
 except ImportError as e:
     logging.warning(f"CanRun engine not available: {e}")
@@ -253,13 +250,16 @@ class CanRunPlugin:
             # Get performance details
             fps = getattr(result.performance_prediction, 'expected_fps', 'Unknown')
             settings = getattr(result.performance_prediction, 'recommended_settings', 'Unknown')
-            resolution = getattr(result.performance_prediction, 'recommended_resolution', 'Unknown')
+            recommended_resolution = getattr(result.performance_prediction, 'recommended_resolution', 'Unknown')
+            
+            # Get detected resolution class from result
+            detected_resolution = getattr(result, 'detected_resolution_class', 'Unknown')
             
             # Build response with verdict at bottom
             response_parts = []
             
             # Game name at top
-            response_parts.append(f"\t") 
+            response_parts.append(f"\t")
             response_parts.append(f"🎮 **Game:** **{steam_api_name}**\t")
 
             
@@ -267,7 +267,8 @@ class CanRunPlugin:
             response_parts.append("💻 **YOUR SYSTEM**")
             response_parts.append(f"• GPU: {result.hardware_specs.gpu_model} ({result.hardware_specs.gpu_vram_gb}GB)")
             response_parts.append(f"• CPU: {result.hardware_specs.cpu_model}")
-            response_parts.append(f"• RAM: {result.hardware_specs.ram_total_gb}GB\t")
+            response_parts.append(f"• RAM: {result.hardware_specs.ram_total_gb}GB")
+            response_parts.append(f"• Display: **{detected_resolution}**\t")
 
             
             # 2. GAME REQUIREMENTS
@@ -292,7 +293,7 @@ class CanRunPlugin:
             response_parts.append("⚡ **PERFORMANCE**")
             response_parts.append(f"• FPS: **{fps}**")
             response_parts.append(f"• Settings: **{settings}**")
-            response_parts.append(f"• Resolution: **{resolution}**")
+            response_parts.append(f"• Recommended: **{recommended_resolution}**")
             response_parts.append(f"• Score: **{tier} Tier ({score}/100)**\t")
 
             

@@ -5,7 +5,7 @@ import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from dynamic_performance_predictor import DynamicPerformancePredictor
+from canrun.src.dynamic_performance_predictor import DynamicPerformancePredictor
 
 def test_performance_prediction():
     predictor = DynamicPerformancePredictor()
