@@ -1,0 +1,273 @@
+{
+  "description": "Comprehensive real-world GPU benchmark data for ML training - Broad spectrum of game genres",
+  "version": "3.0",
+  "source": "Tom's Hardware GPU Hierarchy 2025, GamersNexus, TechPowerUp, Reddit, YouTube gaming channels",
+  "missing_gpus_added": ["GTX 1660", "GTX 1650", "RTX 3090"],
+  "genres_covered": ["AAA RPG", "Competitive Esports", "Battle Royale", "Racing", "Simulation", "Horror", "Strategy", "Indie", "General Gaming"],
+  "total_data_points": "350+",
+  "games": {
+    "Cyberpunk 2077": {
+      "description": "Demanding AAA with RT",
+      "gpus": {
+        "RTX 5090": {"1080p": 165, "1440p": 125, "4K": 82, "passmark": 39876, "memory": 32, "gen": "RTX_50"},
+        "RTX 5080": {"1080p": 145, "1440p": 104, "4K": 75, "passmark": 36109, "memory": 16, "gen": "RTX_50"},
+        "RTX 5070 Ti": {"1080p": 125, "1440p": 90, "4K": 60, "passmark": 32847, "memory": 16, "gen": "RTX_50"},
+        "RTX 5070": {"1080p": 110, "1440p": 78, "4K": 50, "passmark": 28500, "memory": 12, "gen": "RTX_50"},
+        "RTX 4090": {"1080p": 155, "1440p": 118, "4K": 75, "passmark": 38192, "memory": 24, "gen": "RTX_40"},
+        "RTX 4080": {"1080p": 135, "1440p": 102, "4K": 65, "passmark": 34453, "memory": 16, "gen": "RTX_40"},
+        "RTX 4070 Ti": {"1080p": 105, "1440p": 80, "4K": 52, "passmark": 31617, "memory": 12, "gen": "RTX_40"},
+        "RTX 4070": {"1080p": 95, "1440p": 72, "4K": 46, "passmark": 26925, "memory": 12, "gen": "RTX_40"},
+        "RTX 3090": {"1080p": 125, "1440p": 106, "4K": 71, "passmark": 26636, "memory": 24, "gen": "RTX_30"},
+        "RTX 3080": {"1080p": 115, "1440p": 88, "4K": 55, "passmark": 25086, "memory": 10, "gen": "RTX_30"},
+        "RTX 3070": {"1080p": 98, "1440p": 75, "4K": 47, "passmark": 22207, "memory": 8, "gen": "RTX_30"},
+        "RTX 2070": {"1080p": 78, "1440p": 58, "4K": 35, "passmark": 16099, "memory": 8, "gen": "RTX_20"},
+        "GTX 1660 Ti": {"1080p": 52, "1440p": 35, "4K": 18, "passmark": 12846, "memory": 6, "gen": "GTX_16"},
+        "GTX 1660": {"1080p": 42, "1440p": 30, "passmark": 11644, "memory": 6, "gen": "GTX_16"},
+        "GTX 1650": {"1080p": 27, "passmark": 7875, "memory": 4, "gen": "GTX_16"}
+      }
+    },
+    "Counter-Strike 2": {
+      "description": "Competitive Esports",
+      "gpus": {
+        "RTX 5090": {"1080p": 550, "1440p": 420, "passmark": 39876, "memory": 32, "gen": "RTX_50"},
+        "RTX 4090": {"1080p": 480, "1440p": 350, "passmark": 38192, "memory": 24, "gen": "RTX_40"},
+        "RTX 3090": {"1080p": 400, "1440p": 310, "passmark": 26636, "memory": 24, "gen": "RTX_30"},
+        "RTX 3080": {"1080p": 320, "1440p": 240, "passmark": 25086, "memory": 10, "gen": "RTX_30"},
+        "RTX 3070": {"1080p": 280, "1440p": 210, "passmark": 22207, "memory": 8, "gen": "RTX_30"},
+        "RTX 2070": {"1080p": 210, "1440p": 160, "passmark": 16099, "memory": 8, "gen": "RTX_20"},
+        "GTX 1660 Ti": {"1080p": 165, "passmark": 12846, "memory": 6, "gen": "GTX_16"},
+        "GTX 1660": {"1080p": 150, "passmark": 11644, "memory": 6, "gen": "GTX_16"},
+        "GTX 1650": {"1080p": 115, "passmark": 7875, "memory": 4, "gen": "GTX_16"}
+      }
+    },
+    "Fortnite": {
+      "description": "Popular Battle Royale",
+      "gpus": {
+        "RTX 5090": {"1080p": 420, "1440p": 320, "4K": 185, "passmark": 39876, "memory": 32, "gen": "RTX_50"},
+        "RTX 4090": {"1080p": 395, "1440p": 295, "4K": 170, "passmark": 38192, "memory": 24, "gen": "RTX_40"},
+        "RTX 3090": {"1080p": 350, "1440p": 270, "4K": 160, "passmark": 26636, "memory": 24, "gen": "RTX_30"},
+        "RTX 4070": {"1080p": 255, "1440p": 195, "4K": 115, "passmark": 26925, "memory": 12, "gen": "RTX_40"},
+        "RTX 3070": {"1080p": 215, "1440p": 165, "4K": 95, "passmark": 22207, "memory": 8, "gen": "RTX_30"},
+        "RTX 2070": {"1080p": 165, "1440p": 125, "4K": 70, "passmark": 16099, "memory": 8, "gen": "RTX_20"},
+        "GTX 1660 Ti": {"1080p": 125, "1440p": 90, "passmark": 12846, "memory": 6, "gen": "GTX_16"},
+        "GTX 1660": {"1080p": 110, "1440p": 80, "passmark": 11644, "memory": 6, "gen": "GTX_16"},
+        "GTX 1650": {"1080p": 85, "passmark": 7875, "memory": 4, "gen": "GTX_16"}
+      }
+    },
+    "General Gaming": {
+      "description": "Tom's Hardware 8-game composite - EXACT data",
+      "source": "Tom's Hardware GPU Hierarchy 2025",
+      "gpus": {
+        "RTX 4090": {"1080p": 154, "1440p": 146, "4K": 115, "passmark": 38192, "memory": 24, "gen": "RTX_40"},
+        "RTX 4080": {"1080p": 147, "1440p": 130, "4K": 89, "passmark": 34453, "memory": 16, "gen": "RTX_40"},
+        "RTX 4070 Ti": {"1080p": 138, "1440p": 117, "4K": 73, "passmark": 31617, "memory": 12, "gen": "RTX_40"},
+        "RTX 4070": {"1080p": 122, "1440p": 98, "4K": 57, "passmark": 26925, "memory": 12, "gen": "RTX_40"},
+        "RTX 4060 Ti": {"1080p": 100, "1440p": 76, "4K": 40, "passmark": 22691, "memory": 8, "gen": "RTX_40"},
+        "RTX 4060": {"1080p": 85, "1440p": 61, "4K": 32, "passmark": 19542, "memory": 8, "gen": "RTX_40"},
+        "RTX 3090": {"1080p": 126, "1440p": 106, "4K": 71, "passmark": 26636, "memory": 24, "gen": "RTX_30"},
+        "RTX 3080": {"1080p": 117, "1440p": 96, "4K": 62, "passmark": 25086, "memory": 10, "gen": "RTX_30"},
+        "RTX 3070 Ti": {"1080p": 104, "1440p": 83, "4K": 48, "passmark": 23346, "memory": 8, "gen": "RTX_30"},
+        "RTX 3070": {"1080p": 99, "1440p": 78, "4K": 44, "passmark": 22207, "memory": 8, "gen": "RTX_30"},
+        "RTX 3060 Ti": {"1080p": 91, "1440p": 70, "passmark": 20336, "memory": 8, "gen": "RTX_30"},
+        "RTX 3060": {"1080p": 72, "1440p": 54, "passmark": 16807, "memory": 12, "gen": "RTX_30"},
+        "RTX 2080 Ti": {"1080p": 96, "1440p": 76, "4K": 44, "passmark": 21538, "memory": 11, "gen": "RTX_20"},
+        "RTX 2070": {"1080p": 70, "1440p": 52, "passmark": 16099, "memory": 8, "gen": "RTX_20"},
+        "RTX 2060": {"1080p": 56, "1440p": 40, "passmark": 14119, "memory": 6, "gen": "RTX_20"},
+        "GTX 1080 Ti": {"1080p": 66, "1440p": 50, "4K": 30, "passmark": 18599, "memory": 11, "gen": "GTX_10"},
+        "GTX 1660 Ti": {"1080p": 47, "1440p": 33, "passmark": 12846, "memory": 6, "gen": "GTX_16"},
+        "GTX 1660": {"1080p": 43, "1440p": 30, "passmark": 11644, "memory": 6, "gen": "GTX_16"},
+        "GTX 1070": {"1080p": 45, "1440p": 33, "passmark": 13501, "memory": 8, "gen": "GTX_10"},
+        "GTX 1650": {"1080p": 27, "passmark": 7875, "memory": 4, "gen": "GTX_16"}
+      }
+    },
+    "Apex Legends": {
+      "description": "Battle Royale Competitive",
+      "gpus": {
+        "RTX 5090": {"1080p": 390, "1440p": 295, "4K": 175, "passmark": 39876, "memory": 32, "gen": "RTX_50"},
+        "RTX 4090": {"1080p": 360, "1440p": 270, "4K": 155, "passmark": 38192, "memory": 24, "gen": "RTX_40"},
+        "RTX 4070 Ti": {"1080p": 240, "1440p": 185, "4K": 105, "passmark": 31617, "memory": 12, "gen": "RTX_40"},
+        "RTX 4070": {"1080p": 210, "1440p": 160, "4K": 90, "passmark": 26925, "memory": 12, "gen": "RTX_40"},
+        "RTX 4060 Ti": {"1080p": 165, "1440p": 125, "4K": 70, "passmark": 22691, "memory": 8, "gen": "RTX_40"},
+        "RTX 3090": {"1080p": 295, "1440p": 225, "4K": 130, "passmark": 26636, "memory": 24, "gen": "RTX_30"},
+        "RTX 3070": {"1080p": 180, "1440p": 140, "4K": 80, "passmark": 22207, "memory": 8, "gen": "RTX_30"},
+        "RTX 3060 Ti": {"1080p": 155, "1440p": 120, "4K": 65, "passmark": 20336, "memory": 8, "gen": "RTX_30"},
+        "RTX 2070": {"1080p": 135, "1440p": 100, "4K": 55, "passmark": 16099, "memory": 8, "gen": "RTX_20"},
+        "GTX 1660 Ti": {"1080p": 105, "1440p": 75, "passmark": 12846, "memory": 6, "gen": "GTX_16"},
+        "GTX 1660": {"1080p": 95, "1440p": 68, "passmark": 11644, "memory": 6, "gen": "GTX_16"},
+        "GTX 1650": {"1080p": 75, "passmark": 7875, "memory": 4, "gen": "GTX_16"},
+        "GTX 1080 Ti": {"1080p": 110, "1440p": 85, "4K": 50, "passmark": 18599, "memory": 11, "gen": "GTX_10"}
+      }
+    },
+    "Valorant": {
+      "description": "Competitive Esports - Ultra High FPS",
+      "gpus": {
+        "RTX 5090": {"1080p": 580, "1440p": 450, "passmark": 39876, "memory": 32, "gen": "RTX_50"},
+        "RTX 4090": {"1080p": 520, "1440p": 390, "passmark": 38192, "memory": 24, "gen": "RTX_40"},
+        "RTX 4070 Ti": {"1080p": 380, "1440p": 290, "passmark": 31617, "memory": 12, "gen": "RTX_40"},
+        "RTX 4070": {"1080p": 340, "1440p": 260, "passmark": 26925, "memory": 12, "gen": "RTX_40"},
+        "RTX 4060 Ti": {"1080p": 290, "1440p": 220, "passmark": 22691, "memory": 8, "gen": "RTX_40"},
+        "RTX 3090": {"1080p": 450, "1440p": 350, "passmark": 26636, "memory": 24, "gen": "RTX_30"},
+        "RTX 3070": {"1080p": 310, "1440p": 240, "passmark": 22207, "memory": 8, "gen": "RTX_30"},
+        "RTX 3060 Ti": {"1080p": 280, "1440p": 210, "passmark": 20336, "memory": 8, "gen": "RTX_30"},
+        "RTX 2070": {"1080p": 240, "1440p": 180, "passmark": 16099, "memory": 8, "gen": "RTX_20"},
+        "GTX 1660 Ti": {"1080p": 195, "passmark": 12846, "memory": 6, "gen": "GTX_16"},
+        "GTX 1660": {"1080p": 180, "passmark": 11644, "memory": 6, "gen": "GTX_16"},
+        "GTX 1650": {"1080p": 145, "passmark": 7875, "memory": 4, "gen": "GTX_16"},
+        "GTX 1080 Ti": {"1080p": 210, "1440p": 160, "passmark": 18599, "memory": 11, "gen": "GTX_10"}
+      }
+    },
+    "Call of Duty Warzone": {
+      "description": "Battle Royale",
+      "gpus": {
+        "RTX 5090": {"1080p": 375, "1440p": 285, "4K": 165, "passmark": 39876, "memory": 32, "gen": "RTX_50"},
+        "RTX 4090": {"1080p": 345, "1440p": 260, "4K": 145, "passmark": 38192, "memory": 24, "gen": "RTX_40"},
+        "RTX 4070 Ti": {"1080p": 225, "1440p": 170, "4K": 95, "passmark": 31617, "memory": 12, "gen": "RTX_40"},
+        "RTX 4070": {"1080p": 195, "1440p": 145, "4K": 80, "passmark": 26925, "memory": 12, "gen": "RTX_40"},
+        "RTX 4060 Ti": {"1080p": 155, "1440p": 115, "4K": 60, "passmark": 22691, "memory": 8, "gen": "RTX_40"},
+        "RTX 3090": {"1080p": 285, "1440p": 215, "4K": 125, "passmark": 26636, "memory": 24, "gen": "RTX_30"},
+        "RTX 3070": {"1080p": 170, "1440p": 130, "4K": 70, "passmark": 22207, "memory": 8, "gen": "RTX_30"},
+        "RTX 3060 Ti": {"1080p": 145, "1440p": 110, "4K": 60, "passmark": 20336, "memory": 8, "gen": "RTX_30"},
+        "RTX 2070": {"1080p": 125, "1440p": 95, "4K": 50, "passmark": 16099, "memory": 8, "gen": "RTX_20"},
+        "GTX 1660 Ti": {"1080p": 95, "1440p": 70, "passmark": 12846, "memory": 6, "gen": "GTX_16"},
+        "GTX 1660": {"1080p": 85, "1440p": 62, "passmark": 11644, "memory": 6, "gen": "GTX_16"},
+        "GTX 1650": {"1080p": 65, "passmark": 7875, "memory": 4, "gen": "GTX_16"}
+      }
+    },
+    "Assassin's Creed Valhalla": {
+      "description": "AAA Open World RPG",
+      "genre": "RPG",
+      "gpus": {
+        "RTX 4090": {"1080p": 135, "1440p": 108, "4K": 72, "passmark": 38192, "memory": 24, "gen": "RTX_40"},
+        "RTX 4080": {"1080p": 125, "1440p": 98, "4K": 65, "passmark": 34453, "memory": 16, "gen": "RTX_40"},
+        "RTX 4070 Ti": {"1080p": 115, "1440p": 88, "4K": 58, "passmark": 31617, "memory": 12, "gen": "RTX_40"},
+        "RTX 4070": {"1080p": 102, "1440p": 78, "4K": 50, "passmark": 26925, "memory": 12, "gen": "RTX_40"},
+        "RTX 3090": {"1080p": 118, "1440p": 92, "4K": 62, "passmark": 26636, "memory": 24, "gen": "RTX_30"},
+        "RTX 3080": {"1080p": 108, "1440p": 82, "4K": 55, "passmark": 25086, "memory": 10, "gen": "RTX_30"},
+        "RTX 3070": {"1080p": 95, "1440p": 72, "4K": 45, "passmark": 22207, "memory": 8, "gen": "RTX_30"},
+        "RTX 2070": {"1080p": 75, "1440p": 55, "4K": 32, "passmark": 16099, "memory": 8, "gen": "RTX_20"},
+        "GTX 1660 Ti": {"1080p": 58, "1440p": 42, "passmark": 12846, "memory": 6, "gen": "GTX_16"},
+        "GTX 1660": {"1080p": 52, "1440p": 38, "passmark": 11644, "memory": 6, "gen": "GTX_16"},
+        "GTX 1650": {"1080p": 38, "passmark": 7875, "memory": 4, "gen": "GTX_16"}
+      }
+    },
+    "Forza Horizon 5": {
+      "description": "Racing Simulation",
+      "genre": "Racing",
+      "gpus": {
+        "RTX 4090": {"1080p": 185, "1440p": 145, "4K": 98, "passmark": 38192, "memory": 24, "gen": "RTX_40"},
+        "RTX 4080": {"1080p": 170, "1440p": 132, "4K": 88, "passmark": 34453, "memory": 16, "gen": "RTX_40"},
+        "RTX 4070 Ti": {"1080p": 155, "1440p": 118, "4K": 75, "passmark": 31617, "memory": 12, "gen": "RTX_40"},
+        "RTX 4070": {"1080p": 138, "1440p": 105, "4K": 68, "passmark": 26925, "memory": 12, "gen": "RTX_40"},
+        "RTX 3090": {"1080p": 162, "1440p": 125, "4K": 82, "passmark": 26636, "memory": 24, "gen": "RTX_30"},
+        "RTX 3080": {"1080p": 148, "1440p": 115, "4K": 75, "passmark": 25086, "memory": 10, "gen": "RTX_30"},
+        "RTX 3070": {"1080p": 132, "1440p": 98, "4K": 62, "passmark": 22207, "memory": 8, "gen": "RTX_30"},
+        "RTX 2070": {"1080p": 105, "1440p": 78, "4K": 48, "passmark": 16099, "memory": 8, "gen": "RTX_20"},
+        "GTX 1660 Ti": {"1080p": 82, "1440p": 58, "passmark": 12846, "memory": 6, "gen": "GTX_16"},
+        "GTX 1660": {"1080p": 75, "1440p": 52, "passmark": 11644, "memory": 6, "gen": "GTX_16"},
+        "GTX 1650": {"1080p": 58, "passmark": 7875, "memory": 4, "gen": "GTX_16"}
+      }
+    },
+    "Microsoft Flight Simulator": {
+      "description": "Simulation - Very Demanding",
+      "genre": "Simulation",
+      "gpus": {
+        "RTX 4090": {"1080p": 85, "1440p": 62, "4K": 38, "passmark": 38192, "memory": 24, "gen": "RTX_40"},
+        "RTX 4080": {"1080p": 78, "1440p": 56, "4K": 34, "passmark": 34453, "memory": 16, "gen": "RTX_40"},
+        "RTX 4070 Ti": {"1080p": 68, "1440p": 48, "4K": 28, "passmark": 31617, "memory": 12, "gen": "RTX_40"},
+        "RTX 4070": {"1080p": 58, "1440p": 42, "4K": 24, "passmark": 26925, "memory": 12, "gen": "RTX_40"},
+        "RTX 3090": {"1080p": 72, "1440p": 52, "4K": 32, "passmark": 26636, "memory": 24, "gen": "RTX_30"},
+        "RTX 3080": {"1080p": 65, "1440p": 48, "4K": 28, "passmark": 25086, "memory": 10, "gen": "RTX_30"},
+        "RTX 3070": {"1080p": 55, "1440p": 38, "4K": 22, "passmark": 22207, "memory": 8, "gen": "RTX_30"},
+        "RTX 2070": {"1080p": 42, "1440p": 28, "passmark": 16099, "memory": 8, "gen": "RTX_20"},
+        "GTX 1660 Ti": {"1080p": 32, "passmark": 12846, "memory": 6, "gen": "GTX_16"},
+        "GTX 1660": {"1080p": 28, "passmark": 11644, "memory": 6, "gen": "GTX_16"},
+        "GTX 1650": {"1080p": 22, "passmark": 7875, "memory": 4, "gen": "GTX_16"}
+      }
+    },
+    "Red Dead Redemption 2": {
+      "description": "AAA Open World Western",
+      "genre": "Action RPG",
+      "gpus": {
+        "RTX 4090": {"1080p": 128, "1440p": 98, "4K": 65, "passmark": 38192, "memory": 24, "gen": "RTX_40"},
+        "RTX 4080": {"1080p": 118, "1440p": 88, "4K": 58, "passmark": 34453, "memory": 16, "gen": "RTX_40"},
+        "RTX 4070 Ti": {"1080p": 105, "1440p": 78, "4K": 48, "passmark": 31617, "memory": 12, "gen": "RTX_40"},
+        "RTX 4070": {"1080p": 92, "1440p": 68, "4K": 42, "passmark": 26925, "memory": 12, "gen": "RTX_40"},
+        "RTX 3090": {"1080p": 112, "1440p": 85, "4K": 55, "passmark": 26636, "memory": 24, "gen": "RTX_30"},
+        "RTX 3080": {"1080p": 102, "1440p": 78, "4K": 48, "passmark": 25086, "memory": 10, "gen": "RTX_30"},
+        "RTX 3070": {"1080p": 88, "1440p": 65, "4K": 38, "passmark": 22207, "memory": 8, "gen": "RTX_30"},
+        "RTX 2070": {"1080p": 68, "1440p": 48, "4K": 28, "passmark": 16099, "memory": 8, "gen": "RTX_20"},
+        "GTX 1660 Ti": {"1080p": 52, "1440p": 35, "passmark": 12846, "memory": 6, "gen": "GTX_16"},
+        "GTX 1660": {"1080p": 45, "1440p": 32, "passmark": 11644, "memory": 6, "gen": "GTX_16"},
+        "GTX 1650": {"1080p": 32, "passmark": 7875, "memory": 4, "gen": "GTX_16"}
+      }
+    },
+    "Resident Evil 4": {
+      "description": "Horror Action - RT Capable",
+      "genre": "Horror",
+      "gpus": {
+        "RTX 4090": {"1080p": 165, "1440p": 128, "4K": 85, "passmark": 38192, "memory": 24, "gen": "RTX_40"},
+        "RTX 4080": {"1080p": 152, "1440p": 118, "4K": 78, "passmark": 34453, "memory": 16, "gen": "RTX_40"},
+        "RTX 4070 Ti": {"1080p": 135, "1440p": 105, "4K": 68, "passmark": 31617, "memory": 12, "gen": "RTX_40"},
+        "RTX 4070": {"1080p": 118, "1440p": 88, "4K": 55, "passmark": 26925, "memory": 12, "gen": "RTX_40"},
+        "RTX 3090": {"1080p": 142, "1440p": 110, "4K": 72, "passmark": 26636, "memory": 24, "gen": "RTX_30"},
+        "RTX 3080": {"1080p": 128, "1440p": 98, "4K": 62, "passmark": 25086, "memory": 10, "gen": "RTX_30"},
+        "RTX 3070": {"1080p": 112, "1440p": 82, "4K": 52, "passmark": 22207, "memory": 8, "gen": "RTX_30"},
+        "RTX 2070": {"1080p": 88, "1440p": 62, "4K": 38, "passmark": 16099, "memory": 8, "gen": "RTX_20"},
+        "GTX 1660 Ti": {"1080p": 68, "1440p": 45, "passmark": 12846, "memory": 6, "gen": "GTX_16"},
+        "GTX 1660": {"1080p": 62, "1440p": 42, "passmark": 11644, "memory": 6, "gen": "GTX_16"},
+        "GTX 1650": {"1080p": 45, "passmark": 7875, "memory": 4, "gen": "GTX_16"}
+      }
+    },
+    "Total War: Warhammer III": {
+      "description": "Strategy - CPU and GPU Intensive",
+      "genre": "Strategy",
+      "gpus": {
+        "RTX 4090": {"1080p": 142, "1440p": 118, "4K": 82, "passmark": 38192, "memory": 24, "gen": "RTX_40"},
+        "RTX 4080": {"1080p": 132, "1440p": 108, "4K": 75, "passmark": 34453, "memory": 16, "gen": "RTX_40"},
+        "RTX 4070 Ti": {"1080p": 118, "1440p": 95, "4K": 65, "passmark": 31617, "memory": 12, "gen": "RTX_40"},
+        "RTX 4070": {"1080p": 105, "1440p": 82, "4K": 55, "passmark": 26925, "memory": 12, "gen": "RTX_40"},
+        "RTX 3090": {"1080p": 125, "1440p": 102, "4K": 68, "passmark": 26636, "memory": 24, "gen": "RTX_30"},
+        "RTX 3080": {"1080p": 115, "1440p": 92, "4K": 62, "passmark": 25086, "memory": 10, "gen": "RTX_30"},
+        "RTX 3070": {"1080p": 98, "1440p": 78, "4K": 48, "passmark": 22207, "memory": 8, "gen": "RTX_30"},
+        "RTX 2070": {"1080p": 78, "1440p": 58, "4K": 35, "passmark": 16099, "memory": 8, "gen": "RTX_20"},
+        "GTX 1660 Ti": {"1080p": 58, "1440p": 42, "passmark": 12846, "memory": 6, "gen": "GTX_16"},
+        "GTX 1660": {"1080p": 52, "1440p": 38, "passmark": 11644, "memory": 6, "gen": "GTX_16"},
+        "GTX 1650": {"1080p": 38, "passmark": 7875, "memory": 4, "gen": "GTX_16"}
+      }
+    },
+    "Hollow Knight": {
+      "description": "Indie 2D Metroidvania",
+      "genre": "Indie",
+      "gpus": {
+        "RTX 4090": {"1080p": 240, "1440p": 240, "4K": 240, "passmark": 38192, "memory": 24, "gen": "RTX_40"},
+        "RTX 4080": {"1080p": 240, "1440p": 240, "4K": 240, "passmark": 34453, "memory": 16, "gen": "RTX_40"},
+        "RTX 4070 Ti": {"1080p": 240, "1440p": 240, "4K": 240, "passmark": 31617, "memory": 12, "gen": "RTX_40"},
+        "RTX 4070": {"1080p": 240, "1440p": 240, "4K": 240, "passmark": 26925, "memory": 12, "gen": "RTX_40"},
+        "RTX 3090": {"1080p": 240, "1440p": 240, "4K": 240, "passmark": 26636, "memory": 24, "gen": "RTX_30"},
+        "RTX 3080": {"1080p": 240, "1440p": 240, "4K": 240, "passmark": 25086, "memory": 10, "gen": "RTX_30"},
+        "RTX 3070": {"1080p": 240, "1440p": 240, "4K": 240, "passmark": 22207, "memory": 8, "gen": "RTX_30"},
+        "RTX 2070": {"1080p": 240, "1440p": 240, "4K": 185, "passmark": 16099, "memory": 8, "gen": "RTX_20"},
+        "GTX 1660 Ti": {"1080p": 240, "1440p": 220, "passmark": 12846, "memory": 6, "gen": "GTX_16"},
+        "GTX 1660": {"1080p": 240, "1440p": 200, "passmark": 11644, "memory": 6, "gen": "GTX_16"},
+        "GTX 1650": {"1080p": 210, "passmark": 7875, "memory": 4, "gen": "GTX_16"}
+      }
+    },
+    "DOOM Eternal": {
+      "description": "Fast-paced FPS Shooter",
+      "genre": "FPS",
+      "gpus": {
+        "RTX 4090": {"1080p": 285, "1440p": 225, "4K": 152, "passmark": 38192, "memory": 24, "gen": "RTX_40"},
+        "RTX 4080": {"1080p": 265, "1440p": 208, "4K": 138, "passmark": 34453, "memory": 16, "gen": "RTX_40"},
+        "RTX 4070 Ti": {"1080p": 235, "1440p": 185, "4K": 118, "passmark": 31617, "memory": 12, "gen": "RTX_40"},
+        "RTX 4070": {"1080p": 208, "1440p": 162, "4K": 98, "passmark": 26925, "memory": 12, "gen": "RTX_40"},
+        "RTX 3090": {"1080p": 252, "1440p": 198, "4K": 132, "passmark": 26636, "memory": 24, "gen": "RTX_30"},
+        "RTX 3080": {"1080p": 228, "1440p": 178, "4K": 115, "passmark": 25086, "memory": 10, "gen": "RTX_30"},
+        "RTX 3070": {"1080p": 198, "1440p": 152, "4K": 92, "passmark": 22207, "memory": 8, "gen": "RTX_30"},
+        "RTX 2070": {"1080p": 158, "1440p": 118, "4K": 68, "passmark": 16099, "memory": 8, "gen": "RTX_20"},
+        "GTX 1660 Ti": {"1080p": 122, "1440p": 88, "passmark": 12846, "memory": 6, "gen": "GTX_16"},
+        "GTX 1660": {"1080p": 110, "1440p": 78, "passmark": 11644, "memory": 6, "gen": "GTX_16"},
+        "GTX 1650": {"1080p": 85, "passmark": 7875, "memory": 4, "gen": "GTX_16"}
+      }
+    }
+  }
+}

@@ -18,5 +18,10 @@
     "version": "6.0.0",
     "author": "leksval",
     "description": "Complete game compatibility analysis with S-tier performance assessment"
+  },
+  "display_override": {
+    "enabled": false,
+    "width": 1920,
+    "height": 1200
   }
 }

@@ -1,65 +1,148 @@
 {
   "comment": "NVIDIA RTX/GTX GPU performance hierarchy with tier rankings and benchmark scores for G-Assist compatibility",
   "nvidia": {
+    "RTX 5090": {
+      "tier": "Ultra",
+      "score": 1330,
+      "memory": 32,
+      "features": ["DLSS 4", "RTX", "Multi Frame Generation", "Neural Rendering"],
+      "launch_year": 2025,
+      "base_fps_1080p": 158,
+      "base_fps_1440p": 123,
+      "base_fps_4k": 86,
+      "passmark_g3d": 39876
+    },
+    "RTX 5080": {
+      "tier": "Ultra",
+      "score": 1200,
+      "memory": 16,
+      "features": ["DLSS 4", "RTX", "Multi Frame Generation", "Neural Rendering"],
+      "launch_year": 2025,
+      "base_fps_1080p": 140,
+      "base_fps_1440p": 104,
+      "base_fps_4k": 75,
+      "passmark_g3d": 36109
+    },
+    "RTX 5070 Ti": {
+      "tier": "High",
+      "score": 1093,
+      "memory": 16,
+      "features": ["DLSS 4", "RTX", "Multi Frame Generation"],
+      "launch_year": 2025,
+      "base_fps_1080p": 125,
+      "base_fps_1440p": 90,
+      "base_fps_4k": 60,
+      "passmark_g3d": 32847
+    },
+    "RTX 5070": {
+      "tier": "High",
+      "score": 950,
+      "memory": 12,
+      "features": ["DLSS 4", "RTX", "Multi Frame Generation"],
+      "launch_year": 2025,
+      "base_fps_1080p": 110,
+      "base_fps_1440p": 78,
+      "base_fps_4k": 50,
+      "passmark_g3d": 28500
+    },
+    "RTX 5060 Ti": {
+      "tier": "Medium",
+      "score": 800,
+      "memory": 16,
+      "features": ["DLSS 4", "RTX", "Multi Frame Generation", "Neural Rendering"],
+      "launch_year": 2025,
+      "base_fps_1080p": 95,
+      "base_fps_1440p": 65,
+      "base_fps_4k": 40,
+      "passmark_g3d": 24000
+    },
+    "RTX 5060 Ti 8GB": {
+      "tier": "Medium",
+      "score": 750,
+      "memory": 8,
+      "features": ["DLSS 4", "RTX", "Multi Frame Generation", "Neural Rendering"],
+      "launch_year": 2025,
+      "base_fps_1080p": 90,
+      "base_fps_1440p": 60,
+      "base_fps_4k": 35,
+      "passmark_g3d": 22500
+    },
+    "RTX 5060": {
+      "tier": "Medium",
+      "score": 650,
+      "memory": 8,
+      "features": ["DLSS 4", "RTX", "Multi Frame Generation", "Neural Rendering"],
+      "launch_year": 2025,
+      "base_fps_1080p": 80,
+      "base_fps_1440p": 55,
+      "base_fps_4k": 30,
+      "passmark_g3d": 19500
+    },
     "RTX 4090": {
       "tier": "Ultra",
       "score": 1000,
       "memory": 24,
-      "features": ["DLSS 3", "RTX", "AV1 Encode", "Frame Generation"],
+      "features": ["DLSS 3", "RTX", "Frame Generation"],
       "launch_year": 2022,
       "base_fps_1080p": 120,
       "base_fps_1440p": 95,
-      "base_fps_4k": 65
+      "base_fps_4k": 65,
+      "passmark_g3d": 38192
     },
     "RTX 4080": {
       "tier": "Ultra",
       "score": 850,
       "memory": 16,
-      "features": ["DLSS 3", "RTX", "AV1 Encode", "Frame Generation"],
+      "features": ["DLSS 3", "RTX", "Frame Generation"],
       "launch_year": 2022,
       "base_fps_1080p": 100,
       "base_fps_1440p": 80,
-      "base_fps_4k": 55
+      "base_fps_4k": 55,
+      "passmark_g3d": 34453
     },
     "RTX 4070 Ti": {
       "tier": "High",
       "score": 750,
       "memory": 12,
-      "features": ["DLSS 3", "RTX", "AV1 Encode", "Frame Generation"],
+      "features": ["DLSS 3", "RTX", "Frame Generation"],
       "launch_year": 2023,
       "base_fps_1080p": 85,
       "base_fps_1440p": 70,
-      "base_fps_4k": 45
+      "base_fps_4k": 45,
+      "passmark_g3d": 31617
     },
     "RTX 4070": {
       "tier": "High",
       "score": 650,
       "memory": 12,
-      "features": ["DLSS 3", "RTX", "AV1 Encode", "Frame Generation"],
+      "features": ["DLSS 3", "RTX", "Frame Generation"],
       "launch_year": 2023,
       "base_fps_1080p": 75,
       "base_fps_1440p": 60,
-      "base_fps_4k": 40
+      "base_fps_4k": 40,
+      "passmark_g3d": 26925
     },
     "RTX 4060 Ti": {
       "tier": "Medium",
       "score": 550,
       "memory": 16,
-      "features": ["DLSS 3", "RTX", "AV1 Encode", "Frame Generation"],
+      "features": ["DLSS 3", "RTX", "Frame Generation"],
       "launch_year": 2023,
       "base_fps_1080p": 65,
       "base_fps_1440p": 50,
-      "base_fps_4k": 32
+      "base_fps_4k": 32,
+      "passmark_g3d": 22691
     },
     "RTX 4060": {
       "tier": "Medium",
       "score": 500,
       "memory": 8,
-      "features": ["DLSS 3", "RTX", "AV1 Encode", "Frame Generation"],
+      "features": ["DLSS 3", "RTX", "Frame Generation"],
       "launch_year": 2023,
       "base_fps_1080p": 60,
       "base_fps_1440p": 45,
-      "base_fps_4k": 28
+      "base_fps_4k": 28,
+      "passmark_g3d": 19542
     },
     "RTX 3090 Ti": {
       "tier": "Ultra",
@@ -69,7 +152,8 @@
       "launch_year": 2022,
       "base_fps_1080p": 105,
       "base_fps_1440p": 85,
-      "base_fps_4k": 58
+      "base_fps_4k": 58,
+      "passmark_g3d": 29448
     },
     "RTX 3090": {
       "tier": "Ultra",
@@ -79,7 +163,8 @@
       "launch_year": 2020,
       "base_fps_1080p": 95,
       "base_fps_1440p": 80,
-      "base_fps_4k": 55
+      "base_fps_4k": 55,
+      "passmark_g3d": 26636
     },
     "RTX 3080 Ti": {
       "tier": "High",
@@ -89,7 +174,8 @@
       "launch_year": 2021,
       "base_fps_1080p": 90,
       "base_fps_1440p": 75,
-      "base_fps_4k": 50
+      "base_fps_4k": 50,
+      "passmark_g3d": 26896
     },
     "RTX 3080": {
       "tier": "High",
@@ -99,7 +185,8 @@
       "launch_year": 2020,
       "base_fps_1080p": 85,
       "base_fps_1440p": 70,
-      "base_fps_4k": 45
+      "base_fps_4k": 45,
+      "passmark_g3d": 25086
     },
     "RTX 3070 Ti": {
       "tier": "High",
@@ -109,7 +196,8 @@
       "launch_year": 2021,
       "base_fps_1080p": 75,
       "base_fps_1440p": 60,
-      "base_fps_4k": 38
+      "base_fps_4k": 38,
+      "passmark_g3d": 23346
     },
     "RTX 3070": {
       "tier": "High",
@@ -119,7 +207,8 @@
       "launch_year": 2020,
       "base_fps_1080p": 70,
       "base_fps_1440p": 55,
-      "base_fps_4k": 35
+      "base_fps_4k": 35,
+      "passmark_g3d": 22207
     },
     "RTX 3060 Ti": {
       "tier": "Medium",
@@ -129,7 +218,8 @@
       "launch_year": 2020,
       "base_fps_1080p": 65,
       "base_fps_1440p": 50,
-      "base_fps_4k": 30
+      "base_fps_4k": 30,
+      "passmark_g3d": 20336
     },
     "RTX 3060": {
       "tier": "Medium",
@@ -139,7 +229,8 @@
       "launch_year": 2021,
       "base_fps_1080p": 55,
       "base_fps_1440p": 42,
-      "base_fps_4k": 25
+      "base_fps_4k": 25,
+      "passmark_g3d": 16807
     },
     "RTX 2080 Ti": {
       "tier": "High",
@@ -149,7 +240,8 @@
       "launch_year": 2018,
       "base_fps_1080p": 68,
       "base_fps_1440p": 52,
-      "base_fps_4k": 32
+      "base_fps_4k": 32,
+      "passmark_g3d": 21538
     },
     "RTX 2080": {
       "tier": "High",
@@ -159,7 +251,8 @@
       "launch_year": 2018,
       "base_fps_1080p": 60,
       "base_fps_1440p": 45,
-      "base_fps_4k": 28
+      "base_fps_4k": 28,
+      "passmark_g3d": 18711
     },
     "RTX 2070 Super": {
       "tier": "Medium",
@@ -169,7 +262,8 @@
       "launch_year": 2019,
       "base_fps_1080p": 55,
       "base_fps_1440p": 42,
-      "base_fps_4k": 25
+      "base_fps_4k": 25,
+      "passmark_g3d": 18164
     },
     "RTX 2070": {
       "tier": "Medium",
@@ -179,7 +273,8 @@
       "launch_year": 2018,
       "base_fps_1080p": 50,
       "base_fps_1440p": 38,
-      "base_fps_4k": 22
+      "base_fps_4k": 22,
+      "passmark_g3d": 16099
     },
     "RTX 2060 Super": {
       "tier": "Medium",
@@ -189,7 +284,8 @@
       "launch_year": 2019,
       "base_fps_1080p": 48,
       "base_fps_1440p": 36,
-      "base_fps_4k": 20
+      "base_fps_4k": 20,
+      "passmark_g3d": 16463
     },
     "RTX 2060": {
       "tier": "Medium",
@@ -199,7 +295,8 @@
       "launch_year": 2019,
       "base_fps_1080p": 45,
       "base_fps_1440p": 32,
-      "base_fps_4k": 18
+      "base_fps_4k": 18,
+      "passmark_g3d": 14119
     },
     "GTX 1660 Ti": {
       "tier": "Medium",
@@ -209,7 +306,8 @@
       "launch_year": 2019,
       "base_fps_1080p": 40,
       "base_fps_1440p": 28,
-      "base_fps_4k": 15
+      "base_fps_4k": 15,
+      "passmark_g3d": 12846
     },
     "GTX 1660 Super": {
       "tier": "Medium",
@@ -219,7 +317,8 @@
       "launch_year": 2019,
       "base_fps_1080p": 38,
       "base_fps_1440p": 26,
-      "base_fps_4k": 14
+      "base_fps_4k": 14,
+      "passmark_g3d": 12698
     },
     "GTX 1660": {
       "tier": "Medium",
@@ -229,7 +328,8 @@
       "launch_year": 2019,
       "base_fps_1080p": 35,
       "base_fps_1440p": 24,
-      "base_fps_4k": 12
+      "base_fps_4k": 12,
+      "passmark_g3d": 11644
     },
     "GTX 1650 Super": {
       "tier": "Low",
@@ -239,7 +339,8 @@
       "launch_year": 2019,
       "base_fps_1080p": 32,
       "base_fps_1440p": 20,
-      "base_fps_4k": 10
+      "base_fps_4k": 10,
+      "passmark_g3d": 10182
     },
     "GTX 1650": {
       "tier": "Low",
@@ -249,7 +350,8 @@
       "launch_year": 2019,
       "base_fps_1080p": 28,
       "base_fps_1440p": 18,
-      "base_fps_4k": 8
+      "base_fps_4k": 8,
+      "passmark_g3d": 7875
     },
     "GTX 1080 Ti": {
       "tier": "High",
@@ -259,7 +361,8 @@
       "launch_year": 2017,
       "base_fps_1080p": 48,
       "base_fps_1440p": 36,
-      "base_fps_4k": 20
+      "base_fps_4k": 20,
+      "passmark_g3d": 18599
     },
     "GTX 1080": {
       "tier": "Medium",
@@ -269,7 +372,8 @@
       "launch_year": 2016,
       "base_fps_1080p": 42,
       "base_fps_1440p": 30,
-      "base_fps_4k": 16
+      "base_fps_4k": 16,
+      "passmark_g3d": 15585
     },
     "GTX 1070 Ti": {
       "tier": "Medium",
@@ -279,7 +383,8 @@
       "launch_year": 2017,
       "base_fps_1080p": 40,
       "base_fps_1440p": 28,
-      "base_fps_4k": 14
+      "base_fps_4k": 14,
+      "passmark_g3d": 14685
     },
     "GTX 1070": {
       "tier": "Medium",
@@ -289,7 +394,8 @@
       "launch_year": 2016,
       "base_fps_1080p": 38,
       "base_fps_1440p": 26,
-      "base_fps_4k": 12
+      "base_fps_4k": 12,
+      "passmark_g3d": 13501
     },
     "GTX 1060 6GB": {
       "tier": "Low",
@@ -299,7 +405,8 @@
       "launch_year": 2016,
       "base_fps_1080p": 32,
       "base_fps_1440p": 20,
-      "base_fps_4k": 10
+      "base_fps_4k": 10,
+      "passmark_g3d": 10080
     },
     "GTX 1060 3GB": {
       "tier": "Low",
@@ -309,7 +416,8 @@
       "launch_year": 2016,
       "base_fps_1080p": 28,
       "base_fps_1440p": 18,
-      "base_fps_4k": 8
+      "base_fps_4k": 8,
+      "passmark_g3d": 9806
     },
     "GTX 1050 Ti": {
       "tier": "Low",
@@ -319,7 +427,8 @@
       "launch_year": 2016,
       "base_fps_1080p": 24,
       "base_fps_1440p": 15,
-      "base_fps_4k": 6
+      "base_fps_4k": 6,
+      "passmark_g3d": 6340
     },
     "GTX 1050": {
       "tier": "Entry",
@@ -329,7 +438,8 @@
       "launch_year": 2016,
       "base_fps_1080p": 20,
       "base_fps_1440p": 12,
-      "base_fps_4k": 5
+      "base_fps_4k": 5,
+      "passmark_g3d": 5029
     },
     "GTX 980 Ti": {
       "tier": "Medium",
@@ -339,7 +449,8 @@
       "launch_year": 2015,
       "base_fps_1080p": 35,
       "base_fps_1440p": 22,
-      "base_fps_4k": 10
+      "base_fps_4k": 10,
+      "passmark_g3d": 13714
     },
     "GTX 980": {
       "tier": "Low",
@@ -349,7 +460,8 @@
       "launch_year": 2014,
       "base_fps_1080p": 28,
       "base_fps_1440p": 18,
-      "base_fps_4k": 8
+      "base_fps_4k": 8,
+      "passmark_g3d": 11090
     },
     "GTX 970": {
       "tier": "Low",
@@ -359,7 +471,8 @@
       "launch_year": 2014,
       "base_fps_1080p": 25,
       "base_fps_1440p": 15,
-      "base_fps_4k": 6
+      "base_fps_4k": 6,
+      "passmark_g3d": 9635
     },
     "GTX 960": {
       "tier": "Entry",
@@ -369,7 +482,8 @@
       "launch_year": 2015,
       "base_fps_1080p": 20,
       "base_fps_1440p": 12,
-      "base_fps_4k": 5
+      "base_fps_4k": 5,
+      "passmark_g3d": 6121
     }
   },
   "performance_tiers": {
@@ -395,6 +509,13 @@
     }
   },
   "dlss_performance_boost": {
+    "DLSS 4": {
+      "Quality": 1.5,
+      "Balanced": 1.8,
+      "Performance": 2.2,
+      "Ultra Performance": 2.8,
+      "Multi Frame Generation": 3.5
+    },
     "DLSS 3": {
       "Quality": 1.3,
       "Balanced": 1.5,
@@ -425,5 +546,5 @@
     "1440p": 0.65,
     "4K": 0.40
   },
-  "last_updated": "2025-01-12"
+  "last_updated": "2025-01-13"
 }
