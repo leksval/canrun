@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Test fuzzy matching integration for user input."""
 
-import sys
-sys.path.append('src')
+import asyncio
+import pytest
+from canrun.src.optimized_game_fuzzy_matcher import OptimizedGameFuzzyMatcher
 
-from optimized_game_fuzzy_matcher import OptimizedGameFuzzyMatcher
-
-def test_fuzzy_matching():
+@pytest.mark.asyncio
+async def test_fuzzy_matching():
     """Test the fuzzy matching system."""
     print("Testing Fuzzy Matcher Integration...")
     matcher = OptimizedGameFuzzyMatcher()
@@ -25,10 +25,12 @@ def test_fuzzy_matching():
     test_inputs = ['Diablo 4', 'COD MW', 'Baldurs Gate 3', 'GTA 5']
     
     for user_input in test_inputs:
-        result = matcher.find_best_match(user_input, games)
+        result = await matcher.find_best_match(user_input, games)
         if result:
-            match, conf = result
+            match, conf, message = result
             print(f"'{user_input}' -> '{match}' (confidence: {conf:.2f})")
+            if message:
+                print(f"  Note: {message}")
         else:
             print(f"'{user_input}' -> No match found")
 

@@ -2,10 +2,11 @@
 
 import asyncio
 import sys
-sys.path.append('src')
+import pytest
 
-from canrun_engine import CanRunEngine
+from canrun.src.canrun_engine import CanRunEngine
 
+@pytest.mark.asyncio
 async def test_minimum_requirements_logic():
     """Test the new minimum requirements messaging."""
     

@@ -12,12 +12,12 @@ from typing import Dict, List, Optional, Tuple, Any
 from dataclasses import dataclass, asdict
 from datetime import datetime, timedelta
 
-from src.privacy_aware_hardware_detector import PrivacyAwareHardwareDetector, PrivacyAwareHardwareSpecs
-from src.game_requirements_fetcher import GameRequirementsFetcher, GameRequirements
-from src.optimized_game_fuzzy_matcher import OptimizedGameFuzzyMatcher
-from src.compatibility_analyzer import CompatibilityAnalyzer, CompatibilityAnalysis, ComponentAnalysis, ComponentType, CompatibilityLevel
-from src.dynamic_performance_predictor import DynamicPerformancePredictor, PerformanceAssessment, PerformanceTier
-from src.rtx_llm_analyzer import GAssistLLMAnalyzer, LLMAnalysisResult
+from canrun.src.privacy_aware_hardware_detector import PrivacyAwareHardwareDetector, PrivacyAwareHardwareSpecs
+from canrun.src.game_requirements_fetcher import GameRequirementsFetcher, GameRequirements
+from canrun.src.optimized_game_fuzzy_matcher import OptimizedGameFuzzyMatcher
+from canrun.src.compatibility_analyzer import CompatibilityAnalyzer, CompatibilityAnalysis, ComponentAnalysis, ComponentType, CompatibilityLevel
+from canrun.src.dynamic_performance_predictor import DynamicPerformancePredictor, PerformanceAssessment, PerformanceTier
+from canrun.src.rtx_llm_analyzer import GAssistLLMAnalyzer, LLMAnalysisResult
 
 
 @dataclass

@@ -60,8 +60,18 @@ def test_canrun_diablo_direct():
         # Parse the response
         if '<<END>>' in stdout:
             response_text = stdout.split('<<END>>')[0]
+            
+            # Find the JSON part (starts with '{' and ends with '}')
+            json_start = response_text.find('{')
+            if json_start != -1:
+                # Find the last closing brace
+                json_end = response_text.rfind('}') + 1
+                json_text = response_text[json_start:json_end]
+            else:
+                json_text = response_text
+                
             try:
-                response = json.loads(response_text)
+                response = json.loads(json_text)
                 
                 if response.get('success'):
                     message = response.get('message', '')
@@ -69,14 +79,14 @@ def test_canrun_diablo_direct():
                     
                     # Check for key indicators of complete CanRun analysis
                     indicators = [
-                        'PERFORMANCE TIER:',
-                        'A (',  # A-tier scoring
+                        'YOUR SYSTEM',  # System detection section
+                        'GAME REQUIREMENTS',  # Requirements fetching section
+                        'PERFORMANCE',  # Performance prediction section
                         '/100',  # Score out of 100
-                        'PrivacyAwareHardwareDetector',
-                        'GameRequirementsFetcher',
-                        'DynamicPerformancePredictor',
-                        'CompatibilityAnalyzer',
-                        'CANRUN VERDICT:'
+                        'FPS:',  # FPS prediction
+                        'Settings:',  # Graphics settings recommendation
+                        'VERDICT:',  # Final verdict
+                        'CAN RUN'  # Compatibility result
                     ]
                     
                     found_indicators = [ind for ind in indicators if ind in message]

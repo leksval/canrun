@@ -15,10 +15,10 @@ from enum import Enum
 from pathlib import Path
 
 # Import display detector and lightweight ML model
-from src.display_detector import DisplayDetector
+from canrun.src.display_detector import DisplayDetector
 
 try:
-    from src.ml_model_loader import LightweightMLPredictor
+    from canrun.src.ml_model_loader import LightweightMLPredictor
     ML_AVAILABLE = True
 except ImportError:
     ML_AVAILABLE = False

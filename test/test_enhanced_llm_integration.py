@@ -7,18 +7,17 @@ Tests the new structured LLM analysis context and integration.
 import asyncio
 import sys
 import os
+import pytest
 from pathlib import Path
 
-# Add src to path
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+from canrun.src.compatibility_analyzer import CompatibilityAnalyzer
+from canrun.src.rtx_llm_analyzer import GAssistLLMAnalyzer
+from canrun.src.privacy_aware_hardware_detector import PrivacyAwareHardwareDetector
+from canrun.src.game_requirements_fetcher import GameRequirementsFetcher
+from canrun.src.data_sources.game_requirements_model import GameRequirements
+from canrun.src.compatibility_analyzer import CompatibilityAnalysis, ComponentAnalysis, CompatibilityLevel, ComponentType
 
-from src.compatibility_analyzer import CompatibilityAnalyzer
-from src.rtx_llm_analyzer import GAssistLLMAnalyzer
-from src.privacy_aware_hardware_detector import PrivacyAwareHardwareDetector
-from src.game_requirements_fetcher import GameRequirementsFetcher
-from src.data_sources.game_requirements_model import GameRequirements
-from src.compatibility_analyzer import CompatibilityAnalysis, ComponentAnalysis, CompatibilityLevel, ComponentType
-
+@pytest.mark.asyncio
 async def test_enhanced_llm_integration():
     """Test the enhanced LLM integration with structured context."""
     print("🧪 Testing Enhanced LLM Integration...")
@@ -155,14 +154,14 @@ async def test_enhanced_llm_integration():
         traceback.print_exc()
         return False
 
+@pytest.mark.asyncio
 async def test_plugin_llm_integration():
     """Test LLM integration in the plugin context."""
     print("\n🔌 Testing Plugin LLM Integration...")
     
     try:
         # Import plugin components
-        sys.path.insert(0, str(Path(__file__).parent.parent))
-        from plugin import initialize_enhanced_plugin, handle_enhanced_compatibility_check, SteamCompareUI, EnhancedResponseFormatter
+        from canrun.plugin import initialize_enhanced_plugin, handle_enhanced_compatibility_check, SteamCompareUI, EnhancedResponseFormatter
         
         # Initialize plugin
         print("🚀 Initializing plugin...")
@@ -178,7 +177,7 @@ async def test_plugin_llm_integration():
         print("🎮 Testing compatibility check with LLM...")
         
         # Import global components
-        from plugin import canrun_engine, requirements_fetcher
+        from canrun.plugin import canrun_engine, requirements_fetcher
         
         steam_compare = SteamCompareUI(requirements_fetcher)
         formatter = EnhancedResponseFormatter()
@@ -228,6 +227,7 @@ async def test_plugin_llm_integration():
         traceback.print_exc()
         return False
 
+@pytest.mark.asyncio
 async def main():
     """Run all enhanced LLM integration tests."""
     print("🧪 Enhanced LLM Integration Test Suite")

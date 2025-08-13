@@ -54,6 +54,15 @@ if %errorlevel% neq 0 (
 )
 
 echo.
+echo Force killing NVIDIA processes to ensure clean restart...
+taskkill /f /im "NVIDIA app.exe" 2>nul
+taskkill /f /im "nvcontainer.exe" 2>nul
+timeout /t 3 /nobreak >nul
+
+echo Restarting NVIDIA App...
+start "" "C:\Program Files\NVIDIA Corporation\NVIDIA app\nvidia_app.exe"
+
+echo.
 echo Verifying deployment...
 if exist "C:\Program Files\NVIDIA Corporation\NVIDIA app\plugins\canrun\manifest.json" (
     echo ✓ manifest.json deployed successfully

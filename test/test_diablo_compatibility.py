@@ -3,11 +3,11 @@
 
 import sys
 import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
-
 import asyncio
-from canrun_engine import CanRunEngine
+import pytest
+from canrun.src.canrun_engine import CanRunEngine
 
+@pytest.mark.asyncio
 async def test_diablo_compatibility():
     """Test the full compatibility analysis for Diablo 4."""
     

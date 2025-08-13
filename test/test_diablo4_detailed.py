@@ -3,12 +3,11 @@
 import sys
 import os
 import asyncio
+import pytest
 
-# Add src to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+from canrun.src.canrun_engine import CanRunEngine
 
-from canrun_engine import CanRunEngine
-
+@pytest.mark.asyncio
 async def test_diablo4_detailed():
     """Test complete workflow for Diablo 4 with detailed debugging."""
     try:

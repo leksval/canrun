@@ -6,6 +6,7 @@ Tests the enhanced G-Assist plugin with tool name detection and Steam Compare UI
 
 import asyncio
 import json
+import pytest
 import subprocess
 import sys
 import time
@@ -23,6 +24,7 @@ def create_enhanced_g_assist_command(function_name: str, params: Dict[str, Any])
     }
     return json.dumps(command)
 
+@pytest.mark.asyncio
 async def test_enhanced_plugin_communication():
     """Test enhanced G-Assist style communication with Steam Compare UI."""
     print("🧪 ENHANCED G-ASSIST COMMUNICATION TEST")
@@ -78,7 +80,7 @@ async def test_enhanced_plugin_communication():
         try:
             # Launch enhanced plugin as subprocess
             process = subprocess.Popen(
-                [sys.executable, "plugin.py"],
+                [sys.executable, "canrun/plugin.py"],
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -135,7 +137,7 @@ def test_enhanced_manifest_parsing():
     print("-" * 40)
     
     try:
-        with open("manifest.json", "r") as f:
+        with open("canrun/manifest.json", "r") as f:
             manifest = json.load(f)
             
         print("✅ Enhanced manifest JSON is valid")
@@ -197,7 +199,7 @@ def test_command_line_interface():
         print(f"\n🧪 Testing: {test['name']}")
         try:
             result = subprocess.run(
-                [sys.executable, "plugin.py"] + test["args"],
+                [sys.executable, "canrun/plugin.py"] + test["args"],
                 capture_output=True,
                 text=True,
                 timeout=30
@@ -225,6 +227,7 @@ def test_command_line_interface():
         except Exception as e:
             print(f"❌ CLI test error: {e}")
 
+@pytest.mark.asyncio
 async def test_tool_name_detection():
     """Test the tool name detection functionality."""
     print("\n🔍 TESTING TOOL NAME DETECTION")
@@ -261,7 +264,7 @@ async def test_tool_name_detection():
         
         try:
             process = subprocess.Popen(
-                [sys.executable, "plugin.py"],
+                [sys.executable, "canrun/plugin.py"],
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,

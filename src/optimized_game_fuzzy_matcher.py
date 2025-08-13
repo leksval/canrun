@@ -8,7 +8,7 @@ import logging
 from collections import defaultdict
 from typing import List, Tuple, Dict, Optional
 import asyncio
-from src.rtx_llm_analyzer import GAssistLLMAnalyzer
+from canrun.src.rtx_llm_analyzer import GAssistLLMAnalyzer
 
 
 class OptimizedGameFuzzyMatcher:

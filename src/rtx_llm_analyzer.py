@@ -12,8 +12,8 @@ from enum import Enum
 import threading
 from datetime import datetime, timedelta
 
-from src.dynamic_performance_predictor import PerformanceAssessment
-from src.privacy_aware_hardware_detector import PrivacyAwareHardwareSpecs
+from canrun.src.dynamic_performance_predictor import PerformanceAssessment
+from canrun.src.privacy_aware_hardware_detector import PrivacyAwareHardwareSpecs
 
 
 class LLMAnalysisType(Enum):

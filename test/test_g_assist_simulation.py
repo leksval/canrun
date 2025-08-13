@@ -6,6 +6,7 @@ Simulates G-Assist sending commands to our plugin to verify communication protoc
 
 import asyncio
 import json
+import pytest
 import subprocess
 import sys
 import time
@@ -23,6 +24,7 @@ def create_g_assist_command(function_name: str, params: Dict[str, Any]) -> str:
     }
     return json.dumps(command)
 
+@pytest.mark.asyncio
 async def test_plugin_communication():
     """Test G-Assist style communication with our plugin."""
     print("🧪 G-ASSIST COMMAND SIMULATION TEST")
@@ -63,7 +65,7 @@ async def test_plugin_communication():
         try:
             # Launch plugin as subprocess
             process = subprocess.Popen(
-                [sys.executable, "plugin.py"],
+                [sys.executable, "canrun/plugin.py"],
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -110,7 +112,7 @@ def test_manifest_parsing():
     print("-" * 40)
     
     try:
-        with open("manifest.json", "r") as f:
+        with open("canrun/manifest.json", "r") as f:
             manifest = json.load(f)
             
         print("✅ Manifest JSON is valid")
@@ -142,7 +144,7 @@ def test_executable_exists():
     
     import os
     
-    executable_path = "./g-assist-plugin-python.exe"
+    executable_path = "./canrun/g-assist-plugin-canrun.exe"
     if os.path.exists(executable_path):
         print(f"✅ Executable found: {executable_path}")
         print(f"📦 File size: {os.path.getsize(executable_path)} bytes")
