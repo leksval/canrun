@@ -179,38 +179,38 @@ class CanRunGAssistPlugin:
             hardware_specs = loop.run_until_complete(self.canrun_engine.hardware_detector.get_hardware_specs())
             loop.close()
             
-            hardware_message = f"""💻 SYSTEM HARDWARE DETECTION:
+            hardware_message = f"""SYSTEM HARDWARE DETECTION:
 
-🖥️ GRAPHICS CARD:
-• GPU: {hardware_specs.gpu_model}
-• VRAM: {hardware_specs.gpu_vram_gb}GB
-• RTX Features: {'✅ Supported' if hardware_specs.supports_rtx else '❌ Not Available'}
-• DLSS Support: {'✅ Available' if hardware_specs.supports_dlss else '❌ Not Available'}
-• Driver Status: {'✅ Compatible' if hardware_specs.nvidia_driver_version != 'Unknown' else '⚠️ Unknown Version'}
+GRAPHICS CARD:
+- GPU: {hardware_specs.gpu_model}
+- VRAM: {hardware_specs.gpu_vram_gb}GB
+- RTX Features: {'Supported' if hardware_specs.supports_rtx else 'Not Available'}
+- DLSS Support: {'Available' if hardware_specs.supports_dlss else 'Not Available'}
+- Driver Status: {'Compatible' if hardware_specs.nvidia_driver_version != 'Unknown' else 'Unknown Version'}
 
-🧠 PROCESSOR:
-• CPU: {hardware_specs.cpu_model}
-• Cores: {hardware_specs.cpu_cores} Physical / {hardware_specs.cpu_threads} Logical
-• Performance: {'✅ High-Performance' if hardware_specs.cpu_cores >= 6 else '⚠️ Mid-Range'}
+PROCESSOR:
+- CPU: {hardware_specs.cpu_model}
+- Cores: {hardware_specs.cpu_cores} Physical / {hardware_specs.cpu_threads} Logical
+- Performance: {'High-Performance' if hardware_specs.cpu_cores >= 6 else 'Mid-Range'}
 
-💾 MEMORY:
-• RAM: {hardware_specs.ram_total_gb}GB Total
-• Speed: {hardware_specs.ram_speed_mhz}MHz
-• Gaming Performance: {'✅ Excellent' if hardware_specs.ram_total_gb >= 16 else '⚠️ Adequate' if hardware_specs.ram_total_gb >= 8 else '❌ Below Recommended'}
+MEMORY:
+- RAM: {hardware_specs.ram_total_gb}GB Total
+- Speed: {hardware_specs.ram_speed_mhz}MHz
+- Gaming Performance: {'Excellent' if hardware_specs.ram_total_gb >= 16 else 'Adequate' if hardware_specs.ram_total_gb >= 8 else 'Below Recommended'}
 
-🖥️ DISPLAY:
-• Resolution: {hardware_specs.primary_monitor_resolution}
-• Refresh Rate: {hardware_specs.primary_monitor_refresh_hz}Hz
-• G-Sync/FreeSync: {'✅ Likely Supported' if hardware_specs.supports_rtx else '⚠️ Check Monitor Settings'}
+DISPLAY:
+- Resolution: {hardware_specs.primary_monitor_resolution}
+- Refresh Rate: {hardware_specs.primary_monitor_refresh_hz}Hz
+- G-Sync/FreeSync: {'Likely Supported' if hardware_specs.supports_rtx else 'Check Monitor Settings'}
 
-💾 STORAGE:
-• Type: {hardware_specs.storage_type}
-• Performance: {'✅ Fast Loading' if 'SSD' in hardware_specs.storage_type else '⚠️ Standard'}
+STORAGE:
+- Type: {hardware_specs.storage_type}
+- Performance: {'Fast Loading' if 'SSD' in hardware_specs.storage_type else 'Standard'}
 
-🖥️ SYSTEM:
-• OS: {hardware_specs.os_version}
-• DirectX: {hardware_specs.directx_version}
-• G-Assist: ✅ Compatible (Plugin Working)
+SYSTEM:
+- OS: {hardware_specs.os_version}
+- DirectX: {hardware_specs.directx_version}
+- G-Assist: Compatible (Plugin Working)
 
 Hardware detection completed successfully using CanRun's privacy-aware detection system."""
 
@@ -226,41 +226,60 @@ Hardware detection completed successfully using CanRun's privacy-aware detection
             }
     
     def format_canrun_response(self, result):
-        """Format CanRun result for G-Assist display with complete information."""
+        """Format CanRun result for G-Assist display in detailed style with emojis."""
         try:
-            # Extract performance tier and score
+            # Extract key information
             tier = result.performance_prediction.tier.name if hasattr(result.performance_prediction, 'tier') else 'Unknown'
             score = int(result.performance_prediction.score) if hasattr(result.performance_prediction, 'score') else 0
+            fps = result.performance_prediction.expected_fps if hasattr(result.performance_prediction, 'expected_fps') else 0
+            settings = result.performance_prediction.recommended_settings if hasattr(result.performance_prediction, 'recommended_settings') else 'Unknown'
             
             # Get compatibility status
-            can_run = "✅ CAN RUN" if result.can_run_game() else "❌ CANNOT RUN"
+            can_run = result.can_run_game()
             exceeds_recommended = result.exceeds_recommended_requirements()
             
-            # Format comprehensive response
-            original_query = result.game_name
+            # Get game information
+            game_name = result.game_name
             matched_name = result.game_requirements.game_name
             
-            # Get actual Steam API game name if available
-            steam_api_name = result.game_requirements.steam_api_name if hasattr(result.game_requirements, 'steam_api_name') and result.game_requirements.steam_api_name else matched_name
-            
-            # Determine if game name was matched differently from user query
-            steam_api_info = ""
-            if original_query.lower() != steam_api_name.lower():
-                steam_api_info = f"(Steam found: {steam_api_name})"
-            
-            title_line = ""
-            if result.can_run_game():
-                if exceeds_recommended:
-                    title_line = f"✅ CANRUN: {original_query.upper()} will run EXCELLENTLY {steam_api_info}!"
-                else:
-                    title_line = f"✅ CANRUN: {original_query.upper()} will run {steam_api_info}!"
+            # Get resolution information
+            resolution_class = getattr(result, 'detected_resolution_class', 'Unknown')
+            # Safely get current resolution
+            if hasattr(result.hardware_specs, 'display_resolution') and result.hardware_specs.display_resolution:
+                current_resolution = f"{result.hardware_specs.display_resolution.get('width', 1920)}x{result.hardware_specs.display_resolution.get('height', 1080)}"
             else:
-                title_line = f"❌ CANNOT RUN {original_query.upper()} {steam_api_info}!"
+                # Try to get resolution from primary monitor settings
+                try:
+                    width = getattr(result.hardware_specs, 'primary_monitor_width', 1920)
+                    height = getattr(result.hardware_specs, 'primary_monitor_height', 1080)
+                    current_resolution = f"{width}x{height}"
+                except:
+                    current_resolution = "1920x1080"
+            
+            # Determine optimal resolution based on GPU tier
+            if tier in ['S', 'A']:
+                optimal_resolution = "4K (3840x2160)"
+            elif tier in ['B', 'C']:
+                optimal_resolution = "1440p (2560x1440)"
+            else:
+                optimal_resolution = "1080p (1920x1080)"
+            
+            # Create detailed header
+            if can_run:
+                if exceeds_recommended:
+                    header = f"✅ CANRUN: {game_name.upper()} will run EXCELLENTLY !"
+                else:
+                    header = f"✅ CANRUN: {game_name.upper()} will run WELL !"
+                verdict = "✅ CAN RUN"
+            else:
+                header = f"❌ CANRUN: {game_name.upper()} CANNOT RUN"
+                verdict = "❌ CANNOT RUN"
+            
+            # Build detailed response
+            response = f"""{header}
 
-            response = f"""{title_line}
-
-🎮 YOUR SEARCH: {original_query}
-🎮 STEAM MATCHED GAME: {steam_api_name}
+🎮 YOUR SEARCH: {game_name}
+🎮 STEAM MATCHED GAME: {matched_name}
 
 🏆 PERFORMANCE TIER: {tier} ({score}/100)
 
@@ -278,46 +297,32 @@ Hardware detection completed successfully using CanRun's privacy-aware detection
 • VRAM Required: {result.game_requirements.minimum_vram_gb}GB (Min) / {result.game_requirements.recommended_vram_gb}GB (Rec)
 
 ⚡ PERFORMANCE PREDICTION:
-• Expected FPS: {getattr(result.performance_prediction, 'expected_fps', 'Unknown')}
-• Recommended Settings: {getattr(result.performance_prediction, 'recommended_settings', 'Unknown')}
-• Current Resolution: {result.hardware_specs.primary_monitor_resolution}
-• Optimal Resolution: {getattr(result.performance_prediction, 'recommended_resolution', 'Unknown')}
-• Performance Level: {'Exceeds Recommended' if exceeds_recommended else 'Meets Minimum' if result.can_run_game() else 'Below Minimum'}
+• Expected FPS: {fps}
+• Recommended Settings: {settings}
+• Current Resolution: {current_resolution}
+• Optimal Resolution: {optimal_resolution}
+• Performance Level: {'Exceeds Recommended' if exceeds_recommended else 'Meets Minimum'}
 
 🔧 OPTIMIZATION SUGGESTIONS:"""
 
             # Add optimization suggestions
-            if hasattr(result.performance_prediction, 'upgrade_suggestions'):
-                suggestions = result.performance_prediction.upgrade_suggestions[:3]
-                for suggestion in suggestions:
+            if hasattr(result.performance_prediction, 'upgrade_suggestions') and result.performance_prediction.upgrade_suggestions:
+                for suggestion in result.performance_prediction.upgrade_suggestions:
                     response += f"\n• {suggestion}"
             else:
-                response += "\n• Update GPU drivers for optimal performance"
-                if result.hardware_specs.supports_dlss:
-                    response += "\n• Enable DLSS for significant performance boost"
-                if result.hardware_specs.supports_rtx:
-                    response += "\n• Consider RTX features for enhanced visuals"
-
-            # Add compatibility analysis
-            if hasattr(result, 'compatibility_analysis') and result.compatibility_analysis:
-                if hasattr(result.compatibility_analysis, 'bottlenecks') and result.compatibility_analysis.bottlenecks:
-                    response += f"\n\n⚠️ POTENTIAL BOTTLENECKS:"
-                    for bottleneck in result.compatibility_analysis.bottlenecks[:2]:
-                        response += f"\n• {bottleneck.value}"
-
-            # Add final verdict
-            response += f"\n\n🎯 CANRUN VERDICT: {can_run}"
+                if exceeds_recommended:
+                    response += "\n• System performing excellently"
+                else:
+                    response += "\n• Consider upgrading for better performance"
             
-            # Make it clear if the Steam API returned something different than what was requested
-            if steam_api_name.lower() != original_query.lower():
-                response += f"\n\n🎮 NOTE: Steam found '{steam_api_name}' instead of '{original_query}'"
-                response += f"\n    Results shown are for '{steam_api_name}'"
+            # Add final verdict
+            response += f"\n\n🎯 CANRUN VERDICT: {verdict}"
             
             return response
             
         except Exception as e:
             logging.error(f"Error formatting CanRun response: {e}")
-            return f"🎮 CANRUN ANALYSIS: {getattr(result, 'game_name', 'Unknown Game')}\n\n✅ Analysis completed but formatting error occurred.\nRaw result available in logs."
+            return f"❌ Analysis failed for {getattr(result, 'game_name', 'Unknown Game')}. Please check system compatibility."
 
 async def handle_natural_language_query(query):
     """Handle natural language queries like 'canrun game?' and return formatted result."""

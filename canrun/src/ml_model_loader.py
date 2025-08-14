@@ -30,13 +30,27 @@ class LightweightMLPredictor:
         self._load_gpu_hierarchy()
     
     def _load_model(self):
-        """Load the pre-trained ML model data"""
+        """Load the pre-trained ML model data with PyInstaller support"""
         try:
-            # Try both src and data directories
-            model_paths = [
-                Path(__file__).parent / "ml_fps_model.json",
-                Path(__file__).parent.parent / "data" / "ml_fps_model.json"
-            ]
+            import sys
+            import os
+            
+            # Handle PyInstaller executable paths
+            if getattr(sys, 'frozen', False):
+                # Running as compiled executable
+                bundle_dir = Path(sys._MEIPASS)
+                model_paths = [
+                    bundle_dir / "canrun" / "src" / "ml_fps_model.json",
+                    bundle_dir / "canrun" / "data" / "ml_fps_model.json",
+                    bundle_dir / "data" / "ml_fps_model.json",
+                    bundle_dir / "ml_fps_model.json"
+                ]
+            else:
+                # Running in development
+                model_paths = [
+                    Path(__file__).parent / "ml_fps_model.json",
+                    Path(__file__).parent.parent / "data" / "ml_fps_model.json"
+                ]
             
             for model_path in model_paths:
                 if model_path.exists():
@@ -51,18 +65,30 @@ class LightweightMLPredictor:
                         self.logger.info(f"ML model v{model_version} loaded: {len(self.lookup_table)} predictions")
                         return
             
-            self.logger.warning("ML model file not found")
+            self.logger.warning(f"ML model file not found in paths: {[str(p) for p in model_paths]}")
         except Exception as e:
             self.logger.error(f"Failed to load ML model: {e}")
     
     def _load_gpu_hierarchy(self):
-        """Load only PassMark and VRAM data from GPU hierarchy efficiently"""
+        """Load only PassMark and VRAM data from GPU hierarchy efficiently with PyInstaller support"""
         try:
-            # Try multiple possible paths for GPU hierarchy
-            hierarchy_paths = [
-                Path(__file__).parent.parent / "data" / "gpu_hierarchy.json",
-                Path(__file__).parent.parent.parent / "data" / "gpu_hierarchy.json"
-            ]
+            import sys
+            
+            # Handle PyInstaller executable paths
+            if getattr(sys, 'frozen', False):
+                # Running as compiled executable
+                bundle_dir = Path(sys._MEIPASS)
+                hierarchy_paths = [
+                    bundle_dir / "canrun" / "data" / "gpu_hierarchy.json",
+                    bundle_dir / "data" / "gpu_hierarchy.json",
+                    bundle_dir / "gpu_hierarchy.json"
+                ]
+            else:
+                # Running in development
+                hierarchy_paths = [
+                    Path(__file__).parent.parent / "data" / "gpu_hierarchy.json",
+                    Path(__file__).parent.parent.parent / "data" / "gpu_hierarchy.json"
+                ]
             
             hierarchy_path = None
             for path in hierarchy_paths:
@@ -88,7 +114,7 @@ class LightweightMLPredictor:
                     
                     self.logger.info(f"GPU database loaded: {len(self.gpu_hierarchy)} GPUs")
             else:
-                self.logger.warning(f"GPU hierarchy file not found: {hierarchy_path}")
+                self.logger.warning(f"GPU hierarchy file not found in paths: {[str(p) for p in hierarchy_paths]}")
         except Exception as e:
             self.logger.error(f"Failed to load GPU hierarchy: {e}")
     

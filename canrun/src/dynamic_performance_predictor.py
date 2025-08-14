@@ -473,7 +473,7 @@ class StreamlinedPerformancePredictor:
     def _calculate_fps_with_ml(self, gpu_passmark: int, cpu_passmark: int, resolution: str,
                                gpu_model: str, game_requirements: Dict = None) -> int:
         """
-        Calculate FPS using ML model with fallback to formula-based calculation.
+        Calculate FPS using ML model - primary prediction method.
         
         Args:
             gpu_passmark: GPU PassMark G3D score
@@ -485,28 +485,11 @@ class StreamlinedPerformancePredictor:
         Returns:
             Predicted FPS as integer
         """
-        # ML-based FPS calculation - PyInstaller debugging
-        self.logger.error(f"[EXEC_DEBUG] ML method called, ML predictor status: {self.ml_predictor is not None}")
-        if self.ml_predictor:
-            self.logger.error(f"[EXEC_DEBUG] ML predictor loaded: {self.ml_predictor.is_loaded}")
-        # ML-based FPS calculation
-        self.logger.error(f"[FPS_DEBUG] GPU: {gpu_model} (PassMark: {gpu_passmark})")
-        self.logger.error(f"[FPS_DEBUG] CPU PassMark: {cpu_passmark}")
-        self.logger.error(f"[FPS_DEBUG] Resolution: {resolution}")
-        self.logger.error(f"[FPS_DEBUG] Game Requirements: {game_requirements}")
-        self.logger.error(f"[FPS_DEBUG] ML Predictor Available: {self.ml_predictor is not None}")
-        
-        if self.ml_predictor:
-            self.logger.error(f"[FPS_DEBUG] ML Predictor Loaded: {self.ml_predictor.is_loaded}")
-        
-        # Try ML prediction first
         if self.ml_predictor and self.ml_predictor.is_loaded:
             try:
                 game_name = "General Gaming"  # Default
                 if game_requirements:
                     game_name = game_requirements.get('game_name', 'General Gaming')
-                
-                self.logger.error(f"[FPS_DEBUG] Attempting ML prediction for game: {game_name}")
                 
                 ml_fps = self.ml_predictor.predict_fps(
                     gpu_name=gpu_model,
@@ -515,35 +498,16 @@ class StreamlinedPerformancePredictor:
                     game_name=game_name
                 )
                 
-                self.logger.error(f"[FPS_DEBUG] ML prediction result: {ml_fps}")
-                
-                if ml_fps is not None:
-                    self.logger.error(f"[FPS_DEBUG] ML prediction SUCCESS: {gpu_model} @ {resolution} in {game_name} = {ml_fps} FPS")
+                if ml_fps is not None and ml_fps > 0:
                     self.logger.debug(f"ML prediction: {gpu_model} @ {resolution} in {game_name} = {ml_fps} FPS")
                     return int(ml_fps)
-                else:
-                    self.logger.error(f"[FPS_DEBUG] ML prediction returned None, falling back to formula")
-                    self.logger.debug(f"ML prediction failed for {gpu_model}, falling back to formula")
             except Exception as e:
-                self.logger.error(f"[FPS_DEBUG] ML prediction EXCEPTION: {e}")
-                self.logger.debug(f"ML prediction error: {e}, falling back to formula")
-        else:
-            self.logger.error(f"[FPS_DEBUG] ML predictor not available or not loaded - using formula")
+                self.logger.error(f"ML prediction error: {e}")
         
-        # Fallback to formula-based calculation
-        self.logger.error(f"[FPS_DEBUG] Using formula-based calculation")
-        formula_fps = self._calculate_fps(
-            gpu_passmark=gpu_passmark,
-            cpu_passmark=cpu_passmark,
-            resolution=resolution,
-            gpu_model=gpu_model,
-            game_requirements=game_requirements
-        )
-        
-        self.logger.error(f"[FPS_DEBUG] Formula FPS result: {formula_fps}")
-        self.logger.error(f"[FPS_DEBUG] === FPS Calculation End ===")
-        
-        return formula_fps
+        # Simple fallback for missing ML model
+        base_fps = gpu_passmark // 150  # Simple PassMark to FPS ratio
+        resolution_factor = {"4K": 0.4, "1440p": 0.65, "1080p": 1.0, "720p": 1.4}.get(resolution, 1.0)
+        return max(30, int(base_fps * resolution_factor))
     
     def _get_gpu_generation(self, gpu_model: str) -> str:
         """Classify GPU generation for quality settings"""
@@ -568,16 +532,20 @@ class StreamlinedPerformancePredictor:
         """Classify display resolution based on performance impact"""
         total_pixels = width * height
         
-        # 4K and above (includes ultrawide resolutions closer to 4K performance)
-        if total_pixels >= 3840 * 2160 * 0.9:  # True 4K
+        # True 4K and above (8M+ pixels) - actual 4K performance impact
+        if total_pixels >= 3840 * 2160 * 0.9:  # True 4K: 8.3M pixels
             return "4K"
-        elif total_pixels >= 2560 * 1440 * 1.4:  # High-res ultrawide (5M+ pixels)
-            return "4K"  # Performance closer to 4K
-        elif total_pixels >= 2560 * 1440 * 0.9:  # Standard 1440p
+        elif total_pixels >= 3440 * 1440 * 0.95:  # Large ultrawide: 4.7M+ pixels
+            return "4K"
+        # High-res displays in 1440p class (including user's 3072x1728)
+        elif 3000 <= width <= 3200 and 1700 <= height <= 1800:  # User's specific range
             return "1440p"
-        elif total_pixels >= 1920 * 1080 * 0.9:  # 1080p
+        elif total_pixels >= 2560 * 1440 * 0.9:  # Standard 1440p: 3.7M pixels
+            return "1440p"
+        # 1080p class
+        elif total_pixels >= 1920 * 1080 * 0.9:  # 1080p: 2.1M pixels
             return "1080p"
-        elif total_pixels >= 1280 * 720 * 0.9:  # 720p
+        elif total_pixels >= 1280 * 720 * 0.9:  # 720p: 0.9M pixels
             return "720p"
         else:
             return "720p"
