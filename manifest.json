@@ -2,7 +2,7 @@
   "manifestVersion": 1,
   "executable": "g-assist-plugin-canrun.exe",
   "persistent": false,
-  "passthrough": false,
+  "passthrough": true,
   "functions": [
     {
       "name": "canrun",

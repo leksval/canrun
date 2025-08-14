@@ -361,14 +361,34 @@ def main():
     setup_logging()
     logging.info("CanRun Plugin Started")
     
-    # Check if command line arguments were provided
-    if len(sys.argv) > 1:
+    # Filter out multiprocessing arguments that G-Assist may pass
+    filtered_args = []
+    skip_next = False
+    for i, arg in enumerate(sys.argv[1:], 1):
+        if skip_next:
+            skip_next = False
+            continue
+        if arg.startswith('--multiprocessing-fork'):
+            skip_next = False  # This arg has the value embedded
+            continue
+        if arg in ['parent_pid', 'pipe_handle'] and i > 1:
+            skip_next = True  # Skip the next argument which is the value
+            continue
+        if arg.startswith('parent_pid=') or arg.startswith('pipe_handle='):
+            continue  # Skip embedded values
+        filtered_args.append(arg)
+    
+    logging.info(f"Original args: {sys.argv[1:]}")
+    logging.info(f"Filtered args: {filtered_args}")
+    
+    # Check if command line arguments were provided (after filtering)
+    if len(filtered_args) > 0:
         # Force UTF-8 encoding for stdout to handle emojis
         if hasattr(sys.stdout, 'reconfigure'):
             sys.stdout.reconfigure(encoding='utf-8')
         
         # Handle command-line arguments in "canrun game?" format
-        args = sys.argv[1:]
+        args = filtered_args
         
         # Process query
         query = " ".join(args)
