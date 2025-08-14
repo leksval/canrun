@@ -28,6 +28,8 @@ tags:
 
 **CanRun** is an RTX/GTX-exclusive G-Assist plugin that instantly tells you if your PC can run any game with an advanced **S-A-B-C-D-F tier system** and enhanced Steam integration.
 
+![R3](https://github.com/user-attachments/assets/79a68ba5-a4d9-493c-bea5-d455edadf627)
+
 ## ✨ Key Features
 
 - **🎯 RTX/GTX Optimized**: Exclusively designed for RTX/GTX systems with G-Assist integration
@@ -89,7 +91,6 @@ uv run python src/train_unified_ml_model_2025.py
 - **Feature engineering**: Polynomial interactions, PassMark scores, VRAM ratios
 
 
-![R3](https://github.com/user-attachments/assets/79a68ba5-a4d9-493c-bea5-d455edadf627)
 
 ---
 ## Live Demo, download and test locally for real hardvare evaluation as MCP server
