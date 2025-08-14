@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """
-CanRun G-Assist Plugin - Clean Implementation
-Based on working minimal plugin communication with full CanRun engine integration
-Follows official NVIDIA G-Assist plugin standards
+CanRun G-Assist Plugin
+Official NVIDIA G-Assist plugin following standard communication protocol
 """
 
 import sys
@@ -12,13 +11,12 @@ import logging
 import asyncio
 import platform
 from typing import Optional, Dict, Any
-from pathlib import Path
 
 # Windows pipe communication - only import on Windows
 if platform.system() == "Windows":
     from ctypes import byref, windll, wintypes
 
-# Import existing tested CanRun components using proper package imports
+# Import CanRun components
 try:
     from canrun.src.canrun_engine import CanRunEngine
     CANRUN_AVAILABLE = True
@@ -33,15 +31,8 @@ BUFFER_SIZE = 4096
 IS_WINDOWS = platform.system() == "Windows"
 
 def setup_logging():
-    """Setup UTF-8 logging to prevent encoding errors."""
-    # Force UTF-8 encoding for all streams
-    if hasattr(sys.stdout, 'reconfigure'):
-        sys.stdout.reconfigure(encoding='utf-8')
-    if hasattr(sys.stderr, 'reconfigure'):
-        sys.stderr.reconfigure(encoding='utf-8')
-    
+    """Setup minimal logging for plugin operations."""
     log_file = os.path.join(os.environ.get("USERPROFILE" if IS_WINDOWS else "HOME", "."), 'canrun_plugin.log')
-    
     logging.basicConfig(
         filename=log_file,
         level=logging.INFO,
@@ -49,152 +40,97 @@ def setup_logging():
         encoding='utf-8'
     )
 
-def robust_json_parse(data):
-    """Ultra-robust JSON parser that handles G-Assist's complex JSON with extra data."""
+def parse_json_command(data):
+    """Parse JSON command from G-Assist communication."""
     if not data:
         return None
     
     try:
-        # First, try standard JSON parsing
-        return json.loads(data)
+        return json.loads(data.strip())
     except json.JSONDecodeError:
-        pass
-    
-    # If that fails, try to extract JSON from the data
-    data = data.strip()
-    
-    # Look for JSON object boundaries
-    brace_count = 0
-    start_idx = -1
-    
-    for i, char in enumerate(data):
-        if char == '{':
-            if start_idx == -1:
-                start_idx = i
-            brace_count += 1
-        elif char == '}':
-            brace_count -= 1
-            if brace_count == 0 and start_idx != -1:
-                # Found complete JSON object
-                json_str = data[start_idx:i+1]
-                try:
-                    return json.loads(json_str)
-                except json.JSONDecodeError:
-                    continue
-    
-    # If no valid JSON found, return None
-    logging.warning(f"Could not parse JSON from data: {data[:100]}...")
-    return None
+        # Extract JSON from mixed content
+        data = data.strip()
+        brace_count = 0
+        start_idx = -1
+        
+        for i, char in enumerate(data):
+            if char == '{':
+                if start_idx == -1:
+                    start_idx = i
+                brace_count += 1
+            elif char == '}':
+                brace_count -= 1
+                if brace_count == 0 and start_idx != -1:
+                    try:
+                        return json.loads(data[start_idx:i+1])
+                    except json.JSONDecodeError:
+                        continue
+        return None
 
 def read_command():
-    """Read command from Windows named pipe with UTF-8 encoding."""
-    if not IS_WINDOWS:
-        # Fallback for non-Windows
-        try:
-            line = sys.stdin.readline()
-            if not line:
-                return None
-            return json.loads(line)
-        except json.JSONDecodeError:
-            return None
-    
+    """Read command from stdin - Official NVIDIA Implementation."""
     try:
-        pipe = windll.kernel32.GetStdHandle(STD_INPUT_HANDLE)
-        chunks = []
+        line = sys.stdin.readline()
+        if not line:
+            logging.info('EOF received, shutting down')
+            return "EOF"
+            
+        line = line.strip()
+        if not line:
+            logging.warning('Empty line received, continuing')
+            return None
+            
+        logging.info(f'Received command: {line}')
+        return json.loads(line)
         
-        while True:
-            message_bytes = wintypes.DWORD()
-            buffer = bytes(BUFFER_SIZE)
-            success = windll.kernel32.ReadFile(
-                pipe,
-                buffer,
-                BUFFER_SIZE,
-                byref(message_bytes),
-                None
-            )
-
-            if not success:
-                error = windll.kernel32.GetLastError()
-                if error == 109:  # ERROR_BROKEN_PIPE
-                    logging.info('Pipe closed by G-Assist, exiting gracefully')
-                    return None
-                logging.error(f'ReadFile failed with error: {error}')
-                return None
-
-            if message_bytes.value == 0:
-                logging.info('No data read from pipe, assuming closed')
-                return None
-
-            chunk = buffer.decode('utf-8', errors='ignore')[:message_bytes.value]
-            chunks.append(chunk)
-
-            if message_bytes.value < BUFFER_SIZE:
-                break
-
-        retval = ''.join(chunks)
-        logging.info(f'Raw Input: {retval[:200]}...')
-        return robust_json_parse(retval)
-        
+    except json.JSONDecodeError as e:
+        logging.error(f'Invalid JSON received: {e}')
+        return None
     except Exception as e:
-        logging.error(f'Exception in read_command(): {e}')
+        logging.error(f'Error in read_command: {e}')
         return None
 
 def write_response(response):
-    """Write response to Windows named pipe with UTF-8 encoding."""
-    if not IS_WINDOWS:
-        # Fallback for non-Windows
-        try:
-            message = json.dumps(response) + '<<END>>'
-            sys.stdout.write(message)
-            sys.stdout.flush()
-        except Exception as e:
-            logging.error(f'Error writing response: {e}')
-        return
-    
+    """Write response to stdout - Official NVIDIA Implementation."""
     try:
-        pipe = windll.kernel32.GetStdHandle(STD_OUTPUT_HANDLE)
-        json_message = json.dumps(response) + '<<END>>'
-        message_bytes = json_message.encode('utf-8')
-        
-        bytes_written = wintypes.DWORD()
-        windll.kernel32.WriteFile(
-            pipe,
-            message_bytes,
-            len(message_bytes),
-            bytes_written,
-            None
-        )
-        logging.info(f'Response sent: {len(message_bytes)} bytes')
+        message = json.dumps(response) + '<<END>>'
+        sys.stdout.write(message)
+        sys.stdout.flush()
+        logging.info(f'Response sent: {len(message)} characters')
     except Exception as e:
         logging.error(f'Error writing response: {e}')
 
-class CanRunPlugin:
-    """Clean CanRun G-Assist plugin implementation."""
+def is_g_assist_environment():
+    """Check if running in G-Assist environment."""
+    return not sys.stdin.isatty()
+
+class CanRunGAssistPlugin:
+    """Official G-Assist plugin for CanRun game compatibility checking."""
     
     def __init__(self):
-        """Initialize CanRun plugin with engine integration."""
-        self.engine = None
-        
+        """Initialize CanRun G-Assist plugin with complete engine integration."""
         if CANRUN_AVAILABLE:
             try:
-                # Check if running in G-Assist environment vs test mode
-                is_g_assist_env = len(sys.argv) == 1  # G-Assist calls with no args
-                
-                # Initialize CanRun engine with conditional LLM based on environment
-                self.engine = CanRunEngine(
+                self.canrun_engine = CanRunEngine(
                     cache_dir=os.path.join(os.path.dirname(__file__), "cache"),
-                    enable_llm=is_g_assist_env  # Only enable LLM in G-Assist environment
+                    enable_llm=True
                 )
-                logging.info("CanRun engine initialized successfully")
+                logging.info("CanRun engine initialized with complete feature set")
             except Exception as e:
                 logging.error(f"Failed to initialize CanRun engine: {e}")
-                self.engine = None
+                self.canrun_engine = None
         else:
-            logging.warning("CanRun engine not available")
+            self.canrun_engine = None
     
-    async def canrun(self, params):
-        """Main CanRun function - check game compatibility."""
-        game_name = params.get("game_name", params.get("game", "")).strip()
+    async def check_game_compatibility(self, params):
+        """Perform CanRun analysis using the full CanRun engine."""
+        game_name = params.get("game_name", "").strip()
+        
+        force_refresh_param = params.get("force_refresh", False)
+        if isinstance(force_refresh_param, str):
+            force_refresh = force_refresh_param.lower() == "true"
+        else:
+            force_refresh = bool(force_refresh_param)
         
         if not game_name:
             return {
@@ -202,20 +138,18 @@ class CanRunPlugin:
                 "message": "Game name is required for CanRun analysis"
             }
         
-        logging.info(f"CANRUN: Checking compatibility for {game_name}")
+        logging.info(f"Starting CanRun analysis for: {game_name} (force_refresh: {force_refresh})")
         
         try:
-            if not self.engine:
+            if not self.canrun_engine:
                 return {
                     "success": False,
                     "message": f"CanRun engine not available. Cannot analyze {game_name}."
                 }
             
-            # Use the same CanRun engine logic as the working root plugin
-            result = await self.engine.check_game_compatibility(game_name, use_cache=True)
+            result = await self.canrun_engine.check_game_compatibility(game_name, use_cache=not force_refresh)
             
             if result:
-                # Use the same formatting logic as the working root plugin
                 formatted_result = self.format_canrun_response(result)
                 return {
                     "success": True,
@@ -234,164 +168,330 @@ class CanRunPlugin:
                 "message": f"Error analyzing game: {str(e)}"
             }
     
-    def format_canrun_response(self, result):
-        """Format CanRun result for G-Assist display - verdict at bottom for visibility."""
+    def detect_hardware(self, params):
+        """Provide comprehensive hardware detection with real system information."""
+        logging.info("Starting hardware detection with actual system data")
+        
         try:
-            # Extract key information
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            
+            hardware_specs = loop.run_until_complete(self.canrun_engine.hardware_detector.get_hardware_specs())
+            loop.close()
+            
+            hardware_message = f"""💻 SYSTEM HARDWARE DETECTION:
+
+🖥️ GRAPHICS CARD:
+• GPU: {hardware_specs.gpu_model}
+• VRAM: {hardware_specs.gpu_vram_gb}GB
+• RTX Features: {'✅ Supported' if hardware_specs.supports_rtx else '❌ Not Available'}
+• DLSS Support: {'✅ Available' if hardware_specs.supports_dlss else '❌ Not Available'}
+• Driver Status: {'✅ Compatible' if hardware_specs.nvidia_driver_version != 'Unknown' else '⚠️ Unknown Version'}
+
+🧠 PROCESSOR:
+• CPU: {hardware_specs.cpu_model}
+• Cores: {hardware_specs.cpu_cores} Physical / {hardware_specs.cpu_threads} Logical
+• Performance: {'✅ High-Performance' if hardware_specs.cpu_cores >= 6 else '⚠️ Mid-Range'}
+
+💾 MEMORY:
+• RAM: {hardware_specs.ram_total_gb}GB Total
+• Speed: {hardware_specs.ram_speed_mhz}MHz
+• Gaming Performance: {'✅ Excellent' if hardware_specs.ram_total_gb >= 16 else '⚠️ Adequate' if hardware_specs.ram_total_gb >= 8 else '❌ Below Recommended'}
+
+🖥️ DISPLAY:
+• Resolution: {hardware_specs.primary_monitor_resolution}
+• Refresh Rate: {hardware_specs.primary_monitor_refresh_hz}Hz
+• G-Sync/FreeSync: {'✅ Likely Supported' if hardware_specs.supports_rtx else '⚠️ Check Monitor Settings'}
+
+💾 STORAGE:
+• Type: {hardware_specs.storage_type}
+• Performance: {'✅ Fast Loading' if 'SSD' in hardware_specs.storage_type else '⚠️ Standard'}
+
+🖥️ SYSTEM:
+• OS: {hardware_specs.os_version}
+• DirectX: {hardware_specs.directx_version}
+• G-Assist: ✅ Compatible (Plugin Working)
+
+Hardware detection completed successfully using CanRun's privacy-aware detection system."""
+
+            return {
+                "success": True,
+                "message": hardware_message
+            }
+        except Exception as e:
+            logging.error(f"Error in hardware detection: {e}")
+            return {
+                "success": False,
+                "message": f"Hardware detection failed: {str(e)}\n\nPlease check system compatibility and try again."
+            }
+    
+    def format_canrun_response(self, result):
+        """Format CanRun result for G-Assist display with complete information."""
+        try:
+            # Extract performance tier and score
             tier = result.performance_prediction.tier.name if hasattr(result.performance_prediction, 'tier') else 'Unknown'
             score = int(result.performance_prediction.score) if hasattr(result.performance_prediction, 'score') else 0
-            can_run = result.can_run_game()
+            
+            # Get compatibility status
+            can_run = "✅ CAN RUN" if result.can_run_game() else "❌ CANNOT RUN"
             exceeds_recommended = result.exceeds_recommended_requirements()
             
-            # Get game name
+            # Format comprehensive response
             original_query = result.game_name
-            steam_api_name = result.game_requirements.steam_api_name if hasattr(result.game_requirements, 'steam_api_name') and result.game_requirements.steam_api_name else result.game_requirements.game_name
+            matched_name = result.game_requirements.game_name
             
-            # Get performance details
-            fps = getattr(result.performance_prediction, 'expected_fps', 'Unknown')
-            settings = getattr(result.performance_prediction, 'recommended_settings', 'Unknown')
-            recommended_resolution = getattr(result.performance_prediction, 'recommended_resolution', 'Unknown')
+            # Get actual Steam API game name if available
+            steam_api_name = result.game_requirements.steam_api_name if hasattr(result.game_requirements, 'steam_api_name') and result.game_requirements.steam_api_name else matched_name
             
-            # Get detected resolution class from result
-            detected_resolution = getattr(result, 'detected_resolution_class', 'Unknown')
+            # Determine if game name was matched differently from user query
+            steam_api_info = ""
+            if original_query.lower() != steam_api_name.lower():
+                steam_api_info = f"(Steam found: {steam_api_name})"
             
-            # Build response with verdict at bottom
-            response_parts = []
-            
-            # Game name at top
-            response_parts.append(f"\t")
-            response_parts.append(f"🎮 **Game:** **{steam_api_name}**\t")
-
-            
-            # 1. YOUR SYSTEM
-            response_parts.append("💻 **YOUR SYSTEM**")
-            response_parts.append(f"• GPU: {result.hardware_specs.gpu_model} ({result.hardware_specs.gpu_vram_gb}GB)")
-            response_parts.append(f"• CPU: {result.hardware_specs.cpu_model}")
-            response_parts.append(f"• RAM: {result.hardware_specs.ram_total_gb}GB")
-            response_parts.append(f"• Display: **{detected_resolution}**\t")
-
-            
-            # 2. GAME REQUIREMENTS
-            response_parts.append("🎯 **GAME REQUIREMENTS**")
-            
-            # Minimum Requirements
-            response_parts.append("**Minimum**")
-            response_parts.append(f"• GPU: {result.game_requirements.minimum_gpu}")
-            if hasattr(result.game_requirements, 'minimum_cpu') and result.game_requirements.minimum_cpu:
-                response_parts.append(f"• CPU: {result.game_requirements.minimum_cpu}")
-            response_parts.append(f"• RAM: {result.game_requirements.minimum_ram_gb}GB")
-            
-            # Recommended Requirements
-            response_parts.append("**Recommended**")
-            response_parts.append(f"• GPU: {result.game_requirements.recommended_gpu}")
-            if hasattr(result.game_requirements, 'recommended_cpu') and result.game_requirements.recommended_cpu:
-                response_parts.append(f"• CPU: {result.game_requirements.recommended_cpu}")
-            response_parts.append(f"• RAM: {result.game_requirements.recommended_ram_gb}GB\t")
-     
-            
-            # 3. EXPECTED PERFORMANCE
-            response_parts.append("⚡ **PERFORMANCE**")
-            response_parts.append(f"• FPS: **{fps}**")
-            response_parts.append(f"• Settings: **{settings}**")
-            response_parts.append(f"• Recommended: **{recommended_resolution}**")
-            response_parts.append(f"• Score: **{tier} Tier ({score}/100)**\t")
-
-            
-            # 4. OPTIMIZE
-            response_parts.append("🔧 **OPTIMIZE**")
-            if hasattr(result.performance_prediction, 'upgrade_suggestions') and result.performance_prediction.upgrade_suggestions:
-                for suggestion in result.performance_prediction.upgrade_suggestions[:2]:
-                    response_parts.append(f"• {suggestion}")
-            else:
-                if can_run:
-                    if result.hardware_specs.supports_dlss:
-                        response_parts.append("• Enable DLSS Quality mode for higher framerates")
-                    if result.hardware_specs.supports_rtx:
-                        response_parts.append("• Enable RTX ray tracing for enhanced visual quality")
-                    response_parts.append("• Update GPU drivers")
-                else:
-                    response_parts.append("• Upgrade GPU to meet minimum requirements")
-                    response_parts.append("• Check RAM meets minimum requirements")
-            
-            # Add note if different game was found
-            if steam_api_name.lower() != original_query.lower():
-                response_parts.append(f"📝 Note: Showing results for {steam_api_name}")
-            
-            # 5. VERDICT - At bottom for visibility when scrolling!
-            response_parts.append("\t")
-            if can_run:
+            title_line = ""
+            if result.can_run_game():
                 if exceeds_recommended:
-                    response_parts.append("🎯 VERDICT: ✅ CAN RUN - EXCELLENT PERFORMANCE!")
+                    title_line = f"✅ CANRUN: {original_query.upper()} will run EXCELLENTLY {steam_api_info}!"
                 else:
-                    response_parts.append("🎯 VERDICT: ✅ CAN RUN")
+                    title_line = f"✅ CANRUN: {original_query.upper()} will run {steam_api_info}!"
             else:
-                response_parts.append("🎯 **VERDICT:** ❌ CANNOT RUN")
+                title_line = f"❌ CANNOT RUN {original_query.upper()} {steam_api_info}!"
+
+            response = f"""{title_line}
+
+🎮 YOUR SEARCH: {original_query}
+🎮 STEAM MATCHED GAME: {steam_api_name}
+
+🏆 PERFORMANCE TIER: {tier} ({score}/100)
+
+💻 SYSTEM SPECIFICATIONS:
+• CPU: {result.hardware_specs.cpu_model}
+• GPU: {result.hardware_specs.gpu_model} ({result.hardware_specs.gpu_vram_gb}GB VRAM)
+• RAM: {result.hardware_specs.ram_total_gb}GB
+• RTX Features: {'✅ Supported' if result.hardware_specs.supports_rtx else '❌ Not Available'}
+• DLSS Support: {'✅ Available' if result.hardware_specs.supports_dlss else '❌ Not Available'}
+
+🎯 GAME REQUIREMENTS:
+• Minimum GPU: {result.game_requirements.minimum_gpu}
+• Recommended GPU: {result.game_requirements.recommended_gpu}
+• RAM Required: {result.game_requirements.minimum_ram_gb}GB (Min) / {result.game_requirements.recommended_ram_gb}GB (Rec)
+• VRAM Required: {result.game_requirements.minimum_vram_gb}GB (Min) / {result.game_requirements.recommended_vram_gb}GB (Rec)
+
+⚡ PERFORMANCE PREDICTION:
+• Expected FPS: {getattr(result.performance_prediction, 'expected_fps', 'Unknown')}
+• Recommended Settings: {getattr(result.performance_prediction, 'recommended_settings', 'Unknown')}
+• Optimal Resolution: {getattr(result.performance_prediction, 'recommended_resolution', 'Unknown')}
+• Performance Level: {'Exceeds Recommended' if exceeds_recommended else 'Meets Minimum' if result.can_run_game() else 'Below Minimum'}
+
+🔧 OPTIMIZATION SUGGESTIONS:"""
+
+            # Add optimization suggestions
+            if hasattr(result.performance_prediction, 'upgrade_suggestions'):
+                suggestions = result.performance_prediction.upgrade_suggestions[:3]
+                for suggestion in suggestions:
+                    response += f"\n• {suggestion}"
+            else:
+                response += "\n• Update GPU drivers for optimal performance"
+                if result.hardware_specs.supports_dlss:
+                    response += "\n• Enable DLSS for significant performance boost"
+                if result.hardware_specs.supports_rtx:
+                    response += "\n• Consider RTX features for enhanced visuals"
+
+            # Add compatibility analysis
+            if hasattr(result, 'compatibility_analysis') and result.compatibility_analysis:
+                if hasattr(result.compatibility_analysis, 'bottlenecks') and result.compatibility_analysis.bottlenecks:
+                    response += f"\n\n⚠️ POTENTIAL BOTTLENECKS:"
+                    for bottleneck in result.compatibility_analysis.bottlenecks[:2]:
+                        response += f"\n• {bottleneck.value}"
+
+            # Add final verdict
+            response += f"\n\n🎯 CANRUN VERDICT: {can_run}"
             
-            return "\n".join(response_parts)
+            # Make it clear if the Steam API returned something different than what was requested
+            if steam_api_name.lower() != original_query.lower():
+                response += f"\n\n🎮 NOTE: Steam found '{steam_api_name}' instead of '{original_query}'"
+                response += f"\n    Results shown are for '{steam_api_name}'"
+            
+            return response
             
         except Exception as e:
             logging.error(f"Error formatting CanRun response: {e}")
             return f"🎮 CANRUN ANALYSIS: {getattr(result, 'game_name', 'Unknown Game')}\n\n✅ Analysis completed but formatting error occurred.\nRaw result available in logs."
 
-def main():
-    """Main plugin execution loop."""
-    setup_logging()
-    logging.info("CanRun Plugin Started (Clean Implementation)")
+async def handle_natural_language_query(query):
+    """Handle natural language queries like 'canrun game?' and return formatted result."""
+    # Extract game name from query
+    game_name = query.strip()
+    
+    # Remove leading command patterns
+    patterns = ["canrun ", "can run ", "can i run "]
+    for pattern in patterns:
+        if game_name.lower().startswith(pattern):
+            game_name = game_name[len(pattern):].strip()
+            break
+    
+    # Remove trailing question mark if present
+    if game_name and game_name.endswith("?"):
+        game_name = game_name[:-1].strip()
+    
+    if not game_name:
+        return "Please specify a game name after 'canrun'."
     
     # Initialize plugin
-    plugin = CanRunPlugin()
+    plugin = CanRunGAssistPlugin()
     
-    # Check if running in test mode with command line arguments
+    # Use the same logic as in app.py for fresh analysis
+    has_number = any(c.isdigit() for c in game_name)
+    force_refresh = has_number  # Force refresh for numbered games
+    
+    # Create params
+    params = {"game_name": game_name, "force_refresh": force_refresh}
+    
+    # Execute compatibility check
+    response = await plugin.check_game_compatibility(params)
+    
+    # Return the formatted message (same as what Gradio would display)
+    if response.get("success", False):
+        return response.get("message", "Analysis completed successfully.")
+    else:
+        return response.get("message", f"Could not analyze game: {game_name}. Please check the game name and try again.")
+
+def main():
+    """Main plugin execution loop - Official NVIDIA Implementation."""
+    setup_logging()
+    logging.info("CanRun Plugin Started")
+    
+    # Check if command line arguments were provided
     if len(sys.argv) > 1:
-        # Test mode - handle command line arguments
-        if len(sys.argv) >= 3 and sys.argv[1] == "canrun":
-            game_name = " ".join(sys.argv[2:])
-            logging.info(f"Test mode: Checking {game_name}")
-            
-            # Run the canrun function directly
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            response = loop.run_until_complete(plugin.canrun({"game_name": game_name}))
-            loop.close()
-            
-            # Print response for testing
-            print(f"CanRun Test Result: {response}")
-            return
+        # Force UTF-8 encoding for stdout to handle emojis
+        if hasattr(sys.stdout, 'reconfigure'):
+            sys.stdout.reconfigure(encoding='utf-8')
+        
+        # Handle command-line arguments in "canrun game?" format
+        args = sys.argv[1:]
+        
+        # Process query
+        query = " ".join(args)
+        game_query = ""
+        
+        # Check if the query matches our expected format "canrun game?"
+        # This will handle both "canrun game?" and just "game?"
+        if args[0].lower() == "canrun" and len(args) > 1:
+            # Extract just the game name after "canrun"
+            game_query = " ".join(args[1:])
+        elif query.lower().startswith("canrun "):
+            # Handle case where "canrun" might be part of a single argument
+            game_query = query[7:].strip()
         else:
-            print("Usage: python plugin.py canrun <game_name>")
-            return
+            # Assume the entire query is the game name
+            game_query = query
+        
+        # Always remove question mark from the end for processing
+        game_query = game_query.rstrip("?").strip()
+        
+        # Debugging output to help troubleshoot argument issues
+        logging.info(f"Command line args: {args}")
+        logging.info(f"Processed game query: {game_query}")
+        
+        # Create event loop for async operation
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+        # Run the query and print result directly to stdout
+        result = loop.run_until_complete(handle_natural_language_query(game_query))
+        print(result)
+        loop.close()
+        return
     
-    # G-Assist mode - Main G-Assist communication loop
+    # Check if running in G-Assist environment
+    in_g_assist = is_g_assist_environment()
+    logging.info(f"Running in G-Assist environment: {in_g_assist}")
+    
+    # Initialize plugin - CanRun engine always available
+    plugin = CanRunGAssistPlugin()
+    logging.info("CanRun plugin initialized successfully")
+    
+    # If not in G-Assist environment, exit - we only care about G-Assist mode
+    if not in_g_assist:
+        print("This is a G-Assist plugin. Please run through G-Assist.")
+        return
+    
+    # G-Assist protocol mode
     while True:
         command = read_command()
-        if command is None:
-            logging.info("No command received, pipe likely closed. Exiting gracefully.")
+        if command == "EOF":
+            logging.info("EOF received, exiting")
             break
+        if command is None:
+            continue
         
-        # Handle G-Assist tool_calls format (old format)
+        # Handle G-Assist input in different formats
         if "tool_calls" in command:
+            # Standard G-Assist protocol format with tool_calls
             for tool_call in command.get("tool_calls", []):
                 func = tool_call.get("func")
                 params = tool_call.get("params", {})
                 
-                logging.info(f"Processing function: {func} with params: {params}")
-                
-                if func == "canrun":
-                    # For async function, run in event loop
-                    loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(loop)
-                    response = loop.run_until_complete(plugin.canrun(params))
-                    write_response(response)
-                    loop.close()
-                elif func == "initialize":
-                    # G-Assist initialization - respond with success
-                    logging.info("Plugin initialization requested by G-Assist")
+                if func == "initialize":
+                    # Handle plugin initialization
                     write_response({
                         "success": True,
-                        "message": "CanRun plugin initialized successfully"
+                        "message": "CanRun G-Assist plugin initialized successfully"
                     })
+                elif func == "canrun":
+                    # Handle canrun function for game compatibility checks
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    response = loop.run_until_complete(plugin.check_game_compatibility(params))
+                    write_response(response)
+                    loop.close()
+                elif func == "check_compatibility":
+                    # For async function, we need to run in an event loop
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    response = loop.run_until_complete(plugin.check_game_compatibility(params))
+                    write_response(response)
+                    loop.close()
+                elif func == "detect_hardware":
+                    response = plugin.detect_hardware(params)
+                    write_response(response)
+                elif func == "auto_detect":
+                    # Handle natural language input like "canrun game?"
+                    user_input = params.get("user_input", "")
+                    logging.info(f"Auto-detect received: {user_input}")
+                    
+                    # Extract game name from queries like "canrun game?"
+                    game_name = user_input
+                    if "canrun" in user_input.lower():
+                        # Remove "canrun" prefix and extract game name
+                        parts = user_input.lower().split("canrun")
+                        if len(parts) > 1:
+                            game_name = parts[1].strip()
+                    
+                    # Remove question mark if present
+                    game_name = game_name.rstrip("?").strip()
+                    
+                    if game_name:
+                        # Create compatibility check params
+                        compat_params = {"game_name": game_name}
+                        
+                        # For async function, we need to run in an event loop
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                        response = loop.run_until_complete(plugin.check_game_compatibility(compat_params))
+                        write_response(response)
+                        loop.close()
+                    else:
+                        write_response({
+                            "success": False,
+                            "message": "Could not identify a game name in your query. Please try 'Can I run <game name>?'"
+                        })
                 elif func == "shutdown":
                     logging.info("Shutdown command received. Exiting.")
+                    write_response({
+                        "success": True,
+                        "message": "CanRun G-Assist plugin shutdown complete"
+                    })
                     return
                 else:
                     logging.warning(f"Unknown function: {func}")
@@ -399,6 +499,50 @@ def main():
                         "success": False,
                         "message": f"Unknown function: {func}"
                     })
+        elif "user_input" in command:
+            # Alternative format with direct user_input field
+            user_input = command.get("user_input", "")
+            logging.info(f"Direct user input received: {user_input}")
+            
+            # Check if this is a game compatibility query
+            if "canrun" in user_input.lower() or "can run" in user_input.lower() or "can i run" in user_input.lower():
+                # Extract game name
+                game_name = ""
+                for prefix in ["canrun ", "can run ", "can i run "]:
+                    if user_input.lower().startswith(prefix):
+                        game_name = user_input[len(prefix):].strip()
+                        break
+                
+                # If no prefix found but contains "canrun" somewhere
+                if not game_name and "canrun" in user_input.lower():
+                    parts = user_input.lower().split("canrun")
+                    if len(parts) > 1:
+                        game_name = parts[1].strip()
+                
+                # Remove question mark if present
+                game_name = game_name.rstrip("?").strip()
+                
+                if game_name:
+                    # Create compatibility check params
+                    compat_params = {"game_name": game_name}
+                    
+                    # For async function, we need to run in an event loop
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    response = loop.run_until_complete(plugin.check_game_compatibility(compat_params))
+                    write_response(response)
+                    loop.close()
+                else:
+                    write_response({
+                        "success": False,
+                        "message": "Could not identify a game name in your query. Please try 'Can I run <game name>?'"
+                    })
+            else:
+                # Not a game compatibility query
+                write_response({
+                    "success": False,
+                    "message": "I can check if your system can run games. Try asking 'Can I run <game name>?'"
+                })
 
 if __name__ == "__main__":
     main()
