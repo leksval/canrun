@@ -209,7 +209,7 @@ CanRun now includes a full-featured **Model Context Protocol (MCP) server** that
 The MCP server exposes the following tools to G-Assist:
 
 - **check_game_compatibility**: Analyze if a specific game can run on the current system
-  - Input: Game name (e.g., "Diablo 4")
+  - Input: Game name (e.g., "Cyberpunk 2077")
   - Output: Detailed compatibility analysis with performance tier
 
 - **detect_hardware**: Provides comprehensive hardware detection for gaming systems
@@ -331,18 +331,6 @@ XGBRegressor(device='cuda', tree_method='hist', n_estimators=500)
 
 # Console output confirms: "XGBoost is running on: cuda:0"
 ```
-
-### **CUDA Compatibility Guide:**
-| CUDA Version | PyTorch Index | Compatible GPUs |
-|--------------|---------------|-----------------|
-| CUDA 11.8 | `cu118` | RTX 40/30/20, GTX 16/10 series |
-| CUDA 12.1 | `cu121` | RTX 50/40 series (latest) |
-| CPU Only | Default | All systems (fallback) |
-
-### **Performance Comparison:**
-- **CPU Training**: ~7 seconds (baseline)
-- **XGBoost GPU**: ~3-4 seconds (our current setup)
-- **Full GPU Stack**: ~1-2 seconds (with cuML + PyTorch CUDA)
 
 **Deploy to G-Assist (Optional):**
 ```bash
