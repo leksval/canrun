@@ -42,7 +42,7 @@ tags:
 - **🏃 Zero Setup**: Drop-in plugin with automatic RTX/GTX validation
 - **🤖 MCP Server**: Official Model Context Protocol (MCP) server for G-Assist integration
 - **🔄 JSON-Based Configuration**: All benchmark data externalized for easy maintenance
-- **🧠 ML-Powered FPS Prediction**: Advanced RandomForest model with **90.8% R² accuracy**
+- **🧠 ML-Powered FPS Prediction**: Advanced RandomForest model with **94.8% R² accuracy**
 - **📊 Multi-Resolution Support**: Validated 1080p, 1440p, and 4K benchmark data
 
 
