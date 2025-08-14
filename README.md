@@ -145,7 +145,7 @@ copy "g-assist-plugin-canrun.exe" "C:\ProgramData\NVIDIA Corporation\nvtopps\ris
 ## **Installation Guide**
 
 #### **For Developers (Complete Build & Test Pipeline)**
-```bash
+
 # 1. Clone and enter directory
 git clone https://github.com/leksval/canrun
 cd canrun
@@ -165,10 +165,10 @@ uv run python -m PyInstaller --clean --distpath . g-assist-plugin-canrun.spec
 # 5. Test specific components (optional)
 uv run python test/test_official_g_assist_protocol.py  # G-Assist protocol verification
 uv run python plugin.py canrun "Diablo 4"  # Plugin functionality test
-```
 
 
-```
+
+
 
 ### G-Assist MCP Integration
 
@@ -239,6 +239,59 @@ python app.py
 - Mode Detection: stdin.isatty() check for G-Assist environment
 ```
 
+## 🛠️ Development and Contributing
+
+**Setting up Development Environment:**
+
+```bash
+# Clone repository
+git clone https://github.com/yourusername/canrun
+cd canrun
+
+# Install development dependencies
+uv sync --dev
+
+# Run tests to verify setup
+uv run python -m pytest test/ -v
+
+# Test official G-Assist protocol
+python test/test_official_g_assist_protocol.py
+```
+## 🚀 **GPU-Accelerated Training**
+
+For developers wanting to retrain the ML model with CUDA acceleration:
+
+### **CUDA Setup (Recommended for RTX/GTX users)**
+
+```bash
+# Step 1: Install CUDA-enabled PyTorch (for RTX with CUDA 13.0)
+cd canrun
+uv run pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118
+
+# Step 2: Install XGBoost with GPU support
+uv add xgboost
+
+# Step 3: Optional - Install cuML for maximum GPU acceleration
+# conda install -c rapidsai -c conda-forge cuml
+
+# Step 4: Run GPU-accelerated training
+uv run python src/train_fps_predictor_ml_model.py
+```
+
+
+### **XGBoost CUDA Configuration (Verified Working):**
+```python
+# Modern XGBoost syntax (recommended)
+XGBRegressor(device='cuda', tree_method='hist', n_estimators=500)
+
+# Console output confirms: "XGBoost is running on: cuda:0"
+```
+### **Expected GPU Benefits:**
+- **XGBoost GPU**: `device='cuda'` with `tree_method='hist'` - **3-5x faster** tree training
+- **cuML**: GPU-accelerated RandomForest - **10-50x faster** on RTX cards
+- **PyTorch CUDA**: Tensor operations on GPU for enhanced feature engineering
+- **Automatic Fallback**: CPU training if CUDA unavailable
+
 **2. Advanced Performance Assessment**
 ```python
 # S-A-B-C-D-F tier system with weighted scoring
@@ -280,74 +333,7 @@ python app.py
 ```
 
 
-## 🛠️ Development and Contributing
 
-**Setting up Development Environment:**
-
-```bash
-# Clone repository
-git clone https://github.com/yourusername/canrun
-cd canrun
-
-# Install development dependencies
-uv sync --dev
-
-# Run tests to verify setup
-uv run python -m pytest test/ -v
-
-# Test official G-Assist protocol
-python test/test_official_g_assist_protocol.py
-```
-## 🚀 **GPU-Accelerated Training**
-
-For developers wanting to retrain the ML model with CUDA acceleration:
-
-### **CUDA Setup (Recommended for RTX/GTX users)**
-
-```bash
-# Step 1: Install CUDA-enabled PyTorch (for RTX with CUDA 13.0)
-cd canrun
-uv run pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118
-
-# Step 2: Install XGBoost with GPU support
-uv add xgboost
-
-# Step 3: Optional - Install cuML for maximum GPU acceleration
-# conda install -c rapidsai -c conda-forge cuml
-
-# Step 4: Run GPU-accelerated training
-uv run python src/train_fps_predictor_ml_model.py
-```
-
-### **Expected GPU Benefits:**
-- **XGBoost GPU**: `device='cuda'` with `tree_method='hist'` - **3-5x faster** tree training
-- **cuML**: GPU-accelerated RandomForest - **10-50x faster** on RTX cards
-- **PyTorch CUDA**: Tensor operations on GPU for enhanced feature engineering
-- **Automatic Fallback**: CPU training if CUDA unavailable
-
-### **XGBoost CUDA Configuration (Verified Working):**
-```python
-# Modern XGBoost syntax (recommended)
-XGBRegressor(device='cuda', tree_method='hist', n_estimators=500)
-
-# Console output confirms: "XGBoost is running on: cuda:0"
-```
-
-**Deploy to G-Assist (Optional):**
-```bash
-# Create the plugin directory first (if it doesn't exist)
-mkdir "C:\ProgramData\NVIDIA Corporation\nvtopps\rise\plugins\canrun"
-
-# Copy to G-Assist plugins directory
-copy "g-assist-plugin-canrun.exe" "C:\ProgramData\NVIDIA Corporation\nvtopps\rise\plugins\canrun\g-assist-plugin-canrun.exe"
-
-# Alternative G-Assist locations (try if above fails):
-# mkdir "%USERPROFILE%\AppData\Local\NVIDIA Corporation\NVIDIA App\plugins\canrun"
-# copy "g-assist-plugin-canrun.exe" "%USERPROFILE%\AppData\Local\NVIDIA Corporation\NVIDIA App\plugins\canrun\g-assist-plugin-canrun.exe"
-
-# This follows the official NVIDIA G-Assist naming convention: g-assist-plugin-<name>.exe
-# This includes all dependencies and data files and can be used by G-Assist
-```
 ---
 
 
