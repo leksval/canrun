@@ -292,21 +292,21 @@ XGBRegressor(device='cuda', tree_method='hist', n_estimators=500)
 - **PyTorch CUDA**: Tensor operations on GPU for enhanced feature engineering
 - **Automatic Fallback**: CPU training if CUDA unavailable
 
-**2. Advanced Performance Assessment**
+**1. Advanced Performance Assessment**
 # S-A-B-C-D-F tier system with weighted scoring
 - GPU Performance: 60% weight (RTX 3080, RTX 3070, GTX 1660 Ti, etc.)
 - CPU Performance: 25% weight (Intel i7-12700K, Ryzen 5 5600X, etc.)
 - RAM Performance: 15% weight (16GB DDR4, 32GB DDR4, 8GB DDR4, etc.)
 - Comprehensive hardware hierarchies with 50+ GPU/CPU models
 
-**3. Steam-First Requirements Fetching**
+**2. Steam-First Requirements Fetching**
 # Prioritized data source architecture
 - Primary: Steam Store API (real-time, most current)
 - Fallback: Local cache (offline support, curated database)
 - Privacy-protected data sanitization throughout
 - Automatic game ID resolution and requirement parsing
 
-**4. ML-Powered FPS Prediction**
+**3. ML-Powered FPS Prediction**
 
 # Advanced Stacking Ensemble with GPU acceleration
 - Test Accuracy: 94.8% R² (improved with stacking ensemble)
@@ -318,7 +318,7 @@ XGBRegressor(device='cuda', tree_method='hist', n_estimators=500)
 - Ensemble Methods: RandomForest + GradientBoosting + ExtraTrees + Ridge
 - Meta-learner: BayesianRidge with statistical calibration
 
-**5. MCP Server Implementation**
+**4. MCP Server Implementation**
 # Model Context Protocol (MCP) server integration
 - Uses Gradio for both UI and MCP server
 - Async function support for real-time analysis
