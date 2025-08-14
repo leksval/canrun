@@ -42,20 +42,33 @@ tags:
 - **🏃 Zero Setup**: Drop-in plugin with automatic RTX/GTX validation
 - **🤖 MCP Server**: Official Model Context Protocol (MCP) server for G-Assist integration
 - **🔄 JSON-Based Configuration**: All benchmark data externalized for easy maintenance
-- **🧠 ML-Powered FPS Prediction**: Advanced RandomForest model with **94.8% R² accuracy**
 - **📊 Multi-Resolution Support**: Validated 1080p, 1440p, and 4K benchmark data
-
 
 ## 🧠 **ML Pipeline: Unified_Stacking_Ensemble_2025**
 
-**Current Model**: Advanced Stacking Ensemble with **99.42% R² accuracy** after calibration
+### **Final Production Accuracy:**
+- **Mean Absolute Error (MAE):** 13.79 FPS
+- **R² Score:** 0.9558 (95.58% variance explained)
+- **RMSE:** 11.01 FPS
 
-### **Architecture**
-```
-Level 1: RandomForest + GradientBoosting + ExtraTrees + Ridge + XGBoost (GPU)
-Level 2: BayesianRidge Meta-Learner + Isotonic Calibration
-Result: 95.58% final R² with 99.0% calibration quality
-```
+### **Calibrated Model Performance:**
+- **Calibrated MAE:** 3.07 FPS
+- **Calibrated R²:** 0.9941 (99.41% variance explained)
+
+### **Model Details:**
+
+#### **Training Configuration:**
+- **Model Type:** Unified_Stacking_Ensemble_2025
+- **Base Models:** 7 ensemble models (XGBoost GPU, LightGBM GPU, CatBoost, Random Forest, etc.)
+- **Training Samples:** 143
+- **Test Samples:** 36
+- **Training Time:** 81.3 seconds
+- **Features:** 80 engineered features
+
+#### **Quality Indicators:**
+- **Overfitting Gap:** 0.0085 (very low - indicates good generalization)
+- **Domain Correction Factor:** 0.88 (accounts for real-world variance)
+- **GPU Acceleration:** CatBoost GPU enabled
 
 ### **Training Pipeline**
 ```bash
@@ -211,34 +224,6 @@ python app.py
 # The server will be available at:
 # http://localhost:xxxx (where xxxx is an available port)
 
-
-## 📁 Project Structure
-
-```
-canrun/
-├── plugin.py                   # Main G-Assist Plugin (PRIMARY SUBMISSION)
-├── app.py                      # Gradio UI and MCP Server implementation
-├── manifest.json              # G-Assist function definitions with LLM integration
-├── pyproject.toml             # Modern uv package manager configuration
-├── requirements.txt           # Python dependencies
-│
-├── src/                        # Core modules with advanced tier system
-│   ├── canrun_engine.py       # Main compatibility engine with S-A-B-C-D-F integration
-│   ├── privacy_aware_hardware_detector.py # Enhanced hardware detection
-│   ├── game_requirements_fetcher.py # Steam-first game requirements with fallbacks
-│   ├── compatibility_analyzer.py # Analysis logic with tier classification
-│   ├── dynamic_performance_predictor.py # Advanced S-A-B-C-D-F tier system
-│   └── rtx_llm_analyzer.py    # G-Assist LLM integration module
-│
-├── data/                       # Static data files
-│   ├── game_requirements.json  # Cached game requirements
-│   └── gpu_hierarchy.json     # Comprehensive GPU/CPU performance hierarchies
-│
-├── test/                       # Comprehensive test suite
-├── LICENSE                     # Apache 2.0 license
-├── README.md                  # This file
-└── CHANGELOG.md              # Version history and updates
-```
 
 ## 🔧 Technical Implementation
 
