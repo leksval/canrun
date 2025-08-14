@@ -280,6 +280,7 @@ Hardware detection completed successfully using CanRun's privacy-aware detection
 ⚡ PERFORMANCE PREDICTION:
 • Expected FPS: {getattr(result.performance_prediction, 'expected_fps', 'Unknown')}
 • Recommended Settings: {getattr(result.performance_prediction, 'recommended_settings', 'Unknown')}
+• Current Resolution: {result.hardware_specs.primary_monitor_resolution}
 • Optimal Resolution: {getattr(result.performance_prediction, 'recommended_resolution', 'Unknown')}
 • Performance Level: {'Exceeds Recommended' if exceeds_recommended else 'Meets Minimum' if result.can_run_game() else 'Below Minimum'}
 

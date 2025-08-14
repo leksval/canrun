@@ -148,11 +148,7 @@ uv run python -m pytest test/ -v
 uv run python -m PyInstaller --clean --distpath . g-assist-plugin-canrun.spec
 # Expected: g-assist-plugin-canrun.exe created successfully
 
-# 5. Move executable to project root (required for deployment)
-move canrun\g-assist-plugin-canrun.exe g-assist-plugin-canrun.exe
-# Expected: Executable moved to root directory for G-Assist plugin deployment
-
-# 6. Test specific components (optional)
+# 5. Test specific components (optional)
 uv run python test/test_official_g_assist_protocol.py  # G-Assist protocol verification
 uv run python plugin.py canrun "Diablo 4"  # Plugin functionality test
 ```
