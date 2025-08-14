@@ -91,12 +91,6 @@ uv run python src/train_unified_ml_model_2025.py
 - **Feature engineering**: Polynomial interactions, PassMark scores, VRAM ratios
 
 
-
----
-## Live Demo, download and test locally for real hardvare evaluation as MCP server
-[LINK](https://huggingface.co/spaces/grasant/canrun)
-![HF Space Demo](image.png)
-
 ---
 
 
@@ -327,6 +321,10 @@ XGBRegressor(device='cuda', tree_method='hist', n_estimators=500)
 
 
 
+---
+## Live Demo, download and test locally for real hardvare evaluation as MCP server
+[LINK](https://huggingface.co/spaces/grasant/canrun)
+![HF Space Demo](image.png)
 
 ---
 
