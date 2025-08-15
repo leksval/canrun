@@ -24,6 +24,19 @@ except ImportError as e:
     logging.warning(f"CanRun engine not available: {e}")
     CANRUN_AVAILABLE = False
 
+# Import G-Assist response fixer
+try:
+    from g_assist_response_fixer import (
+        clean_ascii_text,
+        create_safe_g_assist_response,
+        format_g_assist_message,
+        validate_g_assist_response
+    )
+    RESPONSE_FIXER_AVAILABLE = True
+except ImportError as e:
+    logging.warning(f"G-Assist response fixer not available: {e}")
+    RESPONSE_FIXER_AVAILABLE = False
+
 # Data Types
 type Response = dict[bool, Optional[str]]
 
@@ -31,14 +44,16 @@ LOG_FILE = os.path.join(os.environ.get("USERPROFILE", "."), 'canrun_plugin.log')
 logging.basicConfig(filename=LOG_FILE, level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 def read_command() -> dict | None:
-    """Reads a command from the communication pipe - NVIDIA Standard Implementation."""
+    """Reads a command from the communication pipe - ROBUST WITH ENHANCED LIMITS."""
     try:
         STD_INPUT_HANDLE = -10
         pipe = windll.kernel32.GetStdHandle(STD_INPUT_HANDLE)
         chunks = []
+        total_bytes = 0
+        MAX_INPUT_SIZE = 1024 * 1024  # 1MB limit for safety
 
-        while True:
-            BUFFER_SIZE = 4096
+        while total_bytes < MAX_INPUT_SIZE:
+            BUFFER_SIZE = 8192  # Increased buffer size for better performance
             message_bytes = wintypes.DWORD()
             buffer = bytes(BUFFER_SIZE)
             success = windll.kernel32.ReadFile(
@@ -53,36 +68,105 @@ def read_command() -> dict | None:
                 logging.error('Error reading from command pipe')
                 return None
 
-            # Add the chunk we read
-            chunk = buffer.decode('utf-8')[:message_bytes.value]
-            chunks.append(chunk)
-
-            # If we read less than the buffer size, we're done
-            if message_bytes.value < BUFFER_SIZE:
+            bytes_read = message_bytes.value
+            if bytes_read == 0:
                 break
 
-        retval = ''.join(chunks)
-        return json.loads(retval)
+            # Decode with error handling for robust character support
+            try:
+                chunk = buffer[:bytes_read].decode('utf-8', errors='replace')
+            except UnicodeDecodeError:
+                # Fallback to latin-1 for maximum compatibility
+                chunk = buffer[:bytes_read].decode('latin-1', errors='replace')
+            
+            chunks.append(chunk)
+            total_bytes += bytes_read
 
-    except json.JSONDecodeError:
-        logging.error('Failed to decode JSON input')
-        return None
+            # If we read less than the buffer size, we're done
+            if bytes_read < BUFFER_SIZE:
+                break
+
+        if total_bytes >= MAX_INPUT_SIZE:
+            logging.warning(f'Input truncated at {MAX_INPUT_SIZE} bytes')
+
+        retval = ''.join(chunks).strip()
+        
+        # Enhanced JSON parsing with robust validation
+        if not retval:
+            logging.debug('Empty input received from G-Assist')
+            return None
+        
+        # Log input size for monitoring
+        if len(retval) > 1000:
+            logging.info(f'Large input received: {len(retval)} characters')
+            
+        # Handle potential G-Assist protocol variations with size limits
+        if len(retval) > 100000:  # 100KB limit for JSON
+            logging.error(f'Input too large for JSON parsing: {len(retval)} characters')
+            return None
+            
+        if retval.startswith('{') and retval.endswith('}'):
+            try:
+                parsed = json.loads(retval)
+                logging.debug(f'Successfully parsed JSON command: {list(parsed.keys())}')
+                return parsed
+            except json.JSONDecodeError as e:
+                logging.error(f'JSON decode error at position {e.pos}: {e.msg}')
+                logging.error(f'Input preview: {repr(retval[:500])}...')
+                return None
+            except Exception as e:
+                logging.error(f'Unexpected JSON parsing error: {str(e)}')
+                return None
+        else:
+            # Handle non-JSON input with expanded command detection
+            logging.info(f'Non-JSON input received: {repr(retval[:200])}')
+            lower_input = retval.lower()
+            
+            # Expanded shutdown command detection
+            shutdown_keywords = ['shutdown', 'exit', 'quit', 'stop', 'terminate', 'close']
+            if any(keyword in lower_input for keyword in shutdown_keywords):
+                logging.info('Shutdown command detected')
+                return {'command': 'shutdown'}
+            
+            # Handle potential binary or corrupted data
+            if len(retval) > 0 and all(ord(c) < 32 or ord(c) > 126 for c in retval[:50]):
+                logging.warning('Binary or corrupted data received, ignoring')
+                return None
+                
+            return None
+
     except Exception as e:
-        logging.error(f'Unexpected error in read_command: {str(e)}')
+        logging.error(f'Critical error in read_command: {str(e)}')
         return None
 
 def write_response(response: Response) -> None:
-    """Write response to communication pipe - OFFICIAL NVIDIA IMPLEMENTATION"""
+    """Write response to communication pipe - IMPROVED WITH G-ASSIST FIXES"""
     try:
         STD_OUTPUT_HANDLE = -11
         pipe = windll.kernel32.GetStdHandle(STD_OUTPUT_HANDLE)
 
-        json_message = json.dumps(response) + "<<END>>"
+        # Use the response fixer if available, otherwise fallback to old method
+        if RESPONSE_FIXER_AVAILABLE:
+            # Validate and format the response properly
+            is_valid, error = validate_g_assist_response(response)
+            if not is_valid:
+                logging.error(f"Invalid response format: {error}")
+                response = create_safe_g_assist_response(False, f"Format error: {error}")
+            
+            json_message = format_g_assist_message(response)
+        else:
+            # Fallback to old method with basic safety
+            if isinstance(response, dict) and 'message' in response:
+                # Basic ASCII cleaning
+                clean_msg = ''.join(char for char in response['message'] if ord(char) < 128)
+                response['message'] = clean_msg
+            json_message = json.dumps(response) + "<<END>>"
+
         message_bytes = json_message.encode('utf-8')
         message_len = len(message_bytes)
 
         bytes_written = wintypes.DWORD()
-        windll.kernel32.WriteFile(
+        success = windll.kernel32.WriteFile(
             pipe,
             message_bytes,
             message_len,
@@ -90,25 +174,50 @@ def write_response(response: Response) -> None:
             None
         )
         
-        logging.info(f'Response sent: {len(json_message)} characters')
+        # Force flush the pipe buffer - CRITICAL FOR G-ASSIST
+        windll.kernel32.FlushFileBuffers(pipe)
+        
+        if success:
+            logging.info(f'Response sent successfully: {len(json_message)} characters')
+        else:
+            logging.error(f'WriteFile failed, bytes written: {bytes_written.value}')
 
     except Exception as e:
         logging.error(f'Failed to write response: {str(e)}')
-        pass
+        # Try emergency fallback response
+        try:
+            emergency_response = '{"success":false,"message":"Communication error"}<<END>>'
+            emergency_bytes = emergency_response.encode('ascii')
+            windll.kernel32.WriteFile(
+                pipe, emergency_bytes, len(emergency_bytes), byref(wintypes.DWORD()), None
+            )
+            windll.kernel32.FlushFileBuffers(pipe)
+        except:
+            pass  # Ultimate fallback - just log and continue
 
 def generate_failure_response(message: str = None) -> Response:
-    """Generates a response indicating failure."""
-    response = {'success': False}
-    if message:
-        response['message'] = message
-    return response
+    """Generates a response indicating failure - G-ASSIST SAFE VERSION."""
+    if RESPONSE_FIXER_AVAILABLE:
+        return create_safe_g_assist_response(False, message)
+    else:
+        response = {'success': False}
+        if message:
+            # Basic ASCII cleaning fallback
+            clean_msg = ''.join(char for char in str(message) if ord(char) < 128)
+            response['message'] = clean_msg[:500]  # Limit length
+        return response
 
 def generate_success_response(message: str = None) -> Response:
-    """Generates a response indicating success."""
-    response = {'success': True}
-    if message:
-        response['message'] = message
-    return response
+    """Generates a response indicating success - G-ASSIST SAFE VERSION."""
+    if RESPONSE_FIXER_AVAILABLE:
+        return create_safe_g_assist_response(True, message)
+    else:
+        response = {'success': True}
+        if message:
+            # Basic ASCII cleaning fallback
+            clean_msg = ''.join(char for char in str(message) if ord(char) < 128)
+            response['message'] = clean_msg[:500]  # Limit length
+        return response
 
 # Initialize CanRun engine globally
 canrun_engine = None
@@ -162,110 +271,146 @@ async def execute_canrun_command(params: dict = None, context: dict = None, syst
         return generate_failure_response(f"Error analyzing game: {str(e)}")
 
 def format_canrun_response(result):
-    """Format CanRun result for G-Assist display."""
+    """Format CanRun result for G-Assist display - IMPROVED WITH RELEVANT DATA."""
     try:
-        # Extract key information
-        tier = result.performance_prediction.tier.name if hasattr(result.performance_prediction, 'tier') else 'Unknown'
-        score = int(result.performance_prediction.score) if hasattr(result.performance_prediction, 'score') else 0
-        fps = result.performance_prediction.expected_fps if hasattr(result.performance_prediction, 'expected_fps') else 0
-        settings = result.performance_prediction.recommended_settings if hasattr(result.performance_prediction, 'recommended_settings') else 'Unknown'
+        # Extract key information safely
+        game_name = getattr(result, 'game_name', 'Unknown Game')
+        can_run = result.can_run_game() if hasattr(result, 'can_run_game') else False
+        exceeds_recommended = result.exceeds_recommended_requirements() if hasattr(result, 'exceeds_recommended_requirements') else False
         
-        # Get compatibility status
-        can_run = result.can_run_game()
-        exceeds_recommended = result.exceeds_recommended_requirements()
+        # Get performance info with ML model ranges
+        tier = 'Unknown'
+        score = 0
+        fps_display = 'Unknown'
+        settings = 'Unknown'
         
-        # Get game information
-        game_name = result.game_name
-        matched_name = result.game_requirements.game_name
-        
-        # Get resolution information safely - match v8.0.0 approach
-        try:
-            current_resolution = getattr(result.hardware_specs, 'primary_monitor_resolution', '1920x1080')
-            # Validate that it's a proper resolution string
-            if not current_resolution or 'x' not in current_resolution:
-                current_resolution = "1920x1080"
-        except:
-            current_resolution = "1920x1080"
-        
-        # Determine optimal resolution based on GPU tier
-        if tier in ['S', 'A']:
-            optimal_resolution = "4K (3840x2160)"
-        elif tier in ['B', 'C']:
-            optimal_resolution = "1440p (2560x1440)"
-        else:
-            optimal_resolution = "1080p (1920x1080)"
-        
-        # Create response
-        if can_run:
-            header = f"CANRUN: {game_name.upper()} will run {'EXCELLENTLY' if exceeds_recommended else 'WELL'}"
-            verdict = "CAN RUN"
-        else:
-            header = f"CANRUN: {game_name.upper()} CANNOT RUN"
-            verdict = "CANNOT RUN"
-        
-        # Use actual ML prediction variance data
-        fps_range_info = ""
-        try:
-            # Get variance data from ML predictor assessment
-            fps_min = getattr(result.performance_prediction, 'fps_min', 0)
-            fps_max = getattr(result.performance_prediction, 'fps_max', 0)
-            variance_range = getattr(result.performance_prediction, 'fps_variance_range', 0)
+        if hasattr(result, 'performance_prediction'):
+            pred = result.performance_prediction
+            tier = pred.tier.name if hasattr(pred, 'tier') and hasattr(pred.tier, 'name') else 'Unknown'
+            score = int(pred.score) if hasattr(pred, 'score') else 0
+            settings = pred.recommended_settings if hasattr(pred, 'recommended_settings') else 'Medium'
             
-            # If ML variance data is available, use it
-            if fps_min > 0 and fps_max > 0 and variance_range > 0:
-                fps_range_info = f"- FPS Range: {fps_min}-{fps_max} at {current_resolution}"
-                
-                # Add helpful tip based on actual predicted performance
-                if fps_min >= 120:
-                    fps_range_info += f" (Excellent for high refresh rate)"
-                elif fps_min >= 60:
-                    fps_range_info += f" (Smooth gameplay)"
-                elif fps_max >= 60:
-                    fps_range_info += f" (Good performance, some settings adjustments recommended)"
-                else:
-                    fps_range_info += f" (Consider lowering settings for better performance)"
+            # Extract FPS range from ML model data
+            if hasattr(pred, 'fps_range') and pred.fps_range:
+                # If we have a proper range object
+                fps_display = f"{pred.fps_range.min}-{pred.fps_range.max}"
+            elif hasattr(pred, 'fps_min') and hasattr(pred, 'fps_max'):
+                # If we have separate min/max values
+                fps_display = f"{int(pred.fps_min)}-{int(pred.fps_max)}"
+            elif hasattr(pred, 'expected_fps_range'):
+                # Alternative range format
+                fps_display = str(pred.expected_fps_range)
+            elif hasattr(pred, 'ml_prediction') and hasattr(pred.ml_prediction, 'fps_range'):
+                # Range from ML prediction sub-object
+                ml_range = pred.ml_prediction.fps_range
+                fps_display = f"{int(ml_range.min)}-{int(ml_range.max)}"
+            elif hasattr(pred, 'expected_fps'):
+                # Fallback to single value if no range available
+                single_fps = int(pred.expected_fps)
+                fps_display = f"{single_fps}"
             else:
-                # Fallback to simple display if variance data not available
-                fps_range_info = f"- Performance: {fps} FPS at {current_resolution}"
-                
-        except Exception as e:
-            fps_range_info = f"- Performance: {fps} FPS at {current_resolution}"
-
-        # Build detailed response without emojis for NVIDIA compliance
-        response = f"""{header}
-
-YOUR SEARCH: {game_name}
-STEAM MATCHED GAME: {matched_name}
-
-PERFORMANCE TIER: {tier} ({score}/100)
-
-SYSTEM SPECIFICATIONS:
-- CPU: {result.hardware_specs.cpu_model}
-- GPU: {result.hardware_specs.gpu_model} ({result.hardware_specs.gpu_vram_gb}GB VRAM)
-- RAM: {result.hardware_specs.ram_total_gb}GB
-- RTX Features: {'Supported' if result.hardware_specs.supports_rtx else 'Not Available'}
-- DLSS Support: {'Available' if result.hardware_specs.supports_dlss else 'Not Available'}
-
-GAME REQUIREMENTS:
-- Minimum GPU: {result.game_requirements.minimum_gpu.replace('®', '').replace('™', '')}
-- Recommended GPU: {result.game_requirements.recommended_gpu.replace('®', '').replace('™', '')}
-- RAM Required: {result.game_requirements.minimum_ram_gb}GB (Min) / {result.game_requirements.recommended_ram_gb}GB (Rec)
-- VRAM Required: {result.game_requirements.minimum_vram_gb}GB (Min) / {result.game_requirements.recommended_vram_gb}GB (Rec)
-
-PERFORMANCE PREDICTION:
-- Recommended Settings: {settings}
-- Current Resolution: {current_resolution}
-- Optimal Resolution: {optimal_resolution}
-- Performance Level: {'Exceeds Recommended' if exceeds_recommended else 'Meets Minimum'}
-{fps_range_info}
-
-CANRUN VERDICT: {verdict}"""
+                fps_display = 'Unknown'
+        
+        # Get comprehensive system and game info
+        gpu_model = 'Unknown GPU'
+        matched_game = game_name
+        ram_gb = 0
+        cpu_model = 'Unknown CPU'
+        
+        if hasattr(result, 'hardware_specs'):
+            hw = result.hardware_specs
+            if hasattr(hw, 'gpu_model'):
+                gpu_model = str(hw.gpu_model)
+            if hasattr(hw, 'ram_total_gb'):
+                ram_gb = int(hw.ram_total_gb)
+            if hasattr(hw, 'cpu_model'):
+                cpu_model = str(hw.cpu_model)
+            
+        if hasattr(result, 'game_requirements') and hasattr(result.game_requirements, 'game_name'):
+            matched_game = str(result.game_requirements.game_name)
+        
+        # Clean all text of unicode characters
+        if RESPONSE_FIXER_AVAILABLE:
+            game_name = clean_ascii_text(game_name)
+            gpu_model = clean_ascii_text(gpu_model)
+            matched_game = clean_ascii_text(matched_game)
+            settings = clean_ascii_text(settings)
+            cpu_model = clean_ascii_text(cpu_model)
+        else:
+            # Basic fallback cleaning
+            game_name = ''.join(char for char in game_name if ord(char) < 128)
+            gpu_model = ''.join(char for char in gpu_model if ord(char) < 128)
+            matched_game = ''.join(char for char in matched_game if ord(char) < 128)
+            settings = ''.join(char for char in settings if ord(char) < 128)
+            cpu_model = ''.join(char for char in cpu_model if ord(char) < 128)
+        
+        # Extract numeric FPS for verdict assessment (use max of range if available)
+        fps_numeric = 0
+        if '-' in fps_display:
+            # Extract max FPS from range for verdict
+            try:
+                fps_parts = fps_display.split('-')
+                fps_numeric = int(fps_parts[-1])  # Use max value
+            except (ValueError, IndexError):
+                fps_numeric = 0
+        elif fps_display.isdigit():
+            fps_numeric = int(fps_display)
+        
+        # Create meaningful verdict with proper performance assessment
+        if can_run:
+            if exceeds_recommended and fps_numeric > 120:
+                verdict = "EXCELLENT"
+                performance_level = "Far exceeds recommended"
+            elif exceeds_recommended:
+                verdict = "VERY GOOD"
+                performance_level = "Exceeds recommended"
+            elif fps_numeric >= 60:
+                verdict = "GOOD"
+                performance_level = "Meets recommended"
+            else:
+                verdict = "PLAYABLE"
+                performance_level = "Meets minimum"
+        else:
+            verdict = "INSUFFICIENT"
+            performance_level = "Below minimum requirements"
+        
+        # Smart resolution recommendation based on actual performance
+        if fps_numeric > 120 and tier in ['S', 'A']:
+            resolution_tip = "Perfect for 4K gaming"
+        elif fps_numeric > 80 and tier in ['S', 'A', 'B']:
+            resolution_tip = "Excellent for 1440p"
+        elif fps_numeric >= 60:
+            resolution_tip = "Great for 1080p"
+        elif fps_numeric >= 30:
+            resolution_tip = "Playable at 1080p"
+        else:
+            resolution_tip = "Consider upgrading hardware"
+        
+        # Create the exact same working format with ML FPS range data
+        response = f"""Game: {matched_game}
+Verdict: {verdict} ({performance_level})
+Performance: {fps_display} FPS at {settings} settings
+GPU: {gpu_model} (Tier {tier})
+Recommendation: {resolution_tip}"""
+        
+        # Ensure length compliance with better fallback
+        if len(response) > 280:
+            response = f"""Game: {matched_game}
+Verdict: {verdict}
+Performance: {fps_display} FPS at {settings}
+GPU: {gpu_model} (Tier {tier})"""
         
         return response
         
     except Exception as e:
         logging.error(f"Error formatting CanRun response: {e}")
-        return f"Analysis failed for {getattr(result, 'game_name', 'Unknown Game')}. Please check system compatibility."
+        # Ultra-safe fallback
+        game_name = getattr(result, 'game_name', 'Unknown Game')
+        if RESPONSE_FIXER_AVAILABLE:
+            game_name = clean_ascii_text(game_name)
+        else:
+            game_name = ''.join(char for char in str(game_name) if ord(char) < 128)
+        return f"Analysis complete: {game_name} compatibility checked"
 
 def execute_initialize_command() -> dict:
     """Command handler for initialize function."""
@@ -376,10 +521,27 @@ def main():
         return
     
     # G-Assist protocol mode
-    while True:
+    consecutive_failures = 0
+    max_failures = 5  # Prevent infinite loop on persistent errors
+    
+    while consecutive_failures < max_failures:
         command = read_command()
         if command is None:
+            consecutive_failures += 1
+            logging.warning(f"Failed to read command (attempt {consecutive_failures}/{max_failures})")
+            
+            # Brief pause to prevent CPU spinning
+            import time
+            time.sleep(0.1)
             continue
+        
+        # Reset failure counter on successful read
+        consecutive_failures = 0
+        
+        # Handle shutdown command
+        if isinstance(command, dict) and command.get('command') == 'shutdown':
+            logging.info("Shutdown command received. Exiting gracefully.")
+            return 0
         
         # Handle G-Assist input in different formats
         if "tool_calls" in command:

@@ -203,27 +203,47 @@ If you don't have `uv` installed:
 pip install uv
 ```
 
-### Option 1: Default Lightweight Build (UPDATED - VERIFIED WORKING)
+### Option 1: Default Lightweight Build (UPDATED - G-Assist Message Visibility Fix v8.1.0)
 
 ```bash
 # Clone repository
 git clone https://github.com/leksval/canrun
 cd canrun
 
-# Build executable using correct uv environment and dependencies (ENHANCED BUILD v8.0.1)
+# Build executable with G-Assist communication fixes (ENHANCED BUILD v8.1.0)
 cd canrun
-uv run pyinstaller --onefile --name g-assist-plugin-canrun plugin.py --add-data "data;data" --add-data "config.json;." --add-data "data/*.pkl;data" --hidden-import canrun_engine --hidden-import canrun_hardware_detector --hidden-import canrun_game_fetcher --hidden-import canrun_game_matcher --hidden-import canrun_compatibility_analyzer --hidden-import canrun_ml_predictor --hidden-import canrun_model_loader --hidden-import GPUtil --hidden-import pynvml --hidden-import wmi --hidden-import cpuinfo --hidden-import psutil --hidden-import joblib --hidden-import pickle --hidden-import numpy --hidden-import pandas
+uv run pyinstaller --onefile --name g-assist-plugin-canrun plugin.py --add-data "data;data" --add-data "config.json;." --add-data "data/*.pkl;data" --hidden-import canrun_engine --hidden-import canrun_hardware_detector --hidden-import canrun_game_fetcher --hidden-import canrun_game_matcher --hidden-import canrun_compatibility_analyzer --hidden-import canrun_ml_predictor --hidden-import canrun_model_loader --hidden-import g_assist_response_fixer --hidden-import GPUtil --hidden-import pynvml --hidden-import wmi --hidden-import cpuinfo --hidden-import psutil --hidden-import joblib --hidden-import pickle --hidden-import numpy --hidden-import pandas
 
 # Copy executable from dist to main directory
 copy dist\g-assist-plugin-canrun.exe g-assist-plugin-canrun.exe
 
-# Verify build and test functionality
+# Verify G-Assist communication fixes
+uv run python test/test_g_assist_fixes.py
+# Expected: 3/3 tests passed - confirms message visibility fixes
+
+# Test official G-Assist protocol compliance
 uv run python -m pytest test/test_official_g_assist_protocol.py -v
 # Expected: 6 passed - confirms G-Assist protocol compliance
 
 # Test plugin with JSON output (recommended for debugging)
 ./g-assist-plugin-canrun.exe canrun "cyberpunk 2077" --json
 ```
+
+**Key Changes in v8.1.0:**
+- Added `--hidden-import g_assist_response_fixer` for message visibility fixes
+- ASCII-only response validation and cleaning
+- Response length limits to prevent G-Assist rejection
+- Enhanced pipe communication with proper flushing
+- Robust JSON parsing with 1MB input limits and encoding fallbacks
+- Consecutive failure prevention to avoid timeout loops
+- Comprehensive error handling with emergency fallbacks
+
+**Timeout Issue Resolution:**
+- Enhanced JSON parsing with `utf-8` and `latin-1` fallback encoding
+- Increased buffer sizes from 4KB to 8KB for better performance
+- Input size limits: 1MB total, 100KB for JSON parsing
+- Graceful handling of malformed/binary data
+- Expanded shutdown command detection to prevent hanging
 
 **Key Build Requirements:**
 - Use `uv run pyinstaller` to ensure correct Python environment (3.12.8)
