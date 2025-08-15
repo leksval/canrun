@@ -310,7 +310,7 @@ def format_canrun_response(result):
 • **GPU:** {result.hardware_specs.gpu_model} ({result.hardware_specs.gpu_vram_gb}GB)
 • **CPU:** {result.hardware_specs.cpu_model}
 • **RAM:** {result.hardware_specs.ram_total_gb}GB
-• **Display:** {actual_resolution} @ **{result.hardware_specs.primary_monitor_refresh_hz}Hz**
+• **Display:** {actual_resolution} @ {result.hardware_specs.primary_monitor_refresh_hz}Hz
 
 🎯 **GAME REQUIREMENTS**"""
         
@@ -385,11 +385,11 @@ def format_canrun_response(result):
 """
         if can_run:
             if exceeds_recommended:
-                message += "🎯 VERDICT: ✅ CAN RUN - EXCELLENT PERFORMANCE!"
+                message += "🎯 **VERDICT: ✅ CAN RUN - EXCELLENT PERFORMANCE!"
             else:
-                message += "🎯 VERDICT: ✅ CAN RUN"
+                message += "🎯 **VERDICT: ✅ CAN RUN**"
         else:
-            message += "🎯 **VERDICT:** ❌ CANNOT RUN"
+            message += "🎯 **VERDICT:** ❌ CANNOT RUN**"
         
         return message.strip()
         
