@@ -281,6 +281,14 @@ def execute_shutdown_command() -> dict:
 
 def cli_mode():
     """Run the plugin in CLI mode for direct testing."""
+    # Filter out PyInstaller injected arguments like parent_pid=xxxx, pipe_handle=xxxx, etc.
+    filtered_argv = []
+    pyinstaller_patterns = ['parent_pid=', 'pipe_handle=', 'handle=', 'process_id=']
+    for arg in sys.argv[1:]:  # Skip the script name
+        is_pyinstaller_arg = any(arg.startswith(pattern) for pattern in pyinstaller_patterns)
+        if not is_pyinstaller_arg:
+            filtered_argv.append(arg)
+    
     parser = argparse.ArgumentParser(description='CanRun Plugin CLI Mode')
     parser.add_argument('command', choices=['canrun', 'detect_hardware', 'initialize', 'shutdown'],
                         help='Command to execute')
@@ -291,7 +299,7 @@ def cli_mode():
     parser.add_argument('--json', action='store_true',
                         help='Output in JSON format')
     
-    args = parser.parse_args()
+    args = parser.parse_args(filtered_argv)
     
     # Initialize the engine
     if not initialize_canrun_engine():

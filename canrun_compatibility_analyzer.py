@@ -151,6 +151,52 @@ class CanRunCompatibilityAnalyzer:
         self.basic_tier_fallbacks = {
             'rtx': 70, 'gtx': 40, 'intel': 60, 'amd': 65
         }
+        
+        # Load GPU database for direct GPU scoring
+        self.gpu_database = self._load_gpu_database()
+    
+    def _load_gpu_database(self) -> dict:
+        """Load GPU database from JSON file."""
+        import json
+        import os
+        try:
+            possible_paths = [
+                "data/gpu_hierarchy.json",
+                "canrun/data/gpu_hierarchy.json",
+                "gpu_hierarchy.json"
+            ]
+            
+            for json_path in possible_paths:
+                if os.path.exists(json_path):
+                    with open(json_path, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                        nvidia_data = data.get('nvidia', {})
+                        self.logger.debug(f"Loaded GPU database with {len(nvidia_data)} entries")
+                        return nvidia_data
+            
+            self.logger.warning("GPU database not found")
+            return {}
+        except Exception as e:
+            self.logger.error(f"Failed to load GPU database: {e}")
+            return {}
+    
+    def _get_gpu_specific_score(self, gpu_model: str) -> int:
+        """Get GPU-specific score directly from GPU database."""
+        gpu_model_lower = gpu_model.lower()
+        
+        # Search in GPU database
+        for gpu_key, gpu_data in self.gpu_database.items():
+            if gpu_key.lower() in gpu_model_lower or gpu_model_lower in gpu_key.lower():
+                # RTX 4090 should get score=1000 from hierarchy -> ~95+ points
+                raw_score = gpu_data.get('score', 500)
+                # Convert to 0-100 scale similar to ML predictor
+                normalized_score = min(100, raw_score / 10)  # 1000 -> 100, 500 -> 50
+                self.logger.debug(f"GPU '{gpu_model}' found: raw_score {raw_score}, normalized {normalized_score}")
+                return int(normalized_score)
+        
+        # If not found in database, log and use minimal fallback
+        self.logger.warning(f"GPU data not found for: {gpu_model}")
+        return 30  # Minimal fallback score
 
     def analyze_compatibility(self, game_name: str, hardware_specs: Dict[str, Any],
                             game_requirements: Dict[str, Any]) -> CompatibilityAnalysis:
@@ -211,24 +257,31 @@ class CanRunCompatibilityAnalyzer:
             recommendations=recommendations
         )
 
-    def _analyze_gpu_with_ml(self, hardware: Dict[str, Any], requirements: Dict[str, Any], 
+    def _analyze_gpu_with_ml(self, hardware: Dict[str, Any], requirements: Dict[str, Any],
                            ml_assessment=None) -> ComponentAnalysis:
         """Analyze GPU compatibility using ML predictions when available."""
         assert hardware.get('is_nvidia_gpu', False), "RTX/GTX GPU required"
         
-        # Use ML assessment if available, otherwise basic comparison
+        # Get GPU-specific score directly from GPU database (not overall system score)
+        gpu_model = hardware.get('gpu_model', '')
+        
+        # Calculate actual GPU score using the same method as ML predictor
+        gpu_score_raw = self._get_gpu_specific_score(gpu_model)
+        gpu_score = gpu_score_raw / 100.0  # Convert to 0-1 scale
+        
+        # Use ML assessment tier if available for meets_minimum/recommended,
+        # but use actual GPU score for scoring
         if ml_assessment:
-            # Extract GPU-specific data from ML assessment
-            gpu_score = ml_assessment.score / 100.0  # Convert to 0-1 scale
+            # Use ML tier for minimum/recommended assessment
             meets_minimum = ml_assessment.tier.value[0] >= 50  # D tier or better
             meets_recommended = ml_assessment.tier.value[0] >= 70  # B tier or better
+            # But use actual GPU score (not overall system score) for bottleneck calculation
             bottleneck_factor = 1.0 - gpu_score if gpu_score < 0.7 else 0.0
         else:
-            # Fallback analysis without ML
-            gpu_score = 0.6  # Conservative estimate
-            meets_minimum = True  # Assume NVIDIA GPU meets minimum
-            meets_recommended = False  # Conservative for recommended
-            bottleneck_factor = 0.3
+            # Fallback analysis without ML - use GPU score directly
+            meets_minimum = gpu_score_raw >= 50  # GPU score of 50+ meets minimum
+            meets_recommended = gpu_score_raw >= 75  # GPU score of 75+ meets recommended
+            bottleneck_factor = 1.0 - gpu_score if gpu_score < 0.7 else 0.0
         
         # Generate details with RTX/DLSS features
         rtx_features = []
