@@ -170,95 +170,40 @@ If you don't have `uv` installed:
 pip install uv
 ```
 
-### Option 1: NVIDIA Standard Plugin Deployment
-Following the official [NVIDIA G-Assist Plugin Standards](https://github.com/NVIDIA/G-Assist):
+### Option 1: Default Lightweight Build
 
 ```bash
 # Clone repository
 git clone https://github.com/leksval/canrun
 cd canrun
 
-# Install dependencies (NVIDIA standard)
-cd canrun
-uv pip install -r requirements.txt
-
-# Build plugin executable (NVIDIA standard)
-uv run pyinstaller --onefile --name g-assist-plugin-canrun plugin.py
- # in dist/
-
-# Copy executable from dist/ to root directory
-copy dist\g-assist-plugin-canrun.exe g-assist-plugin-canrun.exe
-
-# Test plugin functionality
-uv run python plugin.py
-```
-
-### Option 2: Development Environment (Recommended for MCP)
-Using uv for modern Python dependency management and ML model development:
-
-```bash
-# Clone repository
-git clone https://github.com/leksval/canrun
-cd canrun
-
-# Install uv package manager (if not installed)
-pip install uv
-
-# Install full development environment with ML training capabilities
-uv sync --all-extras
-
-# Install development dependencies
-uv add --dev pytest pytest-asyncio pyinstaller
-
-# Run tests
-uv run pytest test/
-
-# Run MCP server for development
-uv run python app.py
-```
-
-### Developer Executable Build
-To build the production executable with all ML dependencies:
-
-```bash
-# Build G-Assist plugin executable (with uv) - COMPLETE WORKING COMMAND
+# Build default lightweight executable
 cd canrun
 uv run pyinstaller --onefile --name g-assist-plugin-canrun plugin.py --add-data "data;data" --add-data "cache;cache" --add-data "config.json;." --hidden-import canrun_engine --hidden-import canrun_hardware_detector --hidden-import canrun_game_fetcher --hidden-import canrun_game_matcher --hidden-import canrun_compatibility_analyzer --hidden-import canrun_ml_predictor --hidden-import canrun_model_loader --hidden-import GPUtil --hidden-import pynvml --hidden-import wmi --hidden-import cpuinfo --hidden-import psutil
 
-# Alternative: Simple build (basic dependencies only)
-uv pip install -r requirements.txt
-pyinstaller --onefile --name g-assist-plugin-canrun plugin.py
-
-# Alternative: Build with spec file
-uv run pyinstaller --clean --distpath . g-assist-plugin-canrun.spec
-
-# Test the built executable (CLI mode)
-cd dist
-./g-assist-plugin-canrun.exe canrun "Diablo 4"
-./g-assist-plugin-canrun.exe canrun "Cyberpunk 2077"
-
-# Test the built executable (G-Assist mode - will wait for JSON input via stdin)
-./g-assist-plugin-canrun.exe
+# Test plugin with JSON output (recommended for debugging)
+./g-assist-plugin-canrun.exe canrun "cyberpunk 2077" --json
 ```
 
-### ML Model Training (For Developers)
-To train new ML models with the full data science stack:
+### Option 2: Full ML Pipeline Development
 
 ```bash
-# Install ML training dependencies (if not already installed)
-uv sync --extra dev
+# Clone repository
+git clone https://github.com/leksval/canrun
+cd canrun
 
-# Train enhanced ML model
-uv run python src/train_ml_model_enhanced.py
+# Install full development environment with ML training capabilities using pyproject
+uv sync --all-extras
 
-# Train unified stacking ensemble (recommended)
+# Run comprehensive test suite
+uv run pytest test/ -v
+
+# Train unified stacking ensemble ML model
 uv run python src/train_unified_ml_model_2025.py
 
-# Validate ML model performance
-uv run python validate_ml_corrections.py
+# Test plugin functionality
+uv run python plugin.py canrun "cyberpunk 2077" --json
 ```
-
-**Note**: Option 1 follows NVIDIA's official plugin standards for deployment. Option 2 is recommended for development work as it provides proper dependency separation, faster installation, and full ML training capabilities.
 
 ## 🏁 Quick Start
 **1-Minute Setup & Verification:**
