@@ -17,7 +17,7 @@ ASCII_TEST_OUTPUT = True
 
 def test_g_assist_protocol_compliance():
     """Test that manifest.json complies with official NVIDIA G-Assist specs"""
-    manifest_path = os.path.join("canrun", "manifest.json")
+    manifest_path = "manifest.json"
     
     assert os.path.exists(manifest_path), "manifest.json file must exist"
     
@@ -37,32 +37,42 @@ def test_g_assist_protocol_compliance():
     assert "functions" in manifest, "functions array required"
     assert len(manifest["functions"]) >= 1, "At least one function required"
     
-    # Test canrun function specifically
-    canrun_func = None
-    for func in manifest["functions"]:
-        if func["name"] == "canrun":
-            canrun_func = func
-            break
+    # Test check_compatibility function specifically (the main function)
+    check_compatibility_func = None
+    detect_hardware_func = None
+    auto_detect_func = None
     
-    assert canrun_func is not None, "canrun function must be defined"
-    assert "description" in canrun_func, "function description required"
-    assert "tags" in canrun_func, "function tags required"
-    assert len(canrun_func["tags"]) >= 5, "Should have comprehensive tags for discoverability"
-    assert "properties" in canrun_func, "function properties required"
-    assert "required" in canrun_func, "required fields array must be present"
-    assert "game_name" in canrun_func["required"], "game_name must be required parameter"
+    for func in manifest["functions"]:
+        if func["name"] == "check_compatibility":
+            check_compatibility_func = func
+        elif func["name"] == "detect_hardware":
+            detect_hardware_func = func
+        elif func["name"] == "auto_detect":
+            auto_detect_func = func
+    
+    assert check_compatibility_func is not None, "check_compatibility function must be defined"
+    assert "description" in check_compatibility_func, "function description required"
+    assert "tags" in check_compatibility_func, "function tags required"
+    assert len(check_compatibility_func["tags"]) >= 5, "Should have comprehensive tags for discoverability"
+    assert "properties" in check_compatibility_func, "function properties required"
+    assert "required" in check_compatibility_func, "required fields array must be present"
+    assert "game_name" in check_compatibility_func["required"], "game_name must be required parameter"
     
     # Check tags include key gaming terms for G-Assist discovery
     expected_tags = ["canrun", "can run", "game", "compatibility"]
-    tags = canrun_func["tags"]
+    tags = check_compatibility_func["tags"]
     for expected_tag in expected_tags:
         assert expected_tag in tags, f"Missing essential tag: {expected_tag}"
+    
+    # Test that other required functions exist
+    assert detect_hardware_func is not None, "detect_hardware function must be defined"
+    assert auto_detect_func is not None, "auto_detect function must be defined"
     
     print("PASS: manifest.json complies with official NVIDIA G-Assist specification")
 
 def test_executable_exists_and_valid():
     """Test that the executable exists and has proper properties"""
-    exe_path = os.path.join("canrun", "g-assist-plugin-canrun.exe")
+    exe_path = "g-assist-plugin-canrun.exe"
     
     assert os.path.exists(exe_path), "Plugin executable must exist"
     assert os.path.isfile(exe_path), "Plugin executable must be a file"
@@ -73,7 +83,7 @@ def test_executable_exists_and_valid():
                               capture_output=True, 
                               text=True, 
                               timeout=10,
-                              cwd="canrun")
+                              cwd=".")
         # Should either show help or run without fatal error
         assert result.returncode in [0, 1, 2], f"Executable should run without fatal error, got code: {result.returncode}"
     except subprocess.TimeoutExpired:
@@ -85,7 +95,7 @@ def test_executable_exists_and_valid():
 
 def test_cli_mode_functionality():
     """Test CLI mode works properly for debugging"""
-    exe_path = os.path.join("canrun", "g-assist-plugin-canrun.exe")
+    exe_path = "g-assist-plugin-canrun.exe"
     
     # Test canrun command with a popular game
     try:
@@ -93,7 +103,7 @@ def test_cli_mode_functionality():
                               capture_output=True, 
                               text=True, 
                               timeout=30,
-                              cwd="canrun")
+                              cwd=".")
         
         # Should succeed or provide meaningful error
         assert result.returncode in [0, 1], f"CLI mode should work, got return code: {result.returncode}"
@@ -123,14 +133,12 @@ def test_g_assist_message_format():
     test_message = {
         "tool_calls": [
             {
-                "func": "canrun"
+                "func": "check_compatibility",
+                "params": {
+                    "game_name": "cyberpunk 2077"
+                }
             }
-        ],
-        "properties": {
-            "game_name": "cyberpunk 2077"
-        },
-        "messages": [],
-        "system_info": {}
+        ]
     }
     
     # Test that our message format is valid JSON
@@ -144,7 +152,7 @@ def test_g_assist_message_format():
 
 def test_plugin_directory_structure():
     """Test that plugin has proper directory structure for G-Assist"""
-    canrun_dir = "canrun"
+    canrun_dir = "."
     
     # Required files for G-Assist plugin
     required_files = [
@@ -169,14 +177,14 @@ def test_ascii_output_compliance():
         print("SKIP: ASCII output test disabled")
         return
         
-    exe_path = os.path.join("canrun", "g-assist-plugin-canrun.exe")
+    exe_path = "g-assist-plugin-canrun.exe"
     
     try:
         result = subprocess.run([exe_path, "canrun", "test", "--json"], 
                               capture_output=True, 
                               text=True, 
                               timeout=20,
-                              cwd="canrun")
+                              cwd=".")
         
         if result.stdout:
             # Check that all characters in output are ASCII

@@ -4,7 +4,7 @@
   "persistent": false,
   "functions": [
     {
-      "name": "canrun",
+      "name": "check_compatibility",
       "description": "Complete CanRun analysis - check if a game can run with full performance assessment, Steam API integration, hardware detection, fuzzy matching, and S-tier scoring system. Responds to 'canrun diablo', 'can I run cyberpunk', etc.",
       "tags": ["canrun", "can run", "can i run", "will run", "game", "compatibility", "diablo", "cyberpunk", "elden ring", "baldurs gate", "performance", "tier", "score"],
       "properties": {
@@ -14,6 +14,25 @@
         }
       },
       "required": ["game_name"]
+    },
+    {
+      "name": "detect_hardware",
+      "description": "Detect and analyze system hardware specifications for gaming performance assessment",
+      "tags": ["hardware", "detect", "system", "specs", "gpu", "cpu", "ram"],
+      "properties": {},
+      "required": []
+    },
+    {
+      "name": "auto_detect",
+      "description": "Automatically detect and analyze natural language queries about game compatibility",
+      "tags": ["auto", "detect", "natural", "language", "query", "parse"],
+      "properties": {
+        "user_input": {
+          "type": "string",
+          "description": "Natural language user input to parse and analyze"
+        }
+      },
+      "required": ["user_input"]
     }
   ]
 }

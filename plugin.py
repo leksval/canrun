@@ -72,12 +72,12 @@ def read_command() -> dict | None:
         return None
 
 def write_response(response: Response) -> None:
-    """Writes a response to the communication pipe - NVIDIA Standard Implementation."""
+    """Write response to communication pipe - OFFICIAL NVIDIA IMPLEMENTATION"""
     try:
         STD_OUTPUT_HANDLE = -11
         pipe = windll.kernel32.GetStdHandle(STD_OUTPUT_HANDLE)
 
-        json_message = json.dumps(response)
+        json_message = json.dumps(response) + "<<END>>"
         message_bytes = json_message.encode('utf-8')
         message_len = len(message_bytes)
 
@@ -86,9 +86,11 @@ def write_response(response: Response) -> None:
             pipe,
             message_bytes,
             message_len,
-            bytes_written,
+            byref(bytes_written),
             None
         )
+        
+        logging.info(f'Response sent: {len(json_message)} characters')
 
     except Exception as e:
         logging.error(f'Failed to write response: {str(e)}')
@@ -348,80 +350,175 @@ def cli_mode():
     return 0 if result.get('success') else 1
 
 def main():
-    """Main entry point - NVIDIA G-Assist Standard Implementation with CLI support."""
+    """Main plugin execution loop - OFFICIAL NVIDIA IMPLEMENTATION"""
+    LOG_FILE = os.path.join(os.environ.get("USERPROFILE", "."), 'canrun_plugin.log')
+    logging.basicConfig(filename=LOG_FILE, level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+    logging.info("CanRun Plugin Started")
     
-    # Check if running in CLI mode (has command line arguments)
+    # Check if command line arguments were provided (CLI mode)
     if len(sys.argv) > 1:
-        # CLI mode - parse arguments and execute directly
         return cli_mode()
     
-    # G-Assist pipe mode - original implementation
-    TOOL_CALLS_PROPERTY = 'tool_calls'
-    CONTEXT_PROPERTY = 'messages'
-    SYSTEM_INFO_PROPERTY = 'system_info'
-    FUNCTION_PROPERTY = 'func'
-    PARAMS_PROPERTY = 'properties'
-    INITIALIZE_COMMAND = 'initialize'
-    SHUTDOWN_COMMAND = 'shutdown'
-
-    ERROR_MESSAGE = 'CanRun Plugin Error!'
-
-    # Generate command handler mapping
-    commands = {
-        'initialize': execute_initialize_command,
-        'shutdown': execute_shutdown_command,
-        'canrun': execute_canrun_command,
-    }
-    cmd = ''
-
-    logging.info('CanRun Plugin started in G-Assist mode')
-    while cmd != SHUTDOWN_COMMAND:
-        response = None
-        input_data = read_command()
-        if input_data is None:
-            logging.error('Error reading command')
-            continue
-
-        logging.info(f'Received input: {input_data}')
-        
-        if TOOL_CALLS_PROPERTY in input_data:
-            tool_calls = input_data[TOOL_CALLS_PROPERTY]
-            for tool_call in tool_calls:
-                if FUNCTION_PROPERTY in tool_call:
-                    cmd = tool_call[FUNCTION_PROPERTY]
-                    logging.info(f'Processing command: {cmd}')
-                    if cmd in commands:
-                        if cmd == INITIALIZE_COMMAND or cmd == SHUTDOWN_COMMAND:
-                            response = commands[cmd]()
-                        else:
-                            # For CanRun function, run async
-                            params = input_data.get(PARAMS_PROPERTY, {})
-                            context = input_data.get(CONTEXT_PROPERTY, {})
-                            system_info = input_data.get(SYSTEM_INFO_PROPERTY, {})
-                            
-                            loop = asyncio.new_event_loop()
-                            asyncio.set_event_loop(loop)
-                            response = loop.run_until_complete(commands[cmd](params, context, system_info))
-                            loop.close()
-                    else:
-                        logging.warning(f'Unknown command: {cmd}')
-                        response = generate_failure_response(f'{ERROR_MESSAGE} Unknown command: {cmd}')
-                else:
-                    logging.warning('Malformed input: missing function property')
-                    response = generate_failure_response(f'{ERROR_MESSAGE} Malformed input.')
-        else:
-            logging.warning('Malformed input: missing tool_calls property')
-            response = generate_failure_response(f'{ERROR_MESSAGE} Malformed input.')
-
-        logging.info(f'Sending response: {response}')
-        write_response(response)
-
-        if cmd == SHUTDOWN_COMMAND:
-            logging.info('Shutdown command received, terminating plugin')
-            break
+    # Check if running in G-Assist environment
+    in_g_assist = not sys.stdin.isatty()
+    logging.info(f"Running in G-Assist environment: {in_g_assist}")
     
-    logging.info('CanRun G-Assist Plugin stopped.')
-    return 0
+    # Initialize plugin
+    if not initialize_canrun_engine():
+        logging.error("Failed to initialize CanRun engine")
+        return 1
+    
+    logging.info("CanRun plugin initialized successfully")
+    
+    # If not in G-Assist environment, exit - we only care about G-Assist mode
+    if not in_g_assist:
+        print("This is a G-Assist plugin. Please run through G-Assist.")
+        return
+    
+    # G-Assist protocol mode
+    while True:
+        command = read_command()
+        if command is None:
+            continue
+        
+        # Handle G-Assist input in different formats
+        if "tool_calls" in command:
+            # Standard G-Assist protocol format with tool_calls
+            for tool_call in command.get("tool_calls", []):
+                func = tool_call.get("func")
+                params = tool_call.get("params", {})
+                
+                if func == "check_compatibility":
+                    # For async function, we need to run in an event loop
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    response = loop.run_until_complete(execute_canrun_command(params))
+                    write_response(response)
+                    loop.close()
+                elif func == "detect_hardware":
+                    # Handle hardware detection requests
+                    if canrun_engine:
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                        hw_specs = loop.run_until_complete(canrun_engine.hardware_detector.get_hardware_specs())
+                        loop.close()
+                        
+                        # Format hardware message similar to v7.0.0
+                        hardware_message = f"""SYSTEM HARDWARE DETECTION:
+
+GRAPHICS CARD:
+- GPU: {hw_specs.gpu_model}
+- VRAM: {hw_specs.gpu_vram_gb}GB
+- RTX Features: {'Supported' if hw_specs.supports_rtx else 'Not Available'}
+- DLSS Support: {'Available' if hw_specs.supports_dlss else 'Not Available'}
+- Driver Status: {'Compatible' if hw_specs.nvidia_driver_version != 'Unknown' else 'Unknown Version'}
+
+PROCESSOR:
+- CPU: {hw_specs.cpu_model}
+- Cores: {hw_specs.cpu_cores} Physical / {hw_specs.cpu_threads} Logical
+- Performance: {'High-Performance' if hw_specs.cpu_cores >= 6 else 'Mid-Range'}
+
+MEMORY:
+- RAM: {hw_specs.ram_total_gb}GB Total
+- Speed: {hw_specs.ram_speed_mhz}MHz
+- Gaming Performance: {'Excellent' if hw_specs.ram_total_gb >= 16 else 'Adequate' if hw_specs.ram_total_gb >= 8 else 'Below Recommended'}
+
+DISPLAY:
+- Resolution: {hw_specs.primary_monitor_resolution}
+- Refresh Rate: {hw_specs.primary_monitor_refresh_hz}Hz
+
+STORAGE:
+- Type: {hw_specs.storage_type}
+- Performance: {'Fast Loading' if 'SSD' in hw_specs.storage_type else 'Standard'}
+
+SYSTEM:
+- OS: {hw_specs.os_version}
+- DirectX: {hw_specs.directx_version}
+- G-Assist: Compatible (Plugin Working)
+
+Hardware detection completed successfully using CanRun's privacy-aware detection system."""
+                        
+                        response = generate_success_response(hardware_message)
+                        write_response(response)
+                    else:
+                        response = generate_failure_response("CanRun engine not available")
+                        write_response(response)
+                elif func == "auto_detect":
+                    # Handle natural language input like "canrun game?"
+                    user_input = params.get("user_input", "")
+                    logging.info(f"Auto-detect received: {user_input}")
+                    
+                    # Extract game name from queries like "canrun game?"
+                    game_name = user_input
+                    if "canrun" in user_input.lower():
+                        # Remove "canrun" prefix and extract game name
+                        parts = user_input.lower().split("canrun")
+                        if len(parts) > 1:
+                            game_name = parts[1].strip()
+                    
+                    # Remove question mark if present
+                    game_name = game_name.rstrip("?").strip()
+                    
+                    if game_name:
+                        # Create compatibility check params
+                        compat_params = {"game_name": game_name}
+                        
+                        # For async function, we need to run in an event loop
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                        response = loop.run_until_complete(execute_canrun_command(compat_params))
+                        write_response(response)
+                        loop.close()
+                    else:
+                        write_response(generate_failure_response("Could not identify a game name in your query. Please try 'Can I run <game name>?'"))
+                elif func == "initialize":
+                    # Handle initialize command
+                    response = execute_initialize_command()
+                    write_response(response)
+                elif func == "shutdown":
+                    logging.info("Shutdown command received. Exiting.")
+                    return
+                else:
+                    logging.warning(f"Unknown function: {func}")
+                    write_response(generate_failure_response(f"Unknown function: {func}"))
+        elif "user_input" in command:
+            # Alternative format with direct user_input field
+            user_input = command.get("user_input", "")
+            logging.info(f"Direct user input received: {user_input}")
+            
+            # Check if this is a game compatibility query
+            if "canrun" in user_input.lower() or "can run" in user_input.lower() or "can i run" in user_input.lower():
+                # Extract game name
+                game_name = ""
+                for prefix in ["canrun ", "can run ", "can i run "]:
+                    if user_input.lower().startswith(prefix):
+                        game_name = user_input[len(prefix):].strip()
+                        break
+                
+                # If no prefix found but contains "canrun" somewhere
+                if not game_name and "canrun" in user_input.lower():
+                    parts = user_input.lower().split("canrun")
+                    if len(parts) > 1:
+                        game_name = parts[1].strip()
+                
+                # Remove question mark if present
+                game_name = game_name.rstrip("?").strip()
+                
+                if game_name:
+                    # Create compatibility check params
+                    compat_params = {"game_name": game_name}
+                    
+                    # For async function, we need to run in an event loop
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    response = loop.run_until_complete(execute_canrun_command(compat_params))
+                    write_response(response)
+                    loop.close()
+                else:
+                    write_response(generate_failure_response("Could not identify a game name in your query. Please try 'Can I run <game name>?'"))
+            else:
+                # Not a game compatibility query
+                write_response(generate_failure_response("I can check if your system can run games. Try asking 'Can I run <game name>?'"))
 
 class CanRunGAssistPlugin:
     """G-Assist Plugin class for MCP server integration."""
