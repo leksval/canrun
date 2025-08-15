@@ -9,7 +9,7 @@ import os
 import pytest
 sys.path.append('.')
 
-from canrun.src.hardware_detector import HardwareDetector
+from canrun_hardware_detector import CanRunHardwareDetector
 import asyncio
 import json
 
@@ -20,7 +20,7 @@ async def test_hardware_detection():
     print("CanRun Hardware Detection Test")
     print("=" * 50)
     
-    detector = HardwareDetector()
+    detector = CanRunHardwareDetector()
     
     try:
         # Test system detection

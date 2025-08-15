@@ -12,7 +12,7 @@ from pathlib import Path
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from canrun.src.display_detector import DisplayDetector
+from canrun_hardware_detector import CanRunHardwareDetector
 
 
 def test_display_detection():
@@ -28,36 +28,36 @@ def test_display_detection():
     print("CANRUN DISPLAY DETECTION TEST")
     print("=" * 60)
     
-    detector = DisplayDetector()
+    detector = CanRunHardwareDetector()
     
     # Test 1: Primary display detection
     print("\n[TEST 1] Detecting Primary Display...")
     print("-" * 40)
     
     primary = detector.detect_primary_display()
-    print(f"✓ Resolution: {primary['width']}x{primary['height']}")
-    print(f"✓ Detection Method: {primary['method']}")
-    print(f"✓ Device: {primary.get('device', 'Unknown')}")
-    print(f"✓ Is Primary: {primary.get('is_primary', False)}")
+    print(f"[OK] Resolution: {primary['width']}x{primary['height']}")
+    print(f"[OK] Detection Method: {primary['method']}")
+    print(f"[OK] Device: {primary.get('device', 'Unknown')}")
+    print(f"[OK] Is Primary: {primary.get('is_primary', False)}")
     
     # Check if this is the problematic 4K detection
     if primary['width'] == 3840 and primary['height'] == 2160:
-        print("\n⚠️  WARNING: 4K display detected!")
+        print("\n  WARNING: 4K display detected!")
         print("   If your actual display is not 4K, this is the issue that was fixed.")
         print("   The new detection should show your actual resolution.")
     elif primary['width'] == 1920 and primary['height'] == 1200:
-        print("\n✅ SUCCESS: Correctly detected 1920x1200 display!")
+        print("\n SUCCESS: Correctly detected 1920x1200 display!")
     
     # Get resolution tier
     tier = detector.get_resolution_tier(primary['width'], primary['height'])
-    print(f"\n✓ Resolution Tier: {tier}")
+    print(f"\n[OK] Resolution Tier: {tier}")
     
     # Test 2: All monitors detection
     print("\n[TEST 2] Detecting All Monitors...")
     print("-" * 40)
     
     all_monitors = detector.get_all_monitors()
-    print(f"✓ Found {len(all_monitors)} monitor(s)")
+    print(f"[OK] Found {len(all_monitors)} monitor(s)")
     
     for i, monitor in enumerate(all_monitors, 1):
         print(f"\nMonitor {i}:")
@@ -77,9 +77,9 @@ def test_display_detection():
     override_result = detector.get_display_resolution()
     
     if override_result['method'] == 'environment_override':
-        print(f"✅ Environment override successful: {override_result['width']}x{override_result['height']}")
+        print(f" Environment override successful: {override_result['width']}x{override_result['height']}")
     else:
-        print("❌ Environment override not working")
+        print(" Environment override not working")
     
     # Clean up environment variables
     del os.environ['CANRUN_DISPLAY_WIDTH']
@@ -90,6 +90,17 @@ def test_display_detection():
     print("-" * 40)
     
     config_path = Path(__file__).parent.parent / 'config.json'
+    if not config_path.exists():
+        # Create a minimal config file for testing
+        config = {
+            "display_override": {
+                "enabled": False,
+                "width": 1920,
+                "height": 1200
+            }
+        }
+        with open(config_path, 'w') as f:
+            json.dump(config, f, indent=2)
     
     # Read current config
     with open(config_path, 'r') as f:
@@ -106,13 +117,13 @@ def test_display_detection():
         json.dump(config, f, indent=2)
     
     # Test with config override
-    detector2 = DisplayDetector()
+    detector2 = CanRunHardwareDetector()
     config_result = detector2.get_display_resolution()
     
     if config_result['method'] == 'config_override':
-        print(f"✅ Config override successful: {config_result['width']}x{config_result['height']}")
+        print(f" Config override successful: {config_result['width']}x{config_result['height']}")
     else:
-        print("❌ Config override not working")
+        print(" Config override not working")
     
     # Restore original config
     config['display_override']['enabled'] = original_enabled
@@ -122,21 +133,27 @@ def test_display_detection():
     with open(config_path, 'w') as f:
         json.dump(config, f, indent=2)
     
+    # Clean up test config file
+    try:
+        os.remove(config_path)
+    except:
+        pass
+    
     # Summary
     print("\n" + "=" * 60)
     print("TEST SUMMARY")
     print("=" * 60)
     
-    print("\n📊 Detection Results:")
+    print("\n Detection Results:")
     print(f"  • Primary Display: {primary['width']}x{primary['height']} ({primary['method']})")
     print(f"  • Total Monitors: {len(all_monitors)}")
     print(f"  • Resolution Tier: {tier}")
     
-    print("\n🔧 Override Methods:")
-    print("  • Environment Variables: ✅ Working")
-    print("  • Config File: ✅ Working")
+    print("\n Override Methods:")
+    print("  • Environment Variables:  Working")
+    print("  • Config File:  Working")
     
-    print("\n💡 How to Fix Wrong Resolution Detection:")
+    print("\n How to Fix Wrong Resolution Detection:")
     print("  1. Set environment variables:")
     print("     - CANRUN_DISPLAY_WIDTH=1920")
     print("     - CANRUN_DISPLAY_HEIGHT=1200")
@@ -144,7 +161,14 @@ def test_display_detection():
     print("     - Set display_override.enabled = true")
     print("     - Set display_override.width and height")
     
-    return primary
+    # Use assert statements instead of return
+    assert primary is not None, "Primary display detection should not return None"
+    assert 'width' in primary, "Primary display should have width"
+    assert 'height' in primary, "Primary display should have height"
+    assert 'method' in primary, "Primary display should have detection method"
+    assert primary['width'] > 0, "Display width should be positive"
+    assert primary['height'] > 0, "Display height should be positive"
+    assert tier in ['720p', '1080p', '1440p', '4K'], f"Resolution tier should be valid: {tier}"
 
 
 def compare_old_vs_new():
@@ -168,7 +192,7 @@ def compare_old_vs_new():
         print(f"Resolution: {old_width}x{old_height}")
         
         if old_width == 3840 and old_height == 2160:
-            print("⚠️  Incorrectly detecting 4K (this was the bug)")
+            print("  Incorrectly detecting 4K (this was the bug)")
     except Exception as e:
         print(f"Failed: {e}")
     
@@ -176,7 +200,7 @@ def compare_old_vs_new():
     print("\n[NEW METHOD] Proper API detection:")
     print("-" * 40)
     
-    detector = DisplayDetector()
+    detector = CanRunHardwareDetector()
     new_result = detector.detect_primary_display()
     
     print(f"Resolution: {new_result['width']}x{new_result['height']}")
@@ -185,9 +209,9 @@ def compare_old_vs_new():
     
     # Show the difference
     if 'old_width' in locals():
-        print("\n📊 Difference Analysis:")
+        print("\n Difference Analysis:")
         if old_width != new_result['width'] or old_height != new_result['height']:
-            print(f"✅ FIXED: Old method showed {old_width}x{old_height}")
+            print(f" FIXED: Old method showed {old_width}x{old_height}")
             print(f"         New method shows {new_result['width']}x{new_result['height']}")
         else:
             print("Both methods show the same resolution")
@@ -195,10 +219,9 @@ def compare_old_vs_new():
 
 if __name__ == "__main__":
     # Run the main test
-    result = test_display_detection()
+    test_display_detection()
     
     # Run comparison
     compare_old_vs_new()
     
     print("\n✅ Display detection test complete!")
-    print(f"\nFinal detected resolution: {result['width']}x{result['height']}")

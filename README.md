@@ -96,43 +96,174 @@ uv run python src/train_unified_ml_model_2025.py
 
 ## 📦 G-Assist Plugin Installation
 
-#### **Ready-to-Use Plugin**
-The G-Assist plugin is now available with the correct structure:
+Following [Official NVIDIA G-Assist Plugin Standards](https://github.com/NVIDIA/G-Assist), CanRun uses the correct plugin architecture:
+
 ```
-└── canrun/                          # Plugin directory for G-Assist
-    ├── g-assist-plugin-canrun.exe   # Main executable (FIXED)
-    ├── manifest.json                # Plugin manifest (FIXED)
-    └── plugin.py                    # Source code
+plugins/
+└── canrun/                          # Plugin directory name = invocation name
+    ├── g-assist-plugin-canrun.exe   # Main executable
+    ├── manifest.json                # Plugin configuration
+    ├── config.json                  # Settings & credentials
+    └── plugin.py                    # Source code (optional)
 ```
 
 ### **🚀 INSTALLATION INSTRUCTIONS**
 
-**Step 1: Copy Plugin to G-Assist Directory**
-```bash
-# Copy the entire canrun/canrun/ directory to G-Assist plugins folder:
-# %USERPROFILE%\AppData\Local\NVIDIA Corporation\NVIDIA App\plugins\
-# or
-# %PROGRAMDATA%\NVIDIA Corporation\nvtopps\rise\plugins\
+**Step 1: Locate G-Assist Plugins Directory**
+
+**Primary location (NVIDIA App):**
+```
+%USERPROFILE%\AppData\Local\NVIDIA Corporation\NVIDIA App\plugins\
 ```
 
-**Step 2: Restart G-Assist**
+**Alternative location (Legacy):**
+```
+%PROGRAMDATA%\NVIDIA Corporation\nvtopps\rise\plugins\
+```
+
+**Step 2: Copy Plugin Files**
+```bash
+# Method 1: Copy entire canrun directory
+xcopy /E /I "canrun" "%USERPROFILE%\AppData\Local\NVIDIA Corporation\NVIDIA App\plugins\canrun"
+
+# Method 2: Manual file copy
+mkdir "%USERPROFILE%\AppData\Local\NVIDIA Corporation\NVIDIA App\plugins\canrun"
+copy "canrun\g-assist-plugin-canrun.exe" "%USERPROFILE%\AppData\Local\NVIDIA Corporation\NVIDIA App\plugins\canrun\"
+copy "canrun\manifest.json" "%USERPROFILE%\AppData\Local\NVIDIA Corporation\NVIDIA App\plugins\canrun\"
+copy "canrun\config.json" "%USERPROFILE%\AppData\Local\NVIDIA Corporation\NVIDIA App\plugins\canrun\"
+```
+
+**Step 3: Restart G-Assist**
 1. Close NVIDIA App / G-Assist completely
 2. Restart NVIDIA App
 3. Enable G-Assist if not already enabled
 
-**Step 3: Test Plugin**
+**Step 4: Test Plugin**
 Try these commands:
-- "canrun diablo"
-- "can I run Cyberpunk 2077?"
+- "Hey canrun, can I run Diablo 4?"
+- "canrun cyberpunk 2077"
 - "/canrun elden ring"
 
-  
+### **Plugin Architecture Notes**
+- **Directory Name**: Must match plugin invocation name (`canrun`)
+- **Executable Name**: Must follow NVIDIA convention `g-assist-plugin-<name>.exe`
+- **Communication**: Windows pipes (stdin/stdout) for G-Assist integration
+- **CLI Mode**: Also supports direct command-line execution for testing
+
+## Installation and Setup
+
+### Prerequisites
+- Python 3.12+ (NVIDIA G-Assist requirement)
+- Windows 10/11 (for hardware detection)
+- NVIDIA GPU recommended for optimal performance
+
+### Prerequisites
+- Python 3.12+ (NVIDIA G-Assist requirement)
+- Windows 10/11 (for hardware detection)
+- NVIDIA GPU recommended for optimal performance
+- **uv package manager** (required for dependency management)
+
+### Install uv Package Manager
+If you don't have `uv` installed:
+```bash
+# Install uv package manager
+pip install uv
+```
+
+### Option 1: NVIDIA Standard Plugin Deployment
+Following the official [NVIDIA G-Assist Plugin Standards](https://github.com/NVIDIA/G-Assist):
+
+```bash
+# Clone repository
+git clone https://github.com/leksval/canrun
+cd canrun
+
+# Install dependencies (NVIDIA standard)
+cd canrun
+uv pip install -r requirements.txt
+
+# Build plugin executable (NVIDIA standard)
+uv run pyinstaller --onefile --name g-assist-plugin-canrun plugin.py
+ # in dist/
+
+# Copy executable from dist/ to root directory
+copy dist\g-assist-plugin-canrun.exe g-assist-plugin-canrun.exe
+
+# Test plugin functionality
+uv run python plugin.py
+```
+
+### Option 2: Development Environment (Recommended for MCP)
+Using uv for modern Python dependency management and ML model development:
+
+```bash
+# Clone repository
+git clone https://github.com/leksval/canrun
+cd canrun
+
+# Install uv package manager (if not installed)
+pip install uv
+
+# Install full development environment with ML training capabilities
+uv sync --all-extras
+
+# Install development dependencies
+uv add --dev pytest pytest-asyncio pyinstaller
+
+# Run tests
+uv run pytest test/
+
+# Run MCP server for development
+uv run python app.py
+```
+
+### Developer Executable Build
+To build the production executable with all ML dependencies:
+
+```bash
+# Build G-Assist plugin executable (with uv) - COMPLETE WORKING COMMAND
+cd canrun
+uv run pyinstaller --onefile --name g-assist-plugin-canrun plugin.py --add-data "data;data" --add-data "cache;cache" --add-data "config.json;." --hidden-import canrun_engine --hidden-import canrun_hardware_detector --hidden-import canrun_game_fetcher --hidden-import canrun_game_matcher --hidden-import canrun_compatibility_analyzer --hidden-import canrun_ml_predictor --hidden-import canrun_model_loader
+
+# Alternative: Simple build (basic dependencies only)
+uv pip install -r requirements.txt
+pyinstaller --onefile --name g-assist-plugin-canrun plugin.py
+
+# Alternative: Build with spec file
+uv run pyinstaller --clean --distpath . g-assist-plugin-canrun.spec
+
+# Test the built executable (CLI mode)
+cd dist
+./g-assist-plugin-canrun.exe canrun "Diablo 4"
+
+# Test the built executable (G-Assist mode - will wait for JSON input via stdin)
+./g-assist-plugin-canrun.exe
+```
+
+### ML Model Training (For Developers)
+To train new ML models with the full data science stack:
+
+```bash
+# Install ML training dependencies (if not already installed)
+uv sync --extra dev
+
+# Train enhanced ML model
+uv run python src/train_ml_model_enhanced.py
+
+# Train unified stacking ensemble (recommended)
+uv run python src/train_unified_ml_model_2025.py
+
+# Validate ML model performance
+uv run python validate_ml_corrections.py
+```
+
+**Note**: Option 1 follows NVIDIA's official plugin standards for deployment. Option 2 is recommended for development work as it provides proper dependency separation, faster installation, and full ML training capabilities.
+
 ## 🏁 Quick Start
 **1-Minute Setup & Verification:**
 
-# Copy to G-Assist plugins directory
-
 ```bash
+# Copy to G-Assist plugins directory
 copy "g-assist-plugin-canrun.exe" "C:\ProgramData\NVIDIA Corporation\nvtopps\rise\plugins\canrun\g-assist-plugin-canrun.exe"
 ```
 
@@ -152,9 +283,11 @@ uv run python -m pytest test/ -v
 # Expected: 155 passed, 0 failed
 
 # 4. Build executable with latest Unified_Stacking_Ensemble_2025 ML model
-# IMPORTANT: Always use --clean flag to ensure fresh build with updated code
-uv run python -m PyInstaller --clean --distpath . g-assist-plugin-canrun.spec
-# Expected: g-assist-plugin-canrun.exe created successfully
+# IMPORTANT: Navigate to canrun directory first
+cd canrun
+uv pip install -r requirements.txt
+pyinstaller --onefile --name g-assist-plugin-canrun plugin.py
+# Expected: g-assist-plugin-canrun.exe created successfully (16.1 MB)
 
 # 5. Test specific components (optional)
 uv run python test/test_official_g_assist_protocol.py  # G-Assist protocol verification

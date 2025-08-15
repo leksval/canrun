@@ -7,14 +7,14 @@ Tests the game compatibility analysis capabilities
 import sys
 import os
 import pytest
-# Add src directory to Python path
+# Add canrun directory to Python path
 current_dir = os.path.dirname(os.path.abspath(__file__))
-src_dir = os.path.join(current_dir, '..', 'src')
-sys.path.insert(0, src_dir)
+canrun_dir = os.path.join(current_dir, '..')
+sys.path.insert(0, canrun_dir)
 
-from canrun.src.compatibility_analyzer import CompatibilityAnalyzer
-from canrun.src.hardware_detector import HardwareDetector
-from canrun.src.game_requirements_fetcher import GameRequirementsFetcher
+from canrun_compatibility_analyzer import CanRunCompatibilityAnalyzer
+from canrun_hardware_detector import CanRunHardwareDetector
+from canrun_game_fetcher import CanRunGameFetcher
 import asyncio
 import json
 
@@ -26,9 +26,9 @@ async def test_compatibility_analysis():
     print("=" * 50)
     
     # Initialize components
-    detector = HardwareDetector()
-    fetcher = GameRequirementsFetcher()
-    analyzer = CompatibilityAnalyzer()
+    detector = CanRunHardwareDetector()
+    fetcher = CanRunGameFetcher()
+    analyzer = CanRunCompatibilityAnalyzer()
     
     try:
         # Test games to analyze

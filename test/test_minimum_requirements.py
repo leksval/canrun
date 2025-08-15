@@ -4,7 +4,7 @@ import asyncio
 import sys
 import pytest
 
-from canrun.src.canrun_engine import CanRunEngine
+from canrun_engine import CanRunEngine
 
 @pytest.mark.asyncio
 async def test_minimum_requirements_logic():

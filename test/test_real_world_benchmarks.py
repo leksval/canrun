@@ -14,14 +14,14 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from canrun.src.dynamic_performance_predictor import StreamlinedPerformancePredictor
+from canrun_ml_predictor import CanRunMLPredictor
 
 class TestRealWorldBenchmarks(unittest.TestCase):
     """Test suite validating against real-world benchmark data"""
     
     def setUp(self):
         """Initialize the performance predictor"""
-        self.predictor = StreamlinedPerformancePredictor()
+        self.predictor = CanRunMLPredictor()
         self.tolerance_mae = 23.2  # Model's actual MAE: 23.2 FPS (94.8% R²)
         # Note: Model trained on specific dataset - real-world benchmarks may vary significantly
         

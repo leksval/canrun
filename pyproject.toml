@@ -12,12 +12,12 @@ dependencies = [
     "asyncio-throttle>=1.0.0",
     "gradio",
     "psutil>=5.0.0",
-    "joblib>=1.5.1",  # Required to load pre-trained ML models
-    "numpy>=1.24.0",   # Required for ML model inference
-    
+    "joblib>=1.5.1", # Required to load pre-trained ML models
+    "numpy>=1.24.0", # Required for ML model inference
     # Windows-specific dependencies
     "pynvml; platform_system=='Windows'",
     "wmi; platform_system=='Windows'",
+    "pyinstaller>=6.15.0",
 ]
 
 [project.optional-dependencies]

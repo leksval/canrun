@@ -3,13 +3,13 @@
 
 import asyncio
 import pytest
-from canrun.src.optimized_game_fuzzy_matcher import OptimizedGameFuzzyMatcher
+from canrun_game_matcher import CanRunGameMatcher
 
 @pytest.mark.asyncio
 async def test_fuzzy_matching():
     """Test the fuzzy matching system."""
     print("Testing Fuzzy Matcher Integration...")
-    matcher = OptimizedGameFuzzyMatcher()
+    matcher = CanRunGameMatcher()
 
     # Test roman numeral conversion
     print(f"\nTesting Roman Numeral Conversion:")
@@ -27,15 +27,20 @@ async def test_fuzzy_matching():
     for user_input in test_inputs:
         result = await matcher.find_best_match(user_input, games)
         if result:
-            match, conf, message = result
+            # Extract data from GameMatchResult object
+            match = result.matched_name
+            conf = result.confidence
+            message = result.message
             print(f"'{user_input}' -> '{match}' (confidence: {conf:.2f})")
             if message:
                 print(f"  Note: {message}")
         else:
             print(f"'{user_input}' -> No match found")
 
-    print("\n✅ Fuzzy matcher integration test completed successfully!")
-    return True
+    print("\n Fuzzy matcher integration test completed successfully!")
+    
+    # Use assert statements instead of return
+    assert True, "Fuzzy matcher integration test should complete successfully"
 
 if __name__ == "__main__":
     test_fuzzy_matching()

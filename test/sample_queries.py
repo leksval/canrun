@@ -8,7 +8,7 @@ import sys
 import os
 sys.path.append('..')
 
-from src.canrun_engine import CanRunEngine
+from canrun_engine import CanRunEngine
 import asyncio
 import json
 

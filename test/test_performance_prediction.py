@@ -12,9 +12,9 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 src_dir = os.path.join(current_dir, '..', 'src')
 sys.path.insert(0, src_dir)
 
-from canrun.src.dynamic_performance_predictor import DynamicPerformancePredictor
-from canrun.src.hardware_detector import HardwareDetector
-from canrun.src.game_requirements_fetcher import GameRequirementsFetcher
+from canrun_ml_predictor import CanRunMLPredictor
+from canrun_hardware_detector import CanRunHardwareDetector
+from canrun_game_fetcher import CanRunGameFetcher
 import asyncio
 import json
 
@@ -26,9 +26,9 @@ async def test_performance_prediction():
     print("=" * 50)
     
     # Initialize components
-    detector = HardwareDetector()
-    fetcher = GameRequirementsFetcher()
-    predictor = DynamicPerformancePredictor()
+    detector = CanRunHardwareDetector()
+    fetcher = CanRunGameFetcher()
+    predictor = CanRunMLPredictor()
     
     try:
         print("\n[TEST 1] Detecting system hardware...")

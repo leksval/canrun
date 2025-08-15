@@ -1,0 +1,38 @@
+# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# CanRun Game Compatibility Analysis System v8.0.0
+# Core runtime dependencies for production deployment
+
+# Core runtime dependencies for exe
+aiohttp>=3.12.15
+py-cpuinfo>=9.0.0
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+asyncio-throttle>=1.0.0
+gradio
+psutil>=5.0.0
+joblib>=1.5.1
+numpy>=1.24.0
+
+# Windows-specific dependencies
+pynvml; platform_system=='Windows'
+wmi; platform_system=='Windows'
+pyinstaller>=6.15.0
+
+# Note: This project uses uv for dependency management
+# For development setup: cd canrun && uv sync --dev
+# For production install: pip install -r requirements.txt
+# Development dependencies are defined in pyproject.toml [project.optional-dependencies]

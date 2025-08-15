@@ -7,12 +7,12 @@ Tests the complete CanRun system integration
 import sys
 import os
 import pytest
-# Add src directory to Python path
+# Add canrun directory to Python path
 current_dir = os.path.dirname(os.path.abspath(__file__))
-src_dir = os.path.join(current_dir, '..', 'src')
-sys.path.insert(0, src_dir)
+canrun_dir = os.path.join(current_dir, '..')
+sys.path.insert(0, canrun_dir)
 
-from canrun.src.canrun_engine import CanRunEngine
+from canrun_engine import CanRunEngine
 import asyncio
 import json
 
@@ -50,13 +50,13 @@ async def test_canrun_integration():
                 print(f"  OK Performance: {result.performance_prediction.expected_fps} FPS")
                 print(f"  OK Optimization suggestions: Available")
                 
-                # Verify result structure
-                required_keys = ['compatibility', 'performance', 'optimization_suggestions', 'hardware_analysis']
-                for key in required_keys:
-                    if key not in result:
-                        print(f"  ⚠ Missing key in result: {key}")
+                # Verify result structure (CanRunResult is a dataclass)
+                required_attrs = ['compatibility_analysis', 'performance_prediction', 'hardware_specs', 'game_requirements']
+                for attr in required_attrs:
+                    if hasattr(result, attr):
+                        print(f"  OK {attr}: Present")
                     else:
-                        print(f"  OK {key}: Present")
+                        print(f"  ⚠ Missing attribute in result: {attr}")
             else:
                 print(f"  ⚠ No result returned for {query['game']}")
         

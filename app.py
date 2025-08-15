@@ -14,7 +14,7 @@ import platform
 
 # Platform detection
 IS_WINDOWS = platform.system() == "Windows"
-from src.canrun_engine import CanRunEngine
+from canrun_engine import CanRunEngine
 from plugin import CanRunGAssistPlugin
 
 # Configure logging
