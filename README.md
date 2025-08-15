@@ -34,64 +34,21 @@ tags:
 
 - **🎯 RTX/GTX Optimized**: Exclusively designed for RTX/GTX systems with G-Assist integration
 - **🎮 CANRUN! Indicator**: Instant visual feedback when your system meets game requirements
+ 
 - **⭐ S-A-B-C-D-F Tier System**: Advanced performance classification with weighted scoring
+- 
 - **🧠 AI-Powered Analysis**: Leverages G-Assist's embedded 8B Llama model for intelligent insights
+- **🧠 ML-Powered FPS Prediction**: Advanced Stacking Ensemble with GPU acceleration
+ 
 - **🔒 Privacy-by-Design**: All processing happens locally on your RTX GPU—no data leaves your system
 - **🎯 Steam-First Data**: Prioritizes Steam API for most up-to-date game requirements
 - **🎯 Intelligent Game Matching**: Advanced fuzzy matching handles game name variations
 - **📊 Smart Performance Prediction**: Comprehensive hardware hierarchies
 - **💡 Intelligent Recommendations**: AI-generated optimization tips
-- **🏃 Zero Setup**: Drop-in plugin with automatic RTX/GTX validation
+- 
 - **🤖 MCP Server**: Official Model Context Protocol (MCP) server for G-Assist integration
 - **🔄 JSON-Based Configuration**: All benchmark data externalized for easy maintenance
-- **📊 Multi-Resolution Support**: Validated 1080p, 1440p, and 4K benchmark data
-
-## 🧠 **ML Pipeline: Unified_Stacking_Ensemble_2025**
-
-### **Final Production Accuracy:**
-- **Mean Absolute Error (MAE):** 13.79 FPS
-- **R² Score:** 0.9558 (95.58% variance explained)
-- **RMSE:** 11.01 FPS
-
-### **Calibrated Model Performance:**
-- **Calibrated MAE:** 3.07 FPS
-- **Calibrated R²:** 0.9941 (99.41% variance explained)
-
-### **Model Details:**
-
-#### **Training Configuration:**
-- **Model Type:** Unified_Stacking_Ensemble_2025
-- **Base Models:** 7 ensemble models (XGBoost GPU, LightGBM GPU, CatBoost, Random Forest, etc.)
-- **Training Samples:** 143
-- **Test Samples:** 36
-- **Training Time:** 81.3 seconds
-- **Features:** 80 engineered features
-
-#### **Quality Indicators:**
-- **Overfitting Gap:** 0.0085 (very low - indicates good generalization)
-- **Domain Correction Factor:** 0.88 (accounts for real-world variance)
-- **GPU Acceleration:** CatBoost GPU enabled
-
-### **Training Pipeline**
-```bash
-# Retrain with latest benchmarks
-cd canrun
-uv run python src/train_unified_ml_model_2025.py
-
-# Expected output:
-# ✅ Unified_Stacking_Ensemble_2025 v7.0_2025_Edition
-# ✅ 99.42% R² after calibration (SOTA performance)
-# ✅ Model saved to canrun/src/ml_fps_model.json
-```
-
-### **Training Data**
-- **1,848 benchmarks** across 14 games, 44 GPUs (GTX 960 → RTX 5090)
-- **Multi-resolution**: 1080p, 1440p, 4K validated data
-- **Real-world sources**: Verified through web research + curated database
-- **Feature engineering**: Polynomial interactions, PassMark scores, VRAM ratios
-
-
----
+- **🏃 Zero Setup**: Drop-in plugin with automatic RTX/GTX validation
 
 
 ## 📦 G-Assist Plugin Installation
@@ -163,9 +120,8 @@ copy "canrun\data" "%USERPROFILE%\AppData\Local\NVIDIA Corporation\NVIDIA App\pl
 
 **Step 4: Test Plugin**
 Try these commands:
-- "Hey canrun, can I run Diablo 4?"
-- "canrun cyberpunk 2077"
 - "/canrun elden ring"
+- "canrun cyberpunk 2077"
 
 ### **Plugin Architecture Notes**
 - **Directory Name**: Must match plugin invocation name (`canrun`)
@@ -188,7 +144,7 @@ If the plugin is not detected by G-Assist:
 ### Prerequisites
 - Python 3.12+ (NVIDIA G-Assist requirement)
 - Windows 10/11 (for hardware detection)
-- NVIDIA GPU recommended for optimal performance
+- NVIDIA GPU recommended for full G-Assist integration
 
 ### Prerequisites
 - Python 3.12+ (NVIDIA G-Assist requirement)
@@ -203,14 +159,14 @@ If you don't have `uv` installed:
 pip install uv
 ```
 
-### Option 1: Default Lightweight Build (UPDATED - G-Assist Message Visibility Fix v8.1.0)
+### Option 1: Default Lightweight Build (UPDATED - G-Assist Message Visibility Fix v8.8.8)
 
 ```bash
 # Clone repository
 git clone https://github.com/leksval/canrun
 cd canrun
 
-# Build executable with G-Assist communication fixes (ENHANCED BUILD v8.1.0)
+# Build executable with G-Assist communication fixes
 cd canrun
 uv run pyinstaller --onefile --name g-assist-plugin-canrun plugin.py --add-data "data;data" --add-data "config.json;." --add-data "data/*.pkl;data" --hidden-import canrun_engine --hidden-import canrun_hardware_detector --hidden-import canrun_game_fetcher --hidden-import canrun_game_matcher --hidden-import canrun_compatibility_analyzer --hidden-import canrun_ml_predictor --hidden-import canrun_model_loader --hidden-import g_assist_response_fixer --hidden-import GPUtil --hidden-import pynvml --hidden-import wmi --hidden-import cpuinfo --hidden-import psutil --hidden-import joblib --hidden-import pickle --hidden-import numpy --hidden-import pandas
 
@@ -229,27 +185,6 @@ uv run python -m pytest test/test_official_g_assist_protocol.py -v
 ./g-assist-plugin-canrun.exe canrun "cyberpunk 2077" --json
 ```
 
-**Key Changes in v8.1.0:**
-- Added `--hidden-import g_assist_response_fixer` for message visibility fixes
-- ASCII-only response validation and cleaning
-- Response length limits to prevent G-Assist rejection
-- Enhanced pipe communication with proper flushing
-- Robust JSON parsing with 1MB input limits and encoding fallbacks
-- Consecutive failure prevention to avoid timeout loops
-- Comprehensive error handling with emergency fallbacks
-
-**Timeout Issue Resolution:**
-- Enhanced JSON parsing with `utf-8` and `latin-1` fallback encoding
-- Increased buffer sizes from 4KB to 8KB for better performance
-- Input size limits: 1MB total, 100KB for JSON parsing
-- Graceful handling of malformed/binary data
-- Expanded shutdown command detection to prevent hanging
-
-**Key Build Requirements:**
-- Use `uv run pyinstaller` to ensure correct Python environment (3.12.8)
-- Include `config.json` from v7.0.0 specification
-- Add all hidden imports for proper dependency bundling
-- The `hook-psutil.py` hook ensures psutil is properly packaged
 
 ### Option 2: Full ML Pipeline Development
 
@@ -265,49 +200,11 @@ uv sync --all-extras
 uv run pytest test/ -v
 
 # Train unified stacking ensemble ML model
-uv run python src/train_unified_ml_model_2025.py
+uv run python src/train_unified_ml_model.py
 
 # Test plugin functionality
 uv run python plugin.py canrun "cyberpunk 2077" --json
 ```
-
-## 🏁 Quick Start
-**1-Minute Setup & Verification:**
-
-```bash
-# Copy to G-Assist plugins directory
-copy "g-assist-plugin-canrun.exe" "C:\ProgramData\NVIDIA Corporation\nvtopps\rise\plugins\canrun\g-assist-plugin-canrun.exe"
-```
-
-## **Installation Guide**
-
-#### **For Developers (Complete Build & Test Pipeline)**
-
-# 1. Clone and enter directory
-git clone https://github.com/leksval/canrun
-cd canrun
-
-# 2. Install development dependencies (includes ML training stack + testing + build tools)
-uv sync --dev  # Installs all dependencies from pyproject.toml
-
-# 3. Run comprehensive test suite
-uv run python -m pytest test/ -v
-# Expected: 155 passed, 0 failed
-
-# 4. Build executable with latest Unified_Stacking_Ensemble_2025 ML model
-# IMPORTANT: Navigate to canrun directory first
-cd canrun
-uv pip install -r requirements.txt
-pyinstaller --onefile --name g-assist-plugin-canrun plugin.py
-# Expected: g-assist-plugin-canrun.exe created successfully (16.1 MB)
-
-# 5. Test specific components (optional)
-uv run python test/test_official_g_assist_protocol.py  # G-Assist protocol verification
-uv run python plugin.py canrun "Diablo 4"  # Plugin functionality test
-
-
-
-
 
 ### G-Assist MCP Integration
 
@@ -328,7 +225,7 @@ cd canrun
 # Run all tests with pytest using uv
 uv run python -m pytest test/ -v
 
-# Test official G-Assist protocol specifically (VERIFIED WORKING)
+# Test official G-Assist protocol specifically
 uv run python -m pytest test/test_official_g_assist_protocol.py -v
 
 # Expected output: 6 passed in 4.14s
@@ -339,37 +236,6 @@ uv run python -m pytest test/test_official_g_assist_protocol.py -v
 # ✅ Directory structure requirements
 # ✅ ASCII output compliance
 ```
-
-**Test Coverage:**
-- ✅ **G-Assist Protocol Compliance**: 6/6 tests passing - Official NVIDIA protocol verified
-- ✅ **Advanced Performance Assessment**: S-A-B-C-D-F tier system with weighted scoring
-- ✅ **LLM Analysis**: 20/20 tests passing - G-Assist integration, privacy protection
-- ✅ **Steam API Integration**: 15/15 tests passing - Real-time requirements fetching
-- ✅ **Hardware Detection**: Fixed Windows 11, display resolution, NVIDIA driver detection
-- ✅ **MCP Server**: Verified Model Context Protocol implementation
-
-### 🛠️ Protocol Fix Update (Latest)
-
-**ISSUE RESOLVED**: G-Assist plugin was detected but showing empty messages instead of game compatibility analysis.
-
-**Root Cause**: Incorrect communication protocol implementation - current code didn't match the working v7.0.0 protocol structure.
-
-**Solution Applied**:
-1. **Protocol Replacement**: Updated [`plugin.py`](plugin.py:1) main() function with exact working v7.0.0 implementation
-2. **Fixed Communication**: Proper stdin/stdout handling with `<<END>>` message termination markers
-3. **Updated Build Process**: Rebuilt executable using PyInstaller with correct dependencies
-4. **Verified Compliance**: All 6 G-Assist protocol tests now pass
-
-**Before Fix**: Empty messages in G-Assist
-**After Fix**: Full game compatibility analysis with S-A-B-C-D-F tier ratings
-
-**Test Command to Verify Fix**:
-```bash
-cd canrun
-uv run python -m pytest test/test_official_g_assist_protocol.py -v
-# Expected: ====== 6 passed in 4.14s ======
-```
-
 
 ## 🤖 MCP Server Functionality
 
@@ -394,48 +260,56 @@ python app.py
 
 # The server will be available at:
 # http://localhost:xxxx (where xxxx is an available port)
-
-
-## 🔧 Technical Implementation
-
-### Core Components
-
-**1. Official G-Assist Protocol (FIXED & VERIFIED)**
-```python
-# Official NVIDIA G-Assist communication protocol (v7.0.0 implementation)
-- Input: {"tool_calls": [{"func": "function_name", "params": {...}}]}
-- Output: {"success": true, "message": "..."}<<END>>
-- Communication: Standard stdin/stdout (verified working with all 6 tests)
-- Mode Detection: stdin.isatty() check for G-Assist environment
-- Protocol Status: COMPLIANT - matches working v7.0.0 specification
-- Latest Fix: Replaced main() function with verified working implementation
 ```
 
-**Recent Protocol Fixes**:
-- ✅ Fixed empty message issue in G-Assist
-- ✅ Updated to working v7.0.0 protocol implementation
-- ✅ Verified stdin/stdout communication with proper `<<END>>` termination
-- ✅ All 6 official G-Assist protocol tests passing
-- ✅ ASCII output compliance verified
 
-## 🛠️ Development and Contributing
+## 🧠 **ML Pipeline: *
 
-**Setting up Development Environment:**
+### **Final Production Accuracy:**
+- **Mean Absolute Error (MAE):** 13.79 FPS
+- **R² Score:** 0.9558 (95.58% variance explained)
+- **RMSE:** 11.01 FPS
 
+### **Calibrated Model Performance:**
+- **Calibrated MAE:** 3.07 FPS
+- **Calibrated R²:** 0.9941 (99.41% variance explained)
+
+### **Model Details:**
+
+#### **Training Configuration:**
+- **Model Type:** Unified_Stacking_Ensemble_2025
+- **Base Models:** 7 ensemble models (XGBoost GPU, LightGBM GPU, CatBoost, Random Forest, etc.)
+- **Training Samples:** 143
+- **Test Samples:** 36
+- **Training Time:** 81.3 seconds
+- **Features:** 80 engineered features
+
+#### **Quality Indicators:**
+- **Overfitting Gap:** 0.0085 (very low - indicates good generalization)
+- **Domain Correction Factor:** 0.88 (accounts for real-world variance)
+- **GPU Acceleration:** CatBoost GPU enabled
+
+### **Training Pipeline**
 ```bash
-# Clone repository
-git clone https://github.com/yourusername/canrun
+# Retrain with latest benchmarks
 cd canrun
+uv run python src/train_unified_ml_model_2025.py
 
-# Install development dependencies
-uv sync --dev
-
-# Run tests to verify setup
-uv run python -m pytest test/ -v
-
-# Test official G-Assist protocol
-python test/test_official_g_assist_protocol.py
+# Expected output:
+# ✅ Unified_Stacking_Ensemble_2025 v7.0_2025_Edition
+# ✅ 99.42% R² after calibration (SOTA performance)
+# ✅ Model saved to canrun/src/ml_fps_model.json
 ```
+
+### **Training Data**
+- **1,848 benchmarks** across 14 games, 44 GPUs (GTX 960 → RTX 5090)
+- **Multi-resolution**: 1080p, 1440p, 4K validated data
+- **Real-world sources**: Verified through web research + curated database
+- **Feature engineering**: Polynomial interactions, PassMark scores, VRAM ratios
+
+
+---
+
 ## 🚀 **GPU-Accelerated Training**
 
 For developers wanting to retrain the ML model with CUDA acceleration:
@@ -471,6 +345,8 @@ XGBRegressor(device='cuda', tree_method='hist', n_estimators=500)
 - **PyTorch CUDA**: Tensor operations on GPU for enhanced feature engineering
 - **Automatic Fallback**: CPU training if CUDA unavailable
 
+# Features
+
 **1. Advanced Performance Assessment**
 # S-A-B-C-D-F tier system with weighted scoring
 - GPU Performance: 60% weight (RTX 3080, RTX 3070, GTX 1660 Ti, etc.)
@@ -488,7 +364,7 @@ XGBRegressor(device='cuda', tree_method='hist', n_estimators=500)
 **3. ML-Powered FPS Prediction**
 
 # Advanced Stacking Ensemble with GPU acceleration
-- Test Accuracy: 94.8% R² (improved with stacking ensemble)
+- Test Accuracy: 95.58 R² (improved with stacking ensemble)
 - Training Data: 1,848 verified benchmarks across 14 games
 - GPU Coverage: 44 NVIDIA cards (GTX 960 → RTX 5090)
 - Multi-resolution: 1080p, 1440p, 4K predictions
@@ -503,8 +379,6 @@ XGBRegressor(device='cuda', tree_method='hist', n_estimators=500)
 - Async function support for real-time analysis
 - Exposes game compatibility and hardware detection tools
 - G-Assist direct integration capability
-
-
 
 ---
 ## Live Demo, download and test locally for real hardvare evaluation as MCP server
