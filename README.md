@@ -263,7 +263,7 @@ python app.py
 ```
 
 
-## 🧠 **ML Pipeline: *
+## 🧠 ML Pipeline
 
 ### **Final Production Accuracy:**
 - **Mean Absolute Error (MAE):** 13.79 FPS
