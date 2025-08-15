@@ -1,6 +1,4 @@
 {
-  "name": "CanRun Gaming Compatibility Checker",
-  "version": "1.0.0",
   "manifestVersion": 1,
   "executable": "./g-assist-plugin-canrun.exe",
   "persistent": true,
@@ -28,10 +26,5 @@
       "name": "shutdown",
       "description": "Shutdown the CanRun plugin"
     }
-  ],
-  "nvidia_requirements": {
-    "min_driver": "472.12",
-    "gpu_series": ["RTX", "GTX"],
-    "os": ["Windows 10", "Windows 11"]
-  }
+  ]
 }

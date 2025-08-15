@@ -223,7 +223,7 @@ To build the production executable with all ML dependencies:
 ```bash
 # Build G-Assist plugin executable (with uv) - COMPLETE WORKING COMMAND
 cd canrun
-uv run pyinstaller --onefile --name g-assist-plugin-canrun plugin.py --add-data "data;data" --add-data "cache;cache" --add-data "config.json;." --hidden-import canrun_engine --hidden-import canrun_hardware_detector --hidden-import canrun_game_fetcher --hidden-import canrun_game_matcher --hidden-import canrun_compatibility_analyzer --hidden-import canrun_ml_predictor --hidden-import canrun_model_loader
+uv run pyinstaller --onefile --name g-assist-plugin-canrun plugin.py --add-data "data;data" --add-data "cache;cache" --add-data "config.json;." --hidden-import canrun_engine --hidden-import canrun_hardware_detector --hidden-import canrun_game_fetcher --hidden-import canrun_game_matcher --hidden-import canrun_compatibility_analyzer --hidden-import canrun_ml_predictor --hidden-import canrun_model_loader --hidden-import GPUtil --hidden-import pynvml --hidden-import wmi --hidden-import cpuinfo --hidden-import psutil
 
 # Alternative: Simple build (basic dependencies only)
 uv pip install -r requirements.txt
@@ -235,6 +235,7 @@ uv run pyinstaller --clean --distpath . g-assist-plugin-canrun.spec
 # Test the built executable (CLI mode)
 cd dist
 ./g-assist-plugin-canrun.exe canrun "Diablo 4"
+./g-assist-plugin-canrun.exe canrun "Cyberpunk 2077"
 
 # Test the built executable (G-Assist mode - will wait for JSON input via stdin)
 ./g-assist-plugin-canrun.exe
