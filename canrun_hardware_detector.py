@@ -363,7 +363,8 @@ class CanRunHardwareDetector:
                         gpu_name = gpu_name.decode('utf-8')
                     
                     mem_info = pynvml.nvmlDeviceGetMemoryInfo(handle)
-                    vram_gb = mem_info.total // (1024 ** 3)
+                    raw_vram_gb = mem_info.total // (1024 ** 3)
+                    rounded_vram_gb = self._round_up_to_standard_vram_capacity(raw_vram_gb)
                     
                     try:
                         driver_version = pynvml.nvmlSystemGetDriverVersion()
@@ -374,14 +375,14 @@ class CanRunHardwareDetector:
                     
                     gpu_info.update({
                         'name': self._clean_gpu_name(gpu_name),
-                        'vram_gb': vram_gb,
+                        'vram_gb': rounded_vram_gb,
                         'is_nvidia': True,
                         'supports_rtx': 'RTX' in gpu_name.upper(),
                         'supports_dlss': 'RTX' in gpu_name.upper(),
                         'driver_version': driver_version
                     })
                     
-                    self.logger.info(f"NVIDIA GPU detected via pynvml: {gpu_info['name']}")
+                    self.logger.info(f"NVIDIA GPU detected via pynvml: {gpu_info['name']} ({raw_vram_gb}GB -> {rounded_vram_gb}GB VRAM)")
                     return gpu_info
             except Exception as e:
                 self.logger.warning(f"NVIDIA ML detection failed: {e}")
@@ -486,8 +487,12 @@ class CanRunHardwareDetector:
         try:
             memory = psutil.virtual_memory()
             
+            # Detect raw RAM and round up to standard capacity
+            raw_ram_gb = round(memory.total / (1024 ** 3))
+            rounded_ram_gb = self._round_up_to_standard_ram_capacity(raw_ram_gb)
+            
             ram_info = {
-                'total_gb': round(memory.total / (1024 ** 3)),
+                'total_gb': rounded_ram_gb,
                 'available_gb': round(memory.available / (1024 ** 3)),
                 'speed_mhz': 3200  # Default modern RAM speed
             }
@@ -503,7 +508,7 @@ class CanRunHardwareDetector:
                 except:
                     pass
             
-            self.logger.info(f"RAM detected: {ram_info['total_gb']}GB @ {ram_info['speed_mhz']}MHz")
+            self.logger.info(f"RAM detected: {raw_ram_gb}GB -> {rounded_ram_gb}GB @ {ram_info['speed_mhz']}MHz")
             return ram_info
         except Exception as e:
             self.logger.warning(f"RAM detection failed: {e}")
@@ -736,6 +741,30 @@ class CanRunHardwareDetector:
         # If not found in database, cannot determine VRAM accurately
         self.logger.warning(f"VRAM data not found for GPU: {gpu_name}")
         return 4  # Minimal fallback only
+    
+    def _round_up_to_standard_ram_capacity(self, detected_gb: int) -> int:
+        """Round up RAM to standard capacities (8, 16, 32, 64, 128GB)."""
+        standard_capacities = [8, 16, 24, 32, 48, 64, 96, 128, 192, 256]
+        
+        for capacity in standard_capacities:
+            # If detected is within 15% of standard capacity, round up to it
+            if detected_gb <= capacity and detected_gb >= capacity * 0.85:
+                return capacity
+        
+        # If no standard capacity fits, return detected value
+        return detected_gb
+    
+    def _round_up_to_standard_vram_capacity(self, detected_gb: int) -> int:
+        """Round up VRAM to standard capacities (4, 6, 8, 12, 16, 24GB)."""
+        standard_capacities = [3, 4, 6, 8, 10, 12, 16, 20, 24, 32, 48]
+        
+        for capacity in standard_capacities:
+            # If detected is within 15% of standard capacity, round up to it
+            if detected_gb <= capacity and detected_gb >= capacity * 0.85:
+                return capacity
+        
+        # If no standard capacity fits, return detected value
+        return detected_gb
     
     def _generate_anonymous_system_id(self) -> str:
         """Generate anonymous system identifier."""

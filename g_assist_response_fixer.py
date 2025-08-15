@@ -97,8 +97,11 @@ def clean_ascii_text(text):
     
     cleaned = ''.join(cleaned_chars)
     
-    # Clean up multiple spaces and tabs
-    cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+    # Clean up multiple spaces and tabs but preserve newlines
+    # Replace multiple spaces/tabs with single space, but keep newlines
+    cleaned = re.sub(r'[ \t]+', ' ', cleaned)  # Multiple spaces/tabs -> single space
+    cleaned = re.sub(r'\n\s*\n', '\n\n', cleaned)  # Clean up extra whitespace between paragraphs
+    cleaned = cleaned.strip()
     
     return cleaned
 

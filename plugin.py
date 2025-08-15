@@ -271,7 +271,7 @@ async def execute_canrun_command(params: dict = None, context: dict = None, syst
         return generate_failure_response(f"Error analyzing game: {str(e)}")
 
 def format_canrun_response(result):
-    """Format CanRun result for G-Assist display - verdict at bottom for visibility."""
+    """Format CanRun result for G-Assist display with proper line breaks."""
     try:
         # Extract key information
         tier = result.performance_prediction.tier.name if hasattr(result.performance_prediction, 'tier') else 'Unknown'
@@ -283,98 +283,122 @@ def format_canrun_response(result):
         original_query = result.game_name
         steam_api_name = result.game_requirements.steam_api_name if hasattr(result.game_requirements, 'steam_api_name') and result.game_requirements.steam_api_name else result.game_requirements.game_name
         
-        # Get performance details
-        fps = getattr(result.performance_prediction, 'expected_fps', 'Unknown')
+        # Get performance details with ranges
+        fps_min = getattr(result.performance_prediction, 'fps_min', None)
+        fps_max = getattr(result.performance_prediction, 'fps_max', None)
+        expected_fps = getattr(result.performance_prediction, 'expected_fps', None)
+        
+        # Display FPS as range if available, otherwise single value or unknown
+        if fps_min and fps_max and fps_min != fps_max:
+            fps = f"{fps_min}-{fps_max} FPS"
+        elif expected_fps and isinstance(expected_fps, (int, float)) and expected_fps > 0:
+            fps = f"~{int(expected_fps)} FPS"
+        else:
+            fps = "Unknown"
+            
         settings = getattr(result.performance_prediction, 'recommended_settings', 'Unknown')
         recommended_resolution = getattr(result.performance_prediction, 'recommended_resolution', 'Unknown')
         
-        # Get detected resolution class from result
-        detected_resolution = getattr(result, 'detected_resolution_class', 'Unknown')
+        # Get actual resolution from hardware specs
+        actual_resolution = result.hardware_specs.primary_monitor_resolution
         
-        # Build response with verdict at bottom
-        response_parts = []
-        
-        # Game name at top
-        response_parts.append(f"\t")
-        response_parts.append(f"🎮 **Game:** **{steam_api_name}**\t")
+        # Build response with explicit line breaks - v7.5.0 approach with consistent bolding
+        message = f"""
+🎮 **Game:** {steam_api_name}
 
-        
-        # 1. YOUR SYSTEM
-        response_parts.append("💻 **YOUR SYSTEM**")
-        response_parts.append(f"• GPU: {result.hardware_specs.gpu_model} ({result.hardware_specs.gpu_vram_gb}GB)")
-        response_parts.append(f"• CPU: {result.hardware_specs.cpu_model}")
-        response_parts.append(f"• RAM: {result.hardware_specs.ram_total_gb}GB")
-        response_parts.append(f"• Display: **{detected_resolution}**\t")
+💻 **YOUR SYSTEM**
+• **GPU:** {result.hardware_specs.gpu_model} ({result.hardware_specs.gpu_vram_gb}GB)
+• **CPU:** {result.hardware_specs.cpu_model}
+• **RAM:** {result.hardware_specs.ram_total_gb}GB
+• **Display:** {actual_resolution} @ **{result.hardware_specs.primary_monitor_refresh_hz}Hz**
 
-        
-        # 2. GAME REQUIREMENTS - Show only relevant requirements
-        response_parts.append("🎯 **GAME REQUIREMENTS**")
+🎯 **GAME REQUIREMENTS**"""
         
         if exceeds_recommended:
             # System exceeds recommended - only show recommended requirements
-            response_parts.append("**Recommended (Your system exceeds these)**")
-            response_parts.append(f"• GPU: {result.game_requirements.recommended_gpu}")
+            message += f"""
+**Recommended** (Your system exceeds these)
+• **GPU:** {result.game_requirements.recommended_gpu}"""
             if hasattr(result.game_requirements, 'recommended_cpu') and result.game_requirements.recommended_cpu:
-                response_parts.append(f"• CPU: {result.game_requirements.recommended_cpu}")
-            response_parts.append(f"• RAM: {result.game_requirements.recommended_ram_gb}GB\t")
+                message += f"""
+• **CPU:** {result.game_requirements.recommended_cpu}"""
+            message += f"""
+• **RAM:** {result.game_requirements.recommended_ram_gb}GB"""
         else:
             # System doesn't exceed recommended - show both minimal and recommended
-            response_parts.append("**Minimum**")
-            response_parts.append(f"• GPU: {result.game_requirements.minimum_gpu}")
+            message += f"""
+**Minimum**
+• **GPU:** {result.game_requirements.minimum_gpu}"""
             if hasattr(result.game_requirements, 'minimum_cpu') and result.game_requirements.minimum_cpu:
-                response_parts.append(f"• CPU: {result.game_requirements.minimum_cpu}")
-            response_parts.append(f"• RAM: {result.game_requirements.minimum_ram_gb}GB")
-            
-            response_parts.append("**Recommended**")
-            response_parts.append(f"• GPU: {result.game_requirements.recommended_gpu}")
+                message += f"""
+• **CPU:** {result.game_requirements.minimum_cpu}"""
+            message += f"""
+• **RAM:** {result.game_requirements.minimum_ram_gb}GB
+
+**Recommended**
+• **GPU:** {result.game_requirements.recommended_gpu}"""
             if hasattr(result.game_requirements, 'recommended_cpu') and result.game_requirements.recommended_cpu:
-                response_parts.append(f"• CPU: {result.game_requirements.recommended_cpu}")
-            response_parts.append(f"• RAM: {result.game_requirements.recommended_ram_gb}GB\t")
- 
+                message += f"""
+• **CPU:** {result.game_requirements.recommended_cpu}"""
+            message += f"""
+• **RAM:** {result.game_requirements.recommended_ram_gb}GB"""
         
         # 3. EXPECTED PERFORMANCE
-        response_parts.append("⚡ **PERFORMANCE**")
-        response_parts.append(f"• FPS: **{fps}**")
-        response_parts.append(f"• Settings: **{settings}**")
-        response_parts.append(f"• Recommended: **{recommended_resolution}**")
-        response_parts.append(f"• Score: **{tier} Tier ({score}/100)**\t")
+        message += f"""
 
+⚡ **PERFORMANCE**
+• **FPS:** {fps}
+• **Settings:** {settings}
+• **Resolution:** {recommended_resolution}
+• **Score:** {tier} Tier ({score}/100)
+
+🔧 **OPTIMIZE**"""
         
-        # 4. OPTIMIZE
-        response_parts.append("🔧 **OPTIMIZE**")
         if hasattr(result.performance_prediction, 'upgrade_suggestions') and result.performance_prediction.upgrade_suggestions:
             for suggestion in result.performance_prediction.upgrade_suggestions[:2]:
-                response_parts.append(f"• {suggestion}")
+                message += f"""
+• {suggestion}"""
         else:
             if can_run:
                 if result.hardware_specs.supports_dlss:
-                    response_parts.append("• Enable DLSS Quality mode for higher framerates")
+                    message += """
+• Enable DLSS Quality mode for higher framerates"""
                 if result.hardware_specs.supports_rtx:
-                    response_parts.append("• Enable RTX ray tracing for enhanced visual quality")
-                response_parts.append("• Update GPU drivers")
+                    message += """
+• Enable RTX ray tracing for enhanced visual quality"""
+                message += """
+• Update GPU drivers"""
             else:
-                response_parts.append("• Upgrade GPU to meet minimum requirements")
-                response_parts.append("• Check RAM meets minimum requirements")
+                message += """
+• Upgrade GPU to meet minimum requirements
+• Check RAM meets minimum requirements"""
         
         # Add note if different game was found
         if steam_api_name.lower() != original_query.lower():
-            response_parts.append(f"📝 Note: Showing results for {steam_api_name}")
+            message += f"""
+
+📝 Note: Showing results for {steam_api_name}"""
         
         # 5. VERDICT - At bottom for visibility when scrolling!
-        response_parts.append("\t")
+        message += """
+
+"""
         if can_run:
             if exceeds_recommended:
-                response_parts.append("🎯 VERDICT: ✅ CAN RUN - EXCELLENT PERFORMANCE!")
+                message += "🎯 VERDICT: ✅ CAN RUN - EXCELLENT PERFORMANCE!"
             else:
-                response_parts.append("🎯 VERDICT: ✅ CAN RUN")
+                message += "🎯 VERDICT: ✅ CAN RUN"
         else:
-            response_parts.append("🎯 **VERDICT:** ❌ CANNOT RUN")
+            message += "🎯 **VERDICT:** ❌ CANNOT RUN"
         
-        return "\n".join(response_parts)
+        return message.strip()
         
     except Exception as e:
         logging.error(f"Error formatting CanRun response: {e}")
-        return f"🎮 CANRUN ANALYSIS: {getattr(result, 'game_name', 'Unknown Game')}\n\n✅ Analysis completed but formatting error occurred.\nRaw result available in logs."
+        return f"""🎮 CANRUN ANALYSIS: {getattr(result, 'game_name', 'Unknown Game')}
+
+✅ Analysis completed but formatting error occurred.
+Raw result available in logs."""
 
 def execute_initialize_command() -> dict:
     """Command handler for initialize function."""
