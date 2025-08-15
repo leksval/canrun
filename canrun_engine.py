@@ -267,27 +267,26 @@ class CanRunEngine:
         return analysis
     
     def _get_display_resolution(self, hardware_specs: HardwareSpecs) -> Dict[str, int]:
-        """Get display resolution from hardware specs or detect."""
-        if hasattr(hardware_specs, 'display_resolution'):
-            return hardware_specs.display_resolution
-        
-        # Fallback to default
-        return {'width': 1920, 'height': 1080}
+        """Get display resolution from hardware detector."""
+        try:
+            # Use the hardware detector's proper display resolution method
+            display_info = self.hardware_detector.get_display_resolution()
+            return {
+                'width': display_info.get('width', 1920),
+                'height': display_info.get('height', 1080)
+            }
+        except Exception as e:
+            self.logger.warning(f"Display resolution detection failed: {e}")
+            # Fallback to default
+            return {'width': 1920, 'height': 1080}
     
     def _classify_resolution(self, display_resolution: Dict[str, int]) -> str:
-        """Classify resolution for performance prediction."""
+        """Classify resolution for performance prediction using hardware detector."""
         width = display_resolution.get('width', 1920)
         height = display_resolution.get('height', 1080)
-        total_pixels = width * height
         
-        if total_pixels >= 3840 * 2160 * 0.9:
-            return "4K"
-        elif total_pixels >= 2560 * 1440 * 0.9:
-            return "1440p"
-        elif total_pixels >= 1920 * 1080 * 0.9:
-            return "1080p"
-        else:
-            return "720p"
+        # Use the hardware detector's resolution tier classification
+        return self.hardware_detector.get_resolution_tier(width, height)
     
     def _load_cache_file(self, cache_file: str) -> Optional[CanRunResult]:
         """Load and validate a single cache file."""

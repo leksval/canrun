@@ -10,7 +10,7 @@ import logging
 
 def clean_ascii_text(text):
     """
-    Clean text to ensure ASCII-only characters for G-Assist compatibility
+    Clean text to ensure ASCII-only characters for G-Assist compatibility with emoji support
     """
     if not isinstance(text, str):
         text = str(text)
@@ -35,6 +35,15 @@ def clean_ascii_text(text):
         chr(8216): "'",  # '
         chr(8217): "'",  # '
         
+        # Bullet points and list symbols - CRITICAL FOR G-ASSIST
+        chr(8226): '- ',  # • (bullet point)
+        chr(8594): '-> ',  # → (arrow)
+        chr(8729): '* ',  # ∙ (bullet operator)
+        chr(9679): '* ',  # ● (black circle)
+        chr(9702): '- ',  # ◦ (white bullet)
+        chr(9632): '* ',  # ■ (black square)
+        chr(9633): '- ',  # □ (white square)
+        
         # Other common symbols
         chr(8230): '...',  # …
         chr(215): 'x',  # ×
@@ -56,16 +65,39 @@ def clean_ascii_text(text):
         chr(8804): '<=',  # ≤
         chr(8800): '!=',  # ≠
         chr(8776): '~=',  # ≈
+        
+        # Keep emojis as-is since G-Assist supports them
+        # Removed emoji-to-text conversions to preserve original emojis
     }
     
     # Apply replacements
     for unicode_char, replacement in unicode_replacements.items():
         text = text.replace(unicode_char, replacement)
     
-    # Remove any remaining non-ASCII characters
-    cleaned = ''.join(char for char in text if ord(char) < 128)
+    # For G-Assist, keep emojis but remove other problematic Unicode
+    # Emojis are generally in the range 0x1F600-0x1F64F, 0x1F300-0x1F5FF, 0x1F680-0x1F6FF, 0x1F1E0-0x1F1FF
+    cleaned_chars = []
+    for char in text:
+        char_code = ord(char)
+        if char_code < 128:  # ASCII characters - always keep
+            cleaned_chars.append(char)
+        elif 0x1F300 <= char_code <= 0x1F9FF:  # Emoji ranges - keep
+            cleaned_chars.append(char)
+        elif 0x1F600 <= char_code <= 0x1F64F:  # Emoticons - keep
+            cleaned_chars.append(char)
+        elif 0x1F680 <= char_code <= 0x1F6FF:  # Transport and map symbols - keep
+            cleaned_chars.append(char)
+        elif 0x1F1E0 <= char_code <= 0x1F1FF:  # Regional indicator symbols - keep
+            cleaned_chars.append(char)
+        elif 0x2600 <= char_code <= 0x26FF:  # Miscellaneous symbols - keep some emojis
+            cleaned_chars.append(char)
+        elif 0x2700 <= char_code <= 0x27BF:  # Dingbats - keep some emojis
+            cleaned_chars.append(char)
+        # Skip other Unicode characters that could cause ASCII validation issues
     
-    # Clean up multiple spaces
+    cleaned = ''.join(cleaned_chars)
+    
+    # Clean up multiple spaces and tabs
     cleaned = re.sub(r'\s+', ' ', cleaned).strip()
     
     return cleaned
@@ -93,11 +125,31 @@ def validate_g_assist_response(response_dict):
         if not isinstance(message, str):
             return False, f"'message' must be string, got {type(message)}"
         
-        # Check ASCII compliance
+        # Check for UTF-8 compliance (allow emojis but catch problematic characters)
         try:
-            message.encode('ascii')
+            # First try UTF-8 encoding
+            message.encode('utf-8')
+            # Then check for problematic characters that cause G-Assist issues
+            problematic_chars = []
+            for char in message:
+                char_code = ord(char)
+                # Allow ASCII and common emoji ranges
+                if (char_code < 128 or  # ASCII
+                    (0x1F300 <= char_code <= 0x1F9FF) or  # Emojis
+                    (0x1F600 <= char_code <= 0x1F64F) or  # Emoticons
+                    (0x1F680 <= char_code <= 0x1F6FF) or  # Transport symbols
+                    (0x1F1E0 <= char_code <= 0x1F1FF) or  # Regional indicators
+                    (0x2600 <= char_code <= 0x26FF) or   # Misc symbols
+                    (0x2700 <= char_code <= 0x27BF)):    # Dingbats
+                    continue
+                else:
+                    problematic_chars.append(f"\\u{char_code:04x}")
+            
+            if problematic_chars:
+                return False, f"Message contains problematic Unicode characters: {', '.join(problematic_chars[:5])}"
+                
         except UnicodeEncodeError as e:
-            return False, f"Message contains non-ASCII characters: {e}"
+            return False, f"Message contains encoding issues: {e}"
     
     # Check JSON serialization
     try:
@@ -107,17 +159,32 @@ def validate_g_assist_response(response_dict):
     
     return True, "Valid"
 
-def create_safe_g_assist_response(success, message, max_length=500):
+def create_safe_g_assist_response(success, message, max_length=1400):
     """
-    Create a G-Assist compatible response with safety checks
+    Create a G-Assist compatible response with safety checks for structured format
     """
     # Clean the message
     if message:
         clean_message = clean_ascii_text(message)
         
-        # Truncate if too long
+        # Smart truncation for structured responses
         if len(clean_message) > max_length:
-            clean_message = clean_message[:max_length-15] + "... [truncated]"
+            # Try to preserve structure by truncating at section boundaries
+            lines = clean_message.split('\n')
+            truncated_lines = []
+            current_length = 0
+            
+            for line in lines:
+                if current_length + len(line) + 1 > max_length - 20:  # Reserve space for truncation notice
+                    break
+                truncated_lines.append(line)
+                current_length += len(line) + 1  # +1 for newline
+            
+            if truncated_lines:
+                clean_message = '\n'.join(truncated_lines) + "\n... [truncated]"
+            else:
+                # Fallback to simple truncation
+                clean_message = clean_message[:max_length-15] + "... [truncated]"
     else:
         clean_message = ""
     
@@ -152,9 +219,9 @@ def format_g_assist_message(response_dict):
     try:
         json_message = json.dumps(response_dict) + "<<END>>"
         
-        # Final ASCII check
+        # Final UTF-8 check (allow emojis)
         try:
-            json_message.encode('ascii')
+            json_message.encode('utf-8')
         except UnicodeEncodeError:
             # Last resort fallback
             json_message = json.dumps({

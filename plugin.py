@@ -271,146 +271,110 @@ async def execute_canrun_command(params: dict = None, context: dict = None, syst
         return generate_failure_response(f"Error analyzing game: {str(e)}")
 
 def format_canrun_response(result):
-    """Format CanRun result for G-Assist display - IMPROVED WITH RELEVANT DATA."""
+    """Format CanRun result for G-Assist display - verdict at bottom for visibility."""
     try:
-        # Extract key information safely
-        game_name = getattr(result, 'game_name', 'Unknown Game')
-        can_run = result.can_run_game() if hasattr(result, 'can_run_game') else False
-        exceeds_recommended = result.exceeds_recommended_requirements() if hasattr(result, 'exceeds_recommended_requirements') else False
+        # Extract key information
+        tier = result.performance_prediction.tier.name if hasattr(result.performance_prediction, 'tier') else 'Unknown'
+        score = int(result.performance_prediction.score) if hasattr(result.performance_prediction, 'score') else 0
+        can_run = result.can_run_game()
+        exceeds_recommended = result.exceeds_recommended_requirements()
         
-        # Get performance info with ML model ranges
-        tier = 'Unknown'
-        score = 0
-        fps_display = 'Unknown'
-        settings = 'Unknown'
+        # Get game name
+        original_query = result.game_name
+        steam_api_name = result.game_requirements.steam_api_name if hasattr(result.game_requirements, 'steam_api_name') and result.game_requirements.steam_api_name else result.game_requirements.game_name
         
-        if hasattr(result, 'performance_prediction'):
-            pred = result.performance_prediction
-            tier = pred.tier.name if hasattr(pred, 'tier') and hasattr(pred.tier, 'name') else 'Unknown'
-            score = int(pred.score) if hasattr(pred, 'score') else 0
-            settings = pred.recommended_settings if hasattr(pred, 'recommended_settings') else 'Medium'
-            
-            # Extract FPS range from ML model data
-            if hasattr(pred, 'fps_range') and pred.fps_range:
-                # If we have a proper range object
-                fps_display = f"{pred.fps_range.min}-{pred.fps_range.max}"
-            elif hasattr(pred, 'fps_min') and hasattr(pred, 'fps_max'):
-                # If we have separate min/max values
-                fps_display = f"{int(pred.fps_min)}-{int(pred.fps_max)}"
-            elif hasattr(pred, 'expected_fps_range'):
-                # Alternative range format
-                fps_display = str(pred.expected_fps_range)
-            elif hasattr(pred, 'ml_prediction') and hasattr(pred.ml_prediction, 'fps_range'):
-                # Range from ML prediction sub-object
-                ml_range = pred.ml_prediction.fps_range
-                fps_display = f"{int(ml_range.min)}-{int(ml_range.max)}"
-            elif hasattr(pred, 'expected_fps'):
-                # Fallback to single value if no range available
-                single_fps = int(pred.expected_fps)
-                fps_display = f"{single_fps}"
-            else:
-                fps_display = 'Unknown'
+        # Get performance details
+        fps = getattr(result.performance_prediction, 'expected_fps', 'Unknown')
+        settings = getattr(result.performance_prediction, 'recommended_settings', 'Unknown')
+        recommended_resolution = getattr(result.performance_prediction, 'recommended_resolution', 'Unknown')
         
-        # Get comprehensive system and game info
-        gpu_model = 'Unknown GPU'
-        matched_game = game_name
-        ram_gb = 0
-        cpu_model = 'Unknown CPU'
+        # Get detected resolution class from result
+        detected_resolution = getattr(result, 'detected_resolution_class', 'Unknown')
         
-        if hasattr(result, 'hardware_specs'):
-            hw = result.hardware_specs
-            if hasattr(hw, 'gpu_model'):
-                gpu_model = str(hw.gpu_model)
-            if hasattr(hw, 'ram_total_gb'):
-                ram_gb = int(hw.ram_total_gb)
-            if hasattr(hw, 'cpu_model'):
-                cpu_model = str(hw.cpu_model)
-            
-        if hasattr(result, 'game_requirements') and hasattr(result.game_requirements, 'game_name'):
-            matched_game = str(result.game_requirements.game_name)
+        # Build response with verdict at bottom
+        response_parts = []
         
-        # Clean all text of unicode characters
-        if RESPONSE_FIXER_AVAILABLE:
-            game_name = clean_ascii_text(game_name)
-            gpu_model = clean_ascii_text(gpu_model)
-            matched_game = clean_ascii_text(matched_game)
-            settings = clean_ascii_text(settings)
-            cpu_model = clean_ascii_text(cpu_model)
+        # Game name at top
+        response_parts.append(f"\t")
+        response_parts.append(f"🎮 **Game:** **{steam_api_name}**\t")
+
+        
+        # 1. YOUR SYSTEM
+        response_parts.append("💻 **YOUR SYSTEM**")
+        response_parts.append(f"• GPU: {result.hardware_specs.gpu_model} ({result.hardware_specs.gpu_vram_gb}GB)")
+        response_parts.append(f"• CPU: {result.hardware_specs.cpu_model}")
+        response_parts.append(f"• RAM: {result.hardware_specs.ram_total_gb}GB")
+        response_parts.append(f"• Display: **{detected_resolution}**\t")
+
+        
+        # 2. GAME REQUIREMENTS - Show only relevant requirements
+        response_parts.append("🎯 **GAME REQUIREMENTS**")
+        
+        if exceeds_recommended:
+            # System exceeds recommended - only show recommended requirements
+            response_parts.append("**Recommended (Your system exceeds these)**")
+            response_parts.append(f"• GPU: {result.game_requirements.recommended_gpu}")
+            if hasattr(result.game_requirements, 'recommended_cpu') and result.game_requirements.recommended_cpu:
+                response_parts.append(f"• CPU: {result.game_requirements.recommended_cpu}")
+            response_parts.append(f"• RAM: {result.game_requirements.recommended_ram_gb}GB\t")
         else:
-            # Basic fallback cleaning
-            game_name = ''.join(char for char in game_name if ord(char) < 128)
-            gpu_model = ''.join(char for char in gpu_model if ord(char) < 128)
-            matched_game = ''.join(char for char in matched_game if ord(char) < 128)
-            settings = ''.join(char for char in settings if ord(char) < 128)
-            cpu_model = ''.join(char for char in cpu_model if ord(char) < 128)
+            # System doesn't exceed recommended - show both minimal and recommended
+            response_parts.append("**Minimum**")
+            response_parts.append(f"• GPU: {result.game_requirements.minimum_gpu}")
+            if hasattr(result.game_requirements, 'minimum_cpu') and result.game_requirements.minimum_cpu:
+                response_parts.append(f"• CPU: {result.game_requirements.minimum_cpu}")
+            response_parts.append(f"• RAM: {result.game_requirements.minimum_ram_gb}GB")
+            
+            response_parts.append("**Recommended**")
+            response_parts.append(f"• GPU: {result.game_requirements.recommended_gpu}")
+            if hasattr(result.game_requirements, 'recommended_cpu') and result.game_requirements.recommended_cpu:
+                response_parts.append(f"• CPU: {result.game_requirements.recommended_cpu}")
+            response_parts.append(f"• RAM: {result.game_requirements.recommended_ram_gb}GB\t")
+ 
         
-        # Extract numeric FPS for verdict assessment (use max of range if available)
-        fps_numeric = 0
-        if '-' in fps_display:
-            # Extract max FPS from range for verdict
-            try:
-                fps_parts = fps_display.split('-')
-                fps_numeric = int(fps_parts[-1])  # Use max value
-            except (ValueError, IndexError):
-                fps_numeric = 0
-        elif fps_display.isdigit():
-            fps_numeric = int(fps_display)
+        # 3. EXPECTED PERFORMANCE
+        response_parts.append("⚡ **PERFORMANCE**")
+        response_parts.append(f"• FPS: **{fps}**")
+        response_parts.append(f"• Settings: **{settings}**")
+        response_parts.append(f"• Recommended: **{recommended_resolution}**")
+        response_parts.append(f"• Score: **{tier} Tier ({score}/100)**\t")
+
         
-        # Create meaningful verdict with proper performance assessment
+        # 4. OPTIMIZE
+        response_parts.append("🔧 **OPTIMIZE**")
+        if hasattr(result.performance_prediction, 'upgrade_suggestions') and result.performance_prediction.upgrade_suggestions:
+            for suggestion in result.performance_prediction.upgrade_suggestions[:2]:
+                response_parts.append(f"• {suggestion}")
+        else:
+            if can_run:
+                if result.hardware_specs.supports_dlss:
+                    response_parts.append("• Enable DLSS Quality mode for higher framerates")
+                if result.hardware_specs.supports_rtx:
+                    response_parts.append("• Enable RTX ray tracing for enhanced visual quality")
+                response_parts.append("• Update GPU drivers")
+            else:
+                response_parts.append("• Upgrade GPU to meet minimum requirements")
+                response_parts.append("• Check RAM meets minimum requirements")
+        
+        # Add note if different game was found
+        if steam_api_name.lower() != original_query.lower():
+            response_parts.append(f"📝 Note: Showing results for {steam_api_name}")
+        
+        # 5. VERDICT - At bottom for visibility when scrolling!
+        response_parts.append("\t")
         if can_run:
-            if exceeds_recommended and fps_numeric > 120:
-                verdict = "EXCELLENT"
-                performance_level = "Far exceeds recommended"
-            elif exceeds_recommended:
-                verdict = "VERY GOOD"
-                performance_level = "Exceeds recommended"
-            elif fps_numeric >= 60:
-                verdict = "GOOD"
-                performance_level = "Meets recommended"
+            if exceeds_recommended:
+                response_parts.append("🎯 VERDICT: ✅ CAN RUN - EXCELLENT PERFORMANCE!")
             else:
-                verdict = "PLAYABLE"
-                performance_level = "Meets minimum"
+                response_parts.append("🎯 VERDICT: ✅ CAN RUN")
         else:
-            verdict = "INSUFFICIENT"
-            performance_level = "Below minimum requirements"
+            response_parts.append("🎯 **VERDICT:** ❌ CANNOT RUN")
         
-        # Smart resolution recommendation based on actual performance
-        if fps_numeric > 120 and tier in ['S', 'A']:
-            resolution_tip = "Perfect for 4K gaming"
-        elif fps_numeric > 80 and tier in ['S', 'A', 'B']:
-            resolution_tip = "Excellent for 1440p"
-        elif fps_numeric >= 60:
-            resolution_tip = "Great for 1080p"
-        elif fps_numeric >= 30:
-            resolution_tip = "Playable at 1080p"
-        else:
-            resolution_tip = "Consider upgrading hardware"
-        
-        # Create the exact same working format with ML FPS range data
-        response = f"""Game: {matched_game}
-Verdict: {verdict} ({performance_level})
-Performance: {fps_display} FPS at {settings} settings
-GPU: {gpu_model} (Tier {tier})
-Recommendation: {resolution_tip}"""
-        
-        # Ensure length compliance with better fallback
-        if len(response) > 280:
-            response = f"""Game: {matched_game}
-Verdict: {verdict}
-Performance: {fps_display} FPS at {settings}
-GPU: {gpu_model} (Tier {tier})"""
-        
-        return response
+        return "\n".join(response_parts)
         
     except Exception as e:
         logging.error(f"Error formatting CanRun response: {e}")
-        # Ultra-safe fallback
-        game_name = getattr(result, 'game_name', 'Unknown Game')
-        if RESPONSE_FIXER_AVAILABLE:
-            game_name = clean_ascii_text(game_name)
-        else:
-            game_name = ''.join(char for char in str(game_name) if ord(char) < 128)
-        return f"Analysis complete: {game_name} compatibility checked"
+        return f"🎮 CANRUN ANALYSIS: {getattr(result, 'game_name', 'Unknown Game')}\n\n✅ Analysis completed but formatting error occurred.\nRaw result available in logs."
 
 def execute_initialize_command() -> dict:
     """Command handler for initialize function."""
