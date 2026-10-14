@@ -121,6 +121,8 @@ celerybeat.pid
 
 # Environments
 .env
+.env.*
+!.env.example
 .venv
 env/
 venv/
@@ -128,6 +130,10 @@ ENV/
 env.bak/
 venv.bak/
 canrun-env/
+
+# Data directory (ignored to avoid Steam store / benchmark data copyright issues)
+data/
+canrun/data/
 
 # Spyder project settings
 .spyderproject
@@ -217,11 +223,10 @@ g-assist-plugin-canrun-diagnostic.spec
 build/
 dist/
 
-# Large executables (>95MB) - GitHub has a 100MB file size limit
-# Allow optimized executables under 95MB for G-Assist plugin deployment
+# Large executables. GitHub rejects a file over 100MB.
+# Keep one copy: the plugin exe at the repo root. dist/ stays ignored.
 *.exe
-!g-assist-plugin-python.exe
-!g-assist-plugin-canrun.exe
+!/g-assist-plugin-canrun.exe
 
 # Additional large file protections (GitHub 100MB limit)
 # Machine learning models and training data
@@ -236,13 +241,8 @@ dist/
 *.onnx
 *.safetensors
 
-# Exception: Include required ML models for CanRun functionality
-!canrun/src/ml_fps_model.json
-!canrun/canrun/src/ml_fps_model.json
-!data/ml_fps_model_unified_2025.json
-!data/unified_calibrator_2025.pkl
-!data/unified_scaler_2025.pkl
-!data/unified_stacking_model_2025.pkl
+# Note: data/ is gitignored above to avoid Steam/third-party data copyright issues
+scripts/ds_pipeline/legacy_v8_snapshot.json
 
 # Large data files
 *.parquet
