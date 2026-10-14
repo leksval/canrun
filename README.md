@@ -28,6 +28,8 @@ tags:
 
 **CanRun** is an RTX/GTX-exclusive G-Assist plugin that instantly tells you if your PC can run any game with an advanced **S-A-B-C-D-F tier system** and enhanced Steam integration.
 
+AVAILABLE on official Nvidia g-assist mod marketplace:  [mod.io/canrun](https://mod.io/g/g-assist/m/canrun2#description)
+
 ![R3](https://github.com/user-attachments/assets/79a68ba5-a4d9-493c-bea5-d455edadf627)
 
 ## ✨ Key Features
@@ -65,7 +67,13 @@ Version 10.0 adds measured frame rates and an honest range around them.
 
 ## 📦 G-Assist Plugin Installation
 
+<<<<<<< HEAD
 CanRun follows the current [NVIDIA G-Assist](https://github.com/NVIDIA/G-Assist) plugin contract: Protocol V2, JSON-RPC 2.0, and `gassist_sdk` 3.1.0. G-Assist launches `plugin.py` directly. The SDK lives in `libs/gassist_sdk` and is added to `PYTHONPATH` by the engine.
+=======
+
+
+Following [Official NVIDIA G-Assist Plugin Standards](https://github.com/NVIDIA/G-Assist), CanRun uses the correct plugin architecture:
+>>>>>>> 0cc7b3582232700fa6c247a8085649b51afe5e8f
 
 ```
 plugins/
