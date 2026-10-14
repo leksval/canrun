@@ -1,117 +1,70 @@
 #!/usr/bin/env python3
-"""
-Test realistic FPS predictions after fixing ML baseline assumptions
-Expected: RTX 4090 Cyberpunk 2077 should now predict ~60-80 FPS instead of 340+ FPS
-"""
+"""Steam frame-rate figures for a few common games. The number is the Steam mean."""
 
-import sys
 import os
+import sys
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from canrun_model_loader import LightweightMLPredictor
+from canrun_steam_fps import resolve_fps
+
 
 def test_realistic_predictions():
-    print("Testing Realistic ML FPS Predictions (After Fix)")
+    print("Testing Steam FPS figures for common GPUs")
     print("=" * 60)
-    
-    # Initialize ML predictor
-    predictor = LightweightMLPredictor()
-    
-    # Test cases with RTX 4090 (38,192 PassMark)
-    test_cases = [
+
+    cases = [
         {
             "game": "Cyberpunk 2077",
             "gpu": "RTX 4090",
-            "passmark": 38192,
-            "resolution": "1080p",
-            "expected_range": "60-80 FPS",
-            "requirements": {
-                'game_name': 'Cyberpunk 2077',
-                'minimum_gpu': 'GeForce GTX 1060 6GB',
-                'recommended_gpu': 'GeForce RTX 2060 SUPER',
-                'minimum_cpu': 'Core i7-6700',
-                'recommended_cpu': 'Core i7-12700',
-                'minimum_ram_gb': 12,
-                'recommended_ram_gb': 16
-            }
+            "cpu": "AMD Ryzen 7 7800X3D",
+            "mean": 72,
+            "stddev": 6,
+            "expected_fps": 72,
+            "fps_min": 66,
+            "fps_max": 78,
         },
         {
             "game": "Diablo 4",
-            "gpu": "RTX 4090", 
-            "passmark": 38192,
-            "resolution": "1080p",
-            "expected_range": "120-180 FPS",
-            "requirements": {
-                'game_name': 'Diablo 4',
-                'minimum_gpu': 'NVIDIA GeForce GTX 660',
-                'recommended_gpu': 'NVIDIA GeForce GTX 970',
-                'minimum_cpu': 'Intel Core i5-2500K',
-                'recommended_cpu': 'Intel Core i5-4670K',
-                'minimum_ram_gb': 8,
-                'recommended_ram_gb': 16
-            }
+            "gpu": "RTX 4090",
+            "cpu": "AMD Ryzen 7 7800X3D",
+            "mean": 120,
+            "stddev": 8,
+            "expected_fps": 120,
+            "fps_min": 110,
+            "fps_max": 130,
         },
         {
             "game": "Counter-Strike 2",
             "gpu": "RTX 4090",
-            "passmark": 38192,
-            "resolution": "1080p",
-            "expected_range": "300+ FPS",
-            "requirements": {
-                'game_name': 'Counter-Strike 2',
-                'minimum_gpu': 'GeForce GTX 1060',
-                'recommended_gpu': 'GeForce RTX 2070',
-                'minimum_cpu': 'Core i5-9600K',
-                'recommended_cpu': 'Core i7-9700K',
-                'minimum_ram_gb': 8,
-                'recommended_ram_gb': 16
-            }
-        }
+            "cpu": "AMD Ryzen 7 7800X3D",
+            "mean": 240,
+            "stddev": 12,
+            "expected_fps": 240,
+            "fps_min": 221,
+            "fps_max": 259,
+        },
     ]
-    
-    print(f"{'Game':<20} {'GPU':<12} {'Resolution':<10} {'Predicted':<12} {'Expected':<15} {'Status'}")
-    print("-" * 80)
-    
-    all_realistic = True
-    
-    for case in test_cases:
-        predicted_fps = predictor.predict_fps(
-            gpu_name=case["gpu"],
-            passmark_score=case["passmark"],
-            resolution=case["resolution"],
-            game_name=case["game"],
-            memory_gb=24,  # RTX 4090 has 24GB
-            game_requirements=case["requirements"]
+
+    for case in cases:
+        estimate = resolve_fps(
+            case["gpu"],
+            case["cpu"],
+            {"response": {"frame_rates": [{
+                "gpu_name": case["gpu"],
+                "cpu_name": case["cpu"],
+                "report_count": 80,
+                "mean_frame_rate": case["mean"],
+                "mean_frame_rate_stddev": case["stddev"],
+            }]}},
+            cluster_map={"clusters": {}, "reference_gpu": "RTX 5070"},
         )
-        
-        # Check if prediction is realistic
-        if case["game"] == "Cyberpunk 2077":
-            realistic = 50 <= predicted_fps <= 120  # Realistic range
-        elif case["game"] == "Diablo 4":
-            realistic = 80 <= predicted_fps <= 200  # Less demanding
-        else:  # Counter-Strike 2
-            realistic = predicted_fps >= 200  # eSports title should be high
-            
-        status = "REALISTIC" if realistic else "UNREALISTIC"
-        if not realistic:
-            all_realistic = False
-            
-        print(f"{case['game']:<20} {case['gpu']:<12} {case['resolution']:<10} {predicted_fps:<12.1f} {case['expected_range']:<15} {status}")
-    
-    print("\n" + "=" * 60)
-    if all_realistic:
-        print(" SUCCESS: All FPS predictions are now REALISTIC!")
-        print("   - Cyberpunk 2077 should be 60-80 FPS (was 340+ FPS)")
-        print("   - ML baseline assumptions have been corrected")
-    else:
-        print(" FAILURE: Some predictions are still unrealistic")
-        print("   - Additional calibration may be needed")
-        print("   - This may be due to missing ML models in test environment")
-        # Don't fail the test if ML models are missing - that's expected in some test environments
-        if "ML model file not found" in str(locals()) or not all_realistic:
-            print("[INFO] Missing ML models detected - using graceful handling")
-        else:
-            assert False, "Some FPS predictions are still unrealistic"
+        print(f"{case['game']}: {estimate.expected_fps} FPS ({estimate.fps_source})")
+        assert estimate.expected_fps == case["expected_fps"]
+        assert estimate.fps_min == case["fps_min"]
+        assert estimate.fps_max == case["fps_max"]
+        assert estimate.fps_source == "steam"
+
 
 if __name__ == "__main__":
     test_realistic_predictions()

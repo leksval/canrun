@@ -268,6 +268,48 @@
         "GTX 1660": {"1080p": 110, "1440p": 78, "passmark": 11644, "memory": 6, "gen": "GTX_16"},
         "GTX 1650": {"1080p": 85, "passmark": 7875, "memory": 4, "gen": "GTX_16"}
       }
+    },
+    "Diablo IV": {
+      "description": "Notebookcheck desktop Ultra preset, native, no upscaling",
+      "genre": "Action RPG",
+      "gpus": {
+        "RTX 4090": {"1080p": 398, "1440p": 392, "4K": 220, "passmark": 38192, "memory": 24, "gen": "RTX_40"},
+        "RTX 4080": {"1080p": 384, "1440p": 293, "4K": 149, "passmark": 34453, "memory": 16, "gen": "RTX_40"},
+        "RTX 4070": {"1080p": 285, "1440p": 193, "4K": 97, "passmark": 26925, "memory": 12, "gen": "RTX_40"},
+        "GTX 1660": {"1080p": 89, "1440p": 57, "4K": 29, "passmark": 11644, "memory": 6, "gen": "GTX_16"}
+      }
+    },
+    "Elden Ring": {
+      "description": "Notebookcheck Maximum preset. The game caps near 60 FPS.",
+      "genre": "Action RPG",
+      "gpus": {
+        "RTX 4090": {"1080p": 60, "1440p": 60, "4K": 60, "passmark": 38192, "memory": 24, "gen": "RTX_40"},
+        "RTX 3090": {"1080p": 59, "1440p": 59, "4K": 59, "passmark": 26636, "memory": 24, "gen": "RTX_30"},
+        "RTX 3080": {"1080p": 59, "1440p": 59, "4K": 58, "passmark": 25086, "memory": 10, "gen": "RTX_30"},
+        "RTX 3070": {"1080p": 59, "1440p": 59, "4K": 57, "passmark": 22207, "memory": 8, "gen": "RTX_30"},
+        "GTX 1660": {"1080p": 55, "1440p": 42, "4K": 24, "passmark": 11644, "memory": 6, "gen": "GTX_16"}
+      }
+    },
+    "Hogwarts Legacy": {
+      "description": "Notebookcheck Ultra preset, native, ray tracing off",
+      "genre": "Action RPG",
+      "gpus": {
+        "RTX 4090": {"1080p": 159, "1440p": 142, "4K": 86, "passmark": 38192, "memory": 24, "gen": "RTX_40"},
+        "RTX 4080": {"1080p": 119, "1440p": 111, "4K": 66, "passmark": 34453, "memory": 16, "gen": "RTX_40"},
+        "RTX 4070 Ti": {"1080p": 118, "1440p": 86, "4K": 47, "passmark": 31617, "memory": 12, "gen": "RTX_40"},
+        "RTX 4070": {"1080p": 103, "1440p": 77, "4K": 40, "passmark": 26925, "memory": 12, "gen": "RTX_40"},
+        "RTX 3080": {"1080p": 101, "1440p": 84, "4K": 49, "passmark": 25086, "memory": 10, "gen": "RTX_30"},
+        "RTX 3070": {"1080p": 81, "1440p": 63, "4K": 35, "passmark": 22207, "memory": 8, "gen": "RTX_30"}
+      }
+    },
+    "Black Myth: Wukong": {
+      "description": "TechSpot cinematic preset, native, hardware ray tracing off",
+      "genre": "Action RPG",
+      "gpus": {
+        "RTX 4090": {"1080p": 90, "1440p": 73, "passmark": 38192, "memory": 24, "gen": "RTX_40"},
+        "RTX 4080": {"1080p": 71, "1440p": 56, "passmark": 34453, "memory": 16, "gen": "RTX_40"},
+        "RX 7900 XTX": {"1080p": 65, "1440p": 51, "passmark": 30000, "memory": 24, "gen": "RX_7000"}
+      }
     }
   }
 }

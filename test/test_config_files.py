@@ -44,6 +44,15 @@ def test_manifest_basic_structure():
     assert isinstance(manifest["functions"], list)
     assert len(manifest["functions"]) > 0
     
+    assert manifest["protocol_version"] == "2.0"
+    assert manifest["executable"] == "plugin.py"
+    assert manifest["name"] == "canrun"
+    assert [func["name"] for func in manifest["functions"]] == [
+        "check_compatibility",
+        "detect_hardware",
+        "auto_detect",
+    ]
+
     # Check first function has required fields
     func = manifest["functions"][0]
     assert "name" in func
@@ -51,8 +60,8 @@ def test_manifest_basic_structure():
     assert "properties" in func
 
 def test_config_version_updated():
-    """Verify config version has been updated to 8.8.8"""
+    """Verify config version has been updated to 10.0"""
     with open(CONFIG_PATH) as f:
         config = json.load(f)
     
-    assert config["plugin_info"]["version"] == "8.8.8"
+    assert config["plugin_info"]["version"] == "10.0"

@@ -1,1 +1,1 @@
-{"tool_calls": [{"func": "check_compatibility", "params": {"game_name": "Diablo 3"}}]}
+{"jsonrpc":"2.0","id":3,"method":"execute","params":{"function":"check_compatibility","arguments":{"game_name":"Diablo 3"},"context":[],"system_info":""}}

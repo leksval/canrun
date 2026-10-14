@@ -43,7 +43,7 @@ if IS_WINDOWS:
     try:
         import pynvml
         PYNVML_AVAILABLE = True
-    except ImportError:
+    except (ImportError, OSError):
         PYNVML_AVAILABLE = False
     
     try:
@@ -55,7 +55,7 @@ if IS_WINDOWS:
     try:
         import wmi
         WMI_AVAILABLE = True
-    except ImportError:
+    except (ImportError, OSError):
         WMI_AVAILABLE = False
 
 # Handle GPUtil import with platform compatibility
@@ -81,7 +81,7 @@ if IS_WINDOWS:
         
         import GPUtil
         GPUTIL_AVAILABLE = True
-    except ImportError:
+    except (ImportError, OSError):
         GPUTIL_AVAILABLE = False
 
 
@@ -244,7 +244,7 @@ class CanRunHardwareDetector:
         elif IS_LINUX:
             try:
                 import subprocess
-                output = subprocess.check_output(['lspci', '-vnn'], text=True)
+                output = subprocess.check_output(['lspci', '-vnn'], text=True, timeout=5)
                 nvidia_lines = [line for line in output.split('\n') if 'NVIDIA' in line]
                 for line in nvidia_lines:
                     line_upper = line.upper()
@@ -257,7 +257,7 @@ class CanRunHardwareDetector:
         elif IS_MACOS:
             try:
                 import subprocess
-                output = subprocess.check_output(['system_profiler', 'SPDisplaysDataType'], text=True)
+                output = subprocess.check_output(['system_profiler', 'SPDisplaysDataType'], text=True, timeout=5)
                 if 'NVIDIA' in output:
                     output_upper = output.upper()
                     return 'RTX' in output_upper or 'GTX' in output_upper
@@ -430,10 +430,44 @@ class CanRunHardwareDetector:
                     return gpu_info
             except Exception as e:
                 self.logger.warning(f"Registry GPU detection failed: {e}")
+
+        smi_gpu = self._detect_nvidia_gpu_from_smi()
+        if smi_gpu:
+            return smi_gpu
         
         # If no NVIDIA GPU found, return basic info
         self.logger.warning("NVIDIA GPU not detected - using fallback")
         return gpu_info
+
+    def _detect_nvidia_gpu_from_smi(self) -> Optional[Dict[str, Any]]:
+        """Read the GPU from nvidia-smi when the NVML library file cannot be loaded."""
+        import subprocess
+        try:
+            completed = subprocess.run(
+                ["nvidia-smi", "--query-gpu=name,memory.total,driver_version", "--format=csv,noheader"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                check=False,
+            )
+            if completed.returncode != 0 or not completed.stdout.strip():
+                return None
+            name, memory, driver = [part.strip() for part in completed.stdout.splitlines()[0].split(",")]
+            memory_value = int(memory.split()[0])
+            raw_vram_gb = memory_value // 1024 if "MiB" in memory else memory_value
+            rounded_vram_gb = self._round_up_to_standard_vram_capacity(raw_vram_gb)
+            self.logger.info(f"NVIDIA GPU detected via nvidia-smi: {name}")
+            return {
+                'name': self._clean_gpu_name(name),
+                'vram_gb': rounded_vram_gb,
+                'is_nvidia': True,
+                'supports_rtx': 'RTX' in name.upper(),
+                'supports_dlss': 'RTX' in name.upper(),
+                'driver_version': driver or 'Unknown'
+            }
+        except (OSError, ValueError, subprocess.SubprocessError) as exc:
+            self.logger.warning(f"nvidia-smi detection failed: {exc}")
+            return None
     
     def _detect_cpu(self) -> Dict[str, Any]:
         """Detect CPU information."""

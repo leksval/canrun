@@ -161,6 +161,8 @@ def test_unknown_fps_display():
     
     # Should show "Unknown"
     assert "FPS: **Unknown**" in formatted_response
+    assert formatted_response.startswith("Estimate only. CanRun does not guarantee")
+    assert formatted_response.index("Estimate only.") < formatted_response.index("Score:")
 
 
 def test_high_resolution_systems():
@@ -184,6 +186,31 @@ def test_high_resolution_systems():
         assert refresh_rate in formatted_response
 
 
+def test_steam_player_source_label():
+    """Steam measurements name the player sample."""
+    result = create_test_result_with_custom_resolution_and_fps()
+    result.performance_prediction.fps_source = "steam"
+    formatted_response = format_canrun_response(result)
+    assert "75-95 FPS (Steam players)" in formatted_response
+
+
+def test_similar_pc_source_label():
+    """Scaled estimates say they come from a similar PC."""
+    result = create_test_result_with_custom_resolution_and_fps()
+    result.performance_prediction.fps_source = "steam_similar"
+    formatted_response = format_canrun_response(result)
+    assert "75-95 FPS (estimated from a similar PC, native, ray tracing off)" in formatted_response
+
+
+def test_heavier_display_notes_the_fps_class():
+    """A monitor above the FPS class is labeled so the range is not read as exact."""
+    result = create_test_result_with_custom_resolution_and_fps()
+    result.detected_resolution_class = "1440p"
+    result.hardware_specs.primary_monitor_resolution = "3072x1728"
+    formatted_response = format_canrun_response(result)
+    assert "FPS estimate uses 1440p" in formatted_response
+
+
 if __name__ == "__main__":
     # Run tests
     test_actual_resolution_display()
@@ -191,5 +218,7 @@ if __name__ == "__main__":
     test_fallback_fps_display()
     test_unknown_fps_display()
     test_high_resolution_systems()
+    test_steam_player_source_label()
+    test_similar_pc_source_label()
     
     print("All resolution and FPS display tests passed!")

@@ -1,12 +1,16 @@
 {
   "manifestVersion": 1,
-  "executable": "g-assist-plugin-canrun.exe",
-  "persistent": false,
+  "name": "canrun",
+  "version": "10.0",
+  "description": "Says whether a Steam game can run on this PC and gives an FPS range when one is known.",
+  "executable": "plugin.py",
+  "persistent": true,
+  "protocol_version": "2.0",
   "functions": [
     {
       "name": "check_compatibility",
-      "description": "Complete CanRun analysis - check if a game can run with full performance assessment, Steam API integration, hardware detection, fuzzy matching, and S-tier scoring system. Responds to 'canrun diablo', 'can I run cyberpunk', etc.",
-      "tags": ["canrun", "can run", "can i run", "will run", "game", "compatibility", "diablo", "cyberpunk", "elden ring", "baldurs gate", "performance", "tier", "score"],
+      "description": "Check one Steam game against this PC. The returned text is the full answer. Show that text to the user unchanged.",
+      "tags": ["canrun", "can run", "can i run", "will run", "game", "compatibility", "diablo", "cyberpunk", "elden ring", "baldurs gate", "dawnwalker", "blood of dawnwalker", "performance", "tier", "score"],
       "properties": {
         "game_name": {
           "type": "string",
@@ -17,15 +21,15 @@
     },
     {
       "name": "detect_hardware",
-      "description": "Detect and analyze system hardware specifications for gaming performance assessment",
+      "description": "Report the GPU, CPU, RAM, and display on this PC. Show the returned text unchanged.",
       "tags": ["hardware", "detect", "system", "specs", "gpu", "cpu", "ram"],
       "properties": {},
       "required": []
     },
     {
       "name": "auto_detect",
-      "description": "Automatically detect and analyze natural language queries about game compatibility",
-      "tags": ["auto", "detect", "natural", "language", "query", "parse"],
+      "description": "Read a question such as 'Can I run Diablo IV?' and answer with the check. Show the returned text unchanged.",
+      "tags": ["auto", "detect", "natural", "language", "query", "parse", "dawnwalker", "blood of dawnwalker"],
       "properties": {
         "user_input": {
           "type": "string",

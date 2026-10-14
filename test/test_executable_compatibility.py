@@ -1,6 +1,11 @@
 """Test suite for g-assist-plugin-canrun.exe compatibility"""
 
-import os
+import pytest
+
+pytestmark = pytest.mark.skip(
+    reason="G-Assist SDK 3.1.0 runs plugin.py. The V1 executable is no longer the plugin entry point."
+)
+
 import hashlib
 import subprocess
 import pytest

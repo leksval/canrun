@@ -1,11 +1,11 @@
 @echo off
 REM ================================================================
-REM CanRun v7.0.0 G-Assist Plugin Installation Script
-REM Updated for NVIDIA G-Assist Plugin System
+REM CanRun v10.0 G-Assist Plugin Installation Script
+REM Protocol V2 (gassist_sdk 3.1.0) - executable is plugin.py
 REM ================================================================
 
 echo ======================================================
-echo Installing CanRun v7.0.0 G-Assist Plugin
+echo Installing CanRun v10.0 G-Assist Plugin
 echo ======================================================
 
 REM Check if running as Administrator
@@ -44,62 +44,68 @@ REM Create the canrun plugin directory
 echo Creating CanRun plugin directory...
 mkdir "%PLUGIN_DIR%"
 
-REM Step 1: Copy main executable
+REM Step 1: Copy plugin sources and configuration
 echo.
-echo Step 1: Installing main executable...
-if exist "%SOURCE_DIR%g-assist-plugin-canrun.exe" (
-    copy "%SOURCE_DIR%g-assist-plugin-canrun.exe" "%PLUGIN_DIR%\"
-    echo [OK] Copied g-assist-plugin-canrun.exe
-) else (
-    echo WARNING: g-assist-plugin-canrun.exe not found!
-    echo You may need to build it first with: pyinstaller --onefile --name g-assist-plugin-canrun plugin.py
+echo Step 1: Installing plugin sources...
+for %%F in (
+    plugin.py
+    canrun_engine.py
+    canrun_hardware_detector.py
+    canrun_game_fetcher.py
+    canrun_game_matcher.py
+    canrun_compatibility_analyzer.py
+    canrun_ml_predictor.py
+    canrun_model_loader.py
+    canrun_steam_fps.py
+    g_assist_response_fixer.py
+    manifest.json
+    config.json
+    requirements.txt
+) do (
+    if not exist "%SOURCE_DIR%%%F" (
+        echo ERROR: Missing %%F
+        goto :error
+    )
+    copy "%SOURCE_DIR%%%F" "%PLUGIN_DIR%\" >nul
+    echo [OK] Copied %%F
 )
 
-REM Step 2: Copy configuration files
+REM Step 2: Copy data and vendored SDK
 echo.
-echo Step 2: Installing configuration files...
-if exist "%SOURCE_DIR%manifest.json" (
-    copy "%SOURCE_DIR%manifest.json" "%PLUGIN_DIR%\"
-    echo [OK] Copied manifest.json
+echo Step 2: Installing data and gassist_sdk...
+if exist "%SOURCE_DIR%data" (
+    xcopy "%SOURCE_DIR%data" "%PLUGIN_DIR%\data\" /E /I /Y >nul
+    echo [OK] Copied data\
 ) else (
-    echo ERROR: manifest.json not found!
+    echo ERROR: data\ directory not found
     goto :error
 )
 
-if exist "%SOURCE_DIR%config.json" (
-    copy "%SOURCE_DIR%config.json" "%PLUGIN_DIR%\"
-    echo [OK] Copied config.json
+if exist "%SOURCE_DIR%libs\gassist_sdk" (
+    xcopy "%SOURCE_DIR%libs" "%PLUGIN_DIR%\libs\" /E /I /Y >nul
+    echo [OK] Copied libs\gassist_sdk
 ) else (
-    echo WARNING: config.json not found - using defaults
-)
-
-REM Step 3: Copy data directory
-echo.
-echo Step 3: Installing data files...
-if exist "%SOURCE_DIR%data" (
-    xcopy "%SOURCE_DIR%data" "%PLUGIN_DIR%\data\" /E /I /Y >nul 2>&1
-    echo [OK] Copied data\ directory
-) else (
-    echo WARNING: data\ directory not found - plugin may have limited functionality
-)
-
-REM Step 4: Copy additional files (optional)
-echo.
-echo Step 4: Installing additional files...
-if exist "%SOURCE_DIR%requirements.txt" (
-    copy "%SOURCE_DIR%requirements.txt" "%PLUGIN_DIR%\"
-    echo [OK] Copied requirements.txt
-)
-
-if exist "%SOURCE_DIR%plugin.py" (
-    copy "%SOURCE_DIR%plugin.py" "%PLUGIN_DIR%\"
-    echo [OK] Copied plugin.py (source)
+    echo ERROR: libs\gassist_sdk not found
+    goto :error
 )
 
 if exist "%SOURCE_DIR%LICENSE" (
-    copy "%SOURCE_DIR%LICENSE" "%PLUGIN_DIR%\"
+    copy "%SOURCE_DIR%LICENSE" "%PLUGIN_DIR%\" >nul
     echo [OK] Copied LICENSE
 )
+
+REM Step 3: Install Python dependencies into libs\ so G-Assist can import them
+echo.
+echo Step 3: Installing Python dependencies into libs\...
+py -3 -m pip install -r "%PLUGIN_DIR%\requirements.txt" -t "%PLUGIN_DIR%\libs"
+if errorlevel 1 (
+    python -m pip install -r "%PLUGIN_DIR%\requirements.txt" -t "%PLUGIN_DIR%\libs"
+    if errorlevel 1 (
+        echo ERROR: pip install failed
+        goto :error
+    )
+)
+echo [OK] Dependencies installed
 
 REM Verify installation
 echo.
@@ -107,47 +113,45 @@ echo ======================================================
 echo Verifying installation...
 echo ======================================================
 
-if exist "%PLUGIN_DIR%\g-assist-plugin-canrun.exe" (
-    echo [OK] Executable: g-assist-plugin-canrun.exe
+if exist "%PLUGIN_DIR%\plugin.py" (
+    echo [OK] Executable: plugin.py
 ) else (
-    echo [ERROR] Missing executable!
+    echo [ERROR] Missing plugin.py
     goto :error
 )
 
 if exist "%PLUGIN_DIR%\manifest.json" (
     echo [OK] Configuration: manifest.json
 ) else (
-    echo [ERROR] Missing manifest.json!
+    echo [ERROR] Missing manifest.json
+    goto :error
+)
+
+if exist "%PLUGIN_DIR%\config.json" (
+    echo [OK] Configuration: config.json
+) else (
+    echo [ERROR] Missing config.json
+    goto :error
+)
+
+if exist "%PLUGIN_DIR%\libs\gassist_sdk\__init__.py" (
+    echo [OK] SDK: libs\gassist_sdk
+) else (
+    echo [ERROR] Missing libs\gassist_sdk
     goto :error
 )
 
 if exist "%PLUGIN_DIR%\data" (
-    echo [OK] Data files: data\ directory
+    echo [OK] Data files: data\
 ) else (
-    echo [ERROR] Missing data\ directory!
+    echo [ERROR] Missing data\
     goto :error
-)
-
-REM Test plugin functionality (optional)
-echo.
-echo ======================================================
-echo Testing plugin functionality...
-echo ======================================================
-
-cd /d "%PLUGIN_DIR%"
-if exist "g-assist-plugin-canrun.exe" (
-    echo Testing plugin execution...
-    REM Test with a simple command to verify it works
-    timeout /t 2 >nul
-    echo Plugin executable found and ready
-) else (
-    echo Plugin executable not found for testing
 )
 
 REM Display installation summary
 echo.
 echo ======================================================
-echo CanRun v7.0.0 Plugin Installation Complete!
+echo CanRun v10.0 Plugin Installation Complete!
 echo ======================================================
 echo.
 echo Plugin installed to: %PLUGIN_DIR%
@@ -157,14 +161,18 @@ dir "%PLUGIN_DIR%" /B 2>nul | findstr /v "^$"
 echo.
 echo G-Assist Integration:
 echo - Plugin Name: canrun
-echo - Voice Commands: "Hey canrun, can I run [game]?"
+echo - Protocol: V2 (JSON-RPC 2.0, gassist_sdk 3.1.0)
+echo - Voice commands: "Can I run [game]?"
 echo - Example: "Can I run Diablo 4?"
 echo - Example: "Check compatibility for Cyberpunk 2077"
 echo.
 echo Next Steps:
 echo 1. Ensure NVIDIA G-Assist is running
 echo 2. Restart G-Assist if it was already running
-echo 3. Test with voice command: "Hey canrun, can I run Diablo 4?"
+echo 3. Test with voice command: "Can I run Diablo 4?"
+echo.
+echo CLI check from the plugin directory:
+echo python plugin.py canrun "cyberpunk 2077" --json
 echo.
 goto :success
 
@@ -177,15 +185,13 @@ echo Please check the following:
 echo 1. All required files are in the source directory
 echo 2. You're running as Administrator
 echo 3. NVIDIA G-Assist is properly installed
+echo 4. Python 3.12+ is on PATH so pip can fill libs\
 echo.
 pause
 exit /b 1
 
 :success
 echo Installation completed successfully!
-echo.
-echo To rebuild the plugin after code changes, use:
-echo pyinstaller --onefile --name g-assist-plugin-canrun --distpath . --add-data "data;data" plugin.py
 echo.
 pause
 exit /b 0

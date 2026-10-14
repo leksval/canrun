@@ -486,6 +486,16 @@
       "passmark_g3d": 6121
     }
   },
+  "amd": {
+    "RX 7900 XTX": {
+      "tier": "High",
+      "passmark_g3d": 30000
+    },
+    "RX 7800 XT": {
+      "tier": "Medium",
+      "passmark_g3d": 22000
+    }
+  },
   "performance_tiers": {
     "Ultra": {
       "min_score": 800,

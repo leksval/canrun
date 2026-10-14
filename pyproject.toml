@@ -1,6 +1,6 @@
 [project]
 name = "canrun"
-version = "8.8.8"
+version = "9.0"
 description = "CanRun Game Compatibility Analysis System"
 requires-python = ">=3.10"
 dependencies = [

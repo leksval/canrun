@@ -1,208 +1,153 @@
 #!/usr/bin/env python3
 """
-Test script to verify G-Assist communication protocol fixes.
-This simulates G-Assist communication to test the plugin.
+Protocol V2 subprocess test.
+
+Speaks length-prefixed JSON-RPC to plugin.py: initialize, ping, then execute.
+The compatibility command uses the protocol-probe shortcut so the test does not call Steam.
+A second ping is sent while that command sleeps, and must be answered before completion.
 """
 
 import json
+import os
+import queue
+import struct
 import subprocess
 import sys
-import time
-import os
+import tempfile
+import threading
 from pathlib import Path
 
-def test_g_assist_communication():
-    """Test the G-Assist communication protocol."""
-    print(" Testing G-Assist Communication Protocol")
-    print("=" * 50)
-    
-    # Test commands to send to the plugin
-    test_commands = [
-        {
-            "name": "Hardware Detection",
-            "command": {
-                "tool_calls": [
-                    {
-                        "func": "detect_hardware",
-                        "params": {}
-                    }
-                ]
-            }
-        },
-        {
-            "name": "Game Compatibility Check",
-            "command": {
-                "tool_calls": [
-                    {
-                        "func": "check_compatibility",
-                        "params": {
-                            "game_name": "Diablo 4"
-                        }
-                    }
-                ]
-            }
-        },
-        {
-            "name": "Auto Detection",
-            "command": {
-                "tool_calls": [
-                    {
-                        "func": "auto_detect",
-                        "params": {
-                            "user_input": "Can I run Cyberpunk 2077?"
-                        }
-                    }
-                ]
-            }
-        }
-    ]
-    
-    plugin_path = Path(__file__).parent.parent / "plugin.py"
-    if not plugin_path.exists():
-        print(" Plugin file not found!")
-        assert False, "Plugin file not found!"
-    
-    success_count = 0
-    total_tests = len(test_commands)
-    
-    for i, test in enumerate(test_commands, 1):
-        print(f"\n Test {i}/{total_tests}: {test['name']}")
-        print("-" * 30)
-        
-        try:
-            # Start the plugin process
-            process = subprocess.Popen(
-                [sys.executable, str(plugin_path)],
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                bufsize=0  # Unbuffered
-            )
-            
-            # Send command to plugin
-            command_json = json.dumps(test['command'])
-            print(f"-> Sending: {command_json}")
-            
-            # Write command and close stdin
-            process.stdin.write(command_json + '\n')
-            process.stdin.flush()
-            process.stdin.close()
-            
-            # Wait for response with shorter timeout for faster testing
-            try:
-                stdout, stderr = process.communicate(timeout=10)
-                
-                print(f"<- Response received:")
-                print(f"   stdout: {stdout[:200]}..." if len(stdout) > 200 else f"   stdout: {stdout}")
-                
-                if stderr:
-                    print(f"   stderr: {stderr[:200]}..." if len(stderr) > 200 else f"   stderr: {stderr}")
-                
-                # Try to parse response as JSON
-                if stdout.strip():
-                    try:
-                        response = json.loads(stdout.strip())
-                        if response.get('success'):
-                            print(" Test PASSED - Valid JSON response with success=True")
-                            success_count += 1
-                        else:
-                            print(f" Test PARTIAL - Valid JSON but success=False: {response.get('message', 'No message')}")
-                    except json.JSONDecodeError as e:
-                        print(f" Test FAILED - Invalid JSON response: {e}")
-                else:
-                    print(" Test FAILED - No response received")
-                    
-            except subprocess.TimeoutExpired:
-                print(" Test FAILED - Timeout (30 seconds)")
-                process.kill()
-                
-        except Exception as e:
-            print(f" Test FAILED - Exception: {e}")
-        
-        # Reduced delay between tests for faster execution
-        time.sleep(0.2)
-    
-    print("\n" + "=" * 50)
-    print(f"*** Test Results: {success_count}/{total_tests} tests passed")
-    
-    if success_count == total_tests:
-        print("*** ALL TESTS PASSED - G-Assist communication is working!")
-    else:
-        print("*** Some tests failed - G-Assist communication needs fixes")
-        print("*** This may be due to missing plugin execution environment")
-        # Don't fail if no tests passed - likely environment issue
-        if success_count == 0:
-            print("[INFO] No G-Assist tests passed - likely plugin execution environment missing")
-            print("[INFO] This is expected in CI/test environments without full plugin setup")
-        else:
-            assert False, f"Only {success_count}/{total_tests} G-Assist tests passed"
+PLUGIN = Path(__file__).resolve().parent.parent / "plugin.py"
 
-def test_cli_mode():
-    """Test CLI mode to ensure it still works."""
-    print("\n*** Testing CLI Mode")
-    print("=" * 30)
-    
-    plugin_path = Path(__file__).parent.parent / "plugin.py"
-    
+
+def _read_exact(stream, count):
+    data = b""
+    while len(data) < count:
+        chunk = stream.read(count - len(data))
+        if not chunk:
+            return None
+        data += chunk
+    return data
+
+
+def _reader(stdout, messages):
     try:
-        # Test CLI mode with hardware detection
-        result = subprocess.run(
-            [sys.executable, str(plugin_path), "--function", "detect_hardware"],
-            capture_output=True,
-            text=True,
-            timeout=10
-        )
-        
-        print(f" CLI Command: python plugin.py --function detect_hardware")
-        print(f" Return code: {result.returncode}")
-        print(f" Output: {result.stdout[:200]}..." if len(result.stdout) > 200 else f" Output: {result.stdout}")
-        
-        if result.stderr:
-            print(f" Stderr: {result.stderr[:200]}..." if len(result.stderr) > 200 else f" Stderr: {result.stderr}")
-        
-        if result.returncode == 0 and result.stdout.strip():
-            try:
-                response = json.loads(result.stdout.strip())
-                if response.get('success'):
-                    print(" CLI Mode PASSED")
-                else:
-                    print(f" CLI Mode PARTIAL - success=False: {response.get('message', 'No message')}")
-                    # Don't fail for partial success - may be environment related
-                    print("[INFO] CLI Mode may require specific plugin environment")
-            except json.JSONDecodeError:
-                print(" CLI Mode FAILED - Invalid JSON")
-                print("[INFO] This may be due to missing plugin dependencies")
-        else:
-            print(" CLI Mode FAILED - No valid output or timeout")
-            print("[INFO] This is expected in test environments without full plugin setup")
-            
-    except Exception as e:
-        print(f" CLI Mode FAILED - Exception: {e}")
-        print("[INFO] This may be due to missing plugin execution environment")
-        # Don't fail for environment issues
+        while True:
+            header = _read_exact(stdout, 4)
+            if not header:
+                break
+            length = struct.unpack(">I", header)[0]
+            payload = _read_exact(stdout, length)
+            if payload is None:
+                messages.put(RuntimeError("truncated Protocol V2 payload"))
+                break
+            messages.put(json.loads(payload.decode("utf-8")))
+    except Exception as exc:
+        messages.put(exc)
+    finally:
+        messages.put(None)
 
-if __name__ == "__main__":
-    print(" CanRun G-Assist Plugin Communication Test")
-    print("Testing the fixes for G-Assist communication protocol")
-    print()
-    
-    # Test CLI mode first
-    cli_success = test_cli_mode()
-    
-    # Test G-Assist communication
-    g_assist_success = test_g_assist_communication()
-    
-    print("\n" + "=" * 60)
-    print(" FINAL RESULTS:")
-    print(f"   CLI Mode: {' PASSED' if cli_success else ' FAILED'}")
-    print(f"   G-Assist Mode: {' PASSED' if g_assist_success else ' FAILED'}")
-    
-    if cli_success and g_assist_success:
-        print("\n ALL COMMUNICATION TESTS PASSED!")
-        print("Your plugin is ready for G-Assist integration!")
-    else:
-        print("\n Some communication tests failed.")
-        print("Please check the plugin implementation.")
-    
-    sys.exit(0 if (cli_success and g_assist_success) else 1)
+
+def _send(stdin, message):
+    payload = json.dumps(message).encode("utf-8")
+    stdin.write(struct.pack(">I", len(payload)) + payload)
+    stdin.flush()
+
+
+def test_protocol_v2_initialize_ping_and_execute():
+    """initialize, ping, and check_compatibility use JSON-RPC 2.0 framing."""
+    env = os.environ.copy()
+    env["CANRUN_PROTOCOL_PROBE"] = "1"
+    messages = queue.Queue()
+
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+        proc = subprocess.Popen(
+            [sys.executable, str(PLUGIN)],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            cwd=tmp,
+            env=env,
+        )
+        threading.Thread(target=_reader, args=(proc.stdout, messages), daemon=True).start()
+        stderr = []
+
+        def _drain():
+            stderr.append(proc.stderr.read())
+
+        threading.Thread(target=_drain, daemon=True).start()
+
+        def next_message(timeout):
+            item = messages.get(timeout=timeout)
+            if isinstance(item, Exception):
+                raise item
+            if item is None:
+                raise AssertionError(f"plugin closed stdout; stderr={b''.join(stderr)!r}")
+            assert item.get("jsonrpc") == "2.0", item
+            return item
+
+        try:
+            _send(proc.stdin, {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "initialize",
+                "params": {"protocol_version": "2.0", "engine_version": "1.0.0"},
+            })
+            initialized = next_message(40)
+            assert initialized["id"] == 1
+            assert initialized["result"]["protocol_version"] == "2.0"
+            assert initialized["result"]["name"] == "canrun"
+            command_names = {command["name"] for command in initialized["result"]["commands"]}
+            assert {"check_compatibility", "detect_hardware", "auto_detect"} <= command_names
+
+            _send(proc.stdin, {
+                "jsonrpc": "2.0",
+                "id": 2,
+                "method": "ping",
+                "params": {"timestamp": 111},
+            })
+            ping = next_message(5)
+            assert ping["id"] == 2
+            assert ping["result"]["timestamp"] == 111
+
+            _send(proc.stdin, {
+                "jsonrpc": "2.0",
+                "id": 3,
+                "method": "execute",
+                "params": {
+                    "function": "check_compatibility",
+                    "arguments": {"game_name": "protocol-probe"},
+                    "context": [],
+                    "system_info": "",
+                },
+            })
+            _send(proc.stdin, {
+                "jsonrpc": "2.0",
+                "id": 4,
+                "method": "ping",
+                "params": {"timestamp": 222},
+            })
+
+            saw_pong = False
+            saw_complete = False
+            for _ in range(6):
+                message = next_message(10)
+                if message.get("id") == 4:
+                    assert message["result"]["timestamp"] == 222
+                    assert saw_complete is False
+                    saw_pong = True
+                elif message.get("method") == "stream":
+                    assert message["params"]["request_id"] == 3
+                elif message.get("method") == "complete":
+                    assert saw_pong, "ping was not answered before the command finished"
+                    assert message["params"]["request_id"] == 3
+                    assert message["params"]["success"] is True
+                    assert message["params"]["data"] == "protocol-probe-ok"
+                    saw_complete = True
+                    break
+                elif message.get("method") == "error":
+                    raise AssertionError(message)
+            assert saw_pong and saw_complete
+        finally:
+            proc.kill()
+            proc.wait(timeout=5)

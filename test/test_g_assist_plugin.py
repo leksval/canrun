@@ -9,7 +9,12 @@ import json
 import time
 import os
 import sys
+import pytest
 from pathlib import Path
+
+pytestmark = pytest.mark.skip(
+    reason="G-Assist SDK 3.1.0 runs plugin.py. The V1 executable is no longer the plugin entry point."
+)
 
 def test_plugin_startup():
     """Test that the plugin executable starts up without errors"""

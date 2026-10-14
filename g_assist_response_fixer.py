@@ -210,7 +210,9 @@ def create_safe_g_assist_response(success, message, max_length=1400):
 
 def format_g_assist_message(response_dict):
     """
-    Format response for G-Assist pipe communication
+    Format a response dictionary as JSON.
+
+    Protocol V2 framing is applied by gassist_sdk. This helper does not append a delimiter.
     """
     # Validate first
     is_valid, error = validate_g_assist_response(response_dict)
@@ -218,9 +220,8 @@ def format_g_assist_message(response_dict):
         logging.error(f"Invalid response format: {error}")
         response_dict = create_safe_g_assist_response(False, f"Format error: {error}")
     
-    # Create JSON and append terminator
     try:
-        json_message = json.dumps(response_dict) + "<<END>>"
+        json_message = json.dumps(response_dict)
         
         # Final UTF-8 check (allow emojis)
         try:
@@ -230,7 +231,7 @@ def format_g_assist_message(response_dict):
             json_message = json.dumps({
                 "success": False,
                 "message": "Response contained invalid characters"
-            }) + "<<END>>"
+            })
         
         return json_message
     
@@ -240,7 +241,7 @@ def format_g_assist_message(response_dict):
         return json.dumps({
             "success": False,
             "message": "Response formatting failed"
-        }) + "<<END>>"
+        })
 
 def test_response_fixer():
     """Test the response fixing functions"""

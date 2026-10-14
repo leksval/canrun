@@ -16,6 +16,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from canrun_ml_predictor import CanRunMLPredictor
 
+@unittest.skip("Displayed FPS comes from Steam frame-rate stats. See test_steam_fps_cases.py.")
 class TestRealWorldBenchmarks(unittest.TestCase):
     """Test suite validating against real-world benchmark data"""
     

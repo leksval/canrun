@@ -9,6 +9,10 @@ import sys
 import pytest
 from pathlib import Path
 
+pytestmark = pytest.mark.skip(
+    reason="G-Assist SDK 3.1.0 runs plugin.py. The V1 executable is no longer the plugin entry point."
+)
+
 @pytest.mark.skip(reason="Executable hangs waiting for G-Assist pipe communication - use test_cli_standalone.py for CLI testing")
 def test_cyberpunk_fps():
     """Test that the production executable exists and runs without crashing"""

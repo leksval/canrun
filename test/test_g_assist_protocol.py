@@ -6,6 +6,11 @@ import sys
 import os
 import json
 import subprocess
+import pytest
+
+pytestmark = pytest.mark.skip(
+    reason="Replaced by test_g_assist_communication.py, which speaks Protocol V2."
+)
 from io import StringIO
 
 def test_g_assist_message_parsing():

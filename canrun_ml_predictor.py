@@ -24,12 +24,12 @@ except ImportError:
 
 try:
     import GPUtil
-except ImportError:
+except (ImportError, OSError):
     GPUtil = None
 
 try:
     import wmi  # Windows only
-except ImportError:
+except (ImportError, OSError):
     wmi = None
 
 
@@ -58,6 +58,7 @@ class PerformanceAssessment:
     fps_min: int = 0
     fps_max: int = 0
     variance_description: str = ""
+    fps_source: str = "unknown"
 
 
 class CanRunMLPredictor:
@@ -159,18 +160,19 @@ class CanRunMLPredictor:
             self.logger.error(f"Failed to load CPU database: {e}")
             return {}
     
-    def assess_performance(self, hardware_specs: Dict[str, Any], game_requirements: Dict[str, Any] = None) -> PerformanceAssessment:
+    def assess_performance(self, hardware_specs: Dict[str, Any], game_requirements: Dict[str, Any] = None, steam_fps: Any = None) -> PerformanceAssessment:
         """
-        Main performance assessment using ML prediction when available.
+        Main performance assessment. The reported FPS comes from Steam stats.
         
         Args:
             hardware_specs: Hardware specifications from detector
             game_requirements: Game requirements from fetcher
+            steam_fps: FpsEstimate from the Steam frame-rate database
             
         Returns:
             PerformanceAssessment with tier, score, FPS, and recommendations
         """
-        self.logger.info("Starting ML performance assessment")
+        self.logger.info("Starting performance assessment")
         
         # Get hardware data in normalized format
         hardware = self._normalize_hardware_data(hardware_specs)
@@ -194,24 +196,14 @@ class CanRunMLPredictor:
         # Get performance tier
         tier = self._score_to_tier(total_score)
         
-        # Calculate FPS using ML model or fallback
-        expected_fps = self._calculate_fps_with_ml(
-            gpu_passmark=gpu_passmark,
-            cpu_passmark=cpu_passmark,
-            resolution=hardware['display']['resolution_class'],
-            gpu_model=hardware['gpu']['model'],
-            game_requirements=game_requirements
+        expected_fps, variance_min, variance_max, variance_range, variance_desc, fps_source = self._fps_from_steam(
+            steam_fps, hardware, game_requirements
         )
         
         # Generate recommendations
         settings, resolution = self._get_recommendations(tier)
         bottlenecks = self._identify_bottlenecks({'gpu': gpu_score, 'cpu': cpu_score, 'ram': ram_score})
         upgrades = self._get_upgrade_suggestions(tier, {'gpu': gpu_score, 'cpu': cpu_score, 'ram': ram_score})
-        
-        # Calculate FPS variance using actual resolution scaling factors
-        variance_range, variance_min, variance_max, variance_desc = self._calculate_fps_variance(
-            expected_fps, hardware['display']['resolution_class'], gpu_passmark
-        )
         
         assessment = PerformanceAssessment(
             score=total_score,
@@ -225,11 +217,45 @@ class CanRunMLPredictor:
             fps_variance_range=variance_range,
             fps_min=variance_min,
             fps_max=variance_max,
-            variance_description=variance_desc
+            variance_description=variance_desc,
+            fps_source=fps_source
         )
         
-        self.logger.info(f"Assessment complete: {tier.name} tier, {expected_fps} FPS")
+        self.logger.info(f"Assessment complete: {tier.name} tier, {expected_fps} FPS ({fps_source})")
         return assessment
+
+    def _fps_from_steam(self, steam_fps: Any, hardware: Dict[str, Any], game_requirements: Dict[str, Any] = None) -> Tuple[int, int, int, int, str, str]:
+        """Steam sample when one exists. Otherwise scale from the published GPU spec."""
+        source = getattr(steam_fps, "fps_source", None) or "unknown"
+        expected = int(getattr(steam_fps, "expected_fps", 0) or 0)
+        fps_min = int(getattr(steam_fps, "fps_min", 0) or 0)
+        fps_max = int(getattr(steam_fps, "fps_max", 0) or 0)
+        if source == "unknown" or expected <= 0:
+            from canrun_steam_fps import estimate_from_requirements
+
+            requirements = game_requirements or {}
+            resolution = requirements.get("resolution") or hardware.get("display", {}).get("resolution_class")
+            estimate = estimate_from_requirements(
+                hardware.get("gpu", {}).get("model", ""),
+                hardware.get("cpu", {}).get("model", ""),
+                str(requirements.get("recommended_gpu") or ""),
+                str(requirements.get("minimum_gpu") or ""),
+                resolution,
+            )
+            if estimate.fps_source == "unknown" or estimate.expected_fps <= 0:
+                return 0, 0, 0, 0, "Steam frame-rate data unavailable", "unknown"
+            expected = estimate.expected_fps
+            fps_min = estimate.fps_min
+            fps_max = estimate.fps_max
+            source = estimate.fps_source
+        descriptions = {
+            "steam": "Steam player frame rates",
+            "steam_similar": "Estimated from a similar PC on Steam",
+            "requirements": "Estimated from the recommended GPU for this resolution, ray tracing off",
+            "requirements_minimum": "Estimated from the minimum GPU for this resolution, ray tracing off",
+            "requirements_unspecified": "Estimated for this PC; the Steam page names no known graphics card, ray tracing off",
+        }
+        return expected, fps_min, fps_max, max(0, fps_max - fps_min), descriptions.get(source, source), source
     
     def _normalize_hardware_data(self, hardware_specs: Dict[str, Any]) -> Dict[str, Any]:
         """Normalize hardware data from various input formats."""
@@ -318,14 +344,17 @@ class CanRunMLPredictor:
     
     def _get_ram_score(self, ram_info: Dict[str, Any], game_requirements: Dict[str, Any] = None) -> int:
         """Get RAM score based on available memory."""
-        available = ram_info.get('available', ram_info.get('total', 8) * 0.7)
-        required = 8  # Default requirement
-        
+        available = ram_info.get('available', ram_info.get('total', 8) * 0.7) or 0
+        required = 8
         if game_requirements:
-            required = game_requirements.get('recommended_ram_gb', 
-                      game_requirements.get('minimum_ram_gb', 8))
-        
-        score = min(100, (available / required) * 100)
+            required = (
+                game_requirements.get('recommended_ram_gb')
+                or game_requirements.get('minimum_ram_gb')
+                or 8
+            )
+        if not required or float(required) <= 0:
+            required = 8
+        score = min(100, (float(available) / float(required)) * 100)
         return int(score)
     
     def _calculate_fps_with_ml(self, gpu_passmark: int, cpu_passmark: int, resolution: str,

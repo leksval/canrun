@@ -75,25 +75,29 @@ def test_ml_loading():
     print(f"  - Score: {assessment.score}")
     print(f"  - Tier: {assessment.tier.name}")
     print(f"  - Expected FPS: {assessment.expected_fps}")
-    print(f"  - FPS Variance: {assessment.fps_min} - {assessment.fps_max}")
-    
-    # Test direct ML prediction if available
-    if ml_predictor.ml_predictor and ml_predictor.ml_predictor.is_loaded:
-        print("\nDirect ML Prediction Test:")
-        fps = ml_predictor.ml_predictor.predict_fps(
-            gpu_name="RTX 4090",
-            passmark_score=38000,
-            resolution="1080p",
-            game_name="Diablo 4",
-            game_requirements=game_requirements
-        )
-        print(f"  - Direct ML FPS: {fps}")
-    
-    # Check all test assertions
+    print(f"  - FPS source: {assessment.fps_source}")
+
+    from canrun_steam_fps import resolve_fps
+    steam_estimate = resolve_fps(
+        "RTX 4090",
+        "AMD Ryzen 7 7800X3D",
+        {"response": {"frame_rates": [{
+            "gpu_name": "NVIDIA GeForce RTX 4090",
+            "cpu_name": "AMD Ryzen 7 7800X3D",
+            "report_count": 120,
+            "mean_frame_rate": 144,
+            "mean_frame_rate_stddev": 8,
+        }]}},
+        cluster_map={"clusters": {}, "reference_gpu": "RTX 5070"},
+    )
+    print(f"  - Steam FPS: {steam_estimate.expected_fps}")
+
     assert predictor.is_loaded, "ML model should be loaded"
     assert ml_predictor.ml_predictor is not None, "ML predictor should be initialized"
-    assert assessment.expected_fps != 209, "FPS should not be the fallback value"
-    assert assessment.expected_fps > 60, "RTX 4090 should get high FPS at 1080p"
+    assert assessment.expected_fps > 0, "A known recommended GPU still produces an estimate"
+    assert assessment.fps_source == "requirements"
+    assert steam_estimate.expected_fps == 144
+    assert steam_estimate.fps_source == "steam"
 
 if __name__ == "__main__":
     test_ml_loading()

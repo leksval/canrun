@@ -5,6 +5,7 @@ Basic diagnostic test for G-Assist plugin components.
 
 import json
 import os
+from pathlib import Path
 
 def test_manifest():
     """Test manifest.json parsing."""
@@ -36,7 +37,7 @@ def test_executable():
     print(' TESTING PLUGIN EXECUTABLE')
     print('-' * 40)
 
-    executable_path = './g-assist-plugin-python.exe'
+    executable_path = Path(__file__).resolve().parent.parent / "plugin.py"
     if os.path.exists(executable_path):
         print(f' Executable found: {executable_path}')
         print(f' File size: {os.path.getsize(executable_path)} bytes')

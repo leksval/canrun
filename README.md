@@ -17,8 +17,8 @@ tags:
 ---
 <table> <tr> <td width="110" valign="middle"> <img width="100" height="100" alt="canrun_logo" src="https://github.com/user-attachments/assets/239082bd-d5ca-427b-b235-5326299f3104" /> </td> <td valign="middle"> <h1 style="display:inline-block; vertical-align:middle; margin:0; padding:0;">  CanRun - System Spec Game Compatibility Checker </h1> </td> </tr> </table>
   
-  [![Version](https://img.shields.io/badge/version-8.8.8-blue.svg)](https://github.com/canrun/canrun)
-  [![Python](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/downloads/)
+  [![Version](https://img.shields.io/badge/version-10.0-blue.svg)](https://github.com/canrun/canrun)
+  [![Python](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/downloads/)
   [![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
   [![G-Assist](https://img.shields.io/badge/G--Assist-Official%20Protocol%20Verified-brightgreen.svg)](https://www.nvidia.com/en-us/geforce/technologies/g-assist/)
   [![Steam API](https://img.shields.io/badge/Steam%20API-Integrated-blue.svg)](https://steamcommunity.com/dev)
@@ -37,107 +37,132 @@ tags:
  
 - **⭐ S-A-B-C-D-F Tier System**: Advanced performance classification with weighted scoring
 - 
-- **🧠 AI-Powered Analysis**: Leverages G-Assist's embedded 8B Llama model for intelligent insights
-- **🧠 ML-Powered FPS Prediction**: Advanced Stacking Ensemble with GPU acceleration
- 
-- **🔒 Privacy-by-Design**: All processing happens locally on your RTX GPU—no data leaves your system
-- **🎯 Steam-First Data**: Prioritizes Steam API for most up-to-date game requirements
-- **🎯 Intelligent Game Matching**: Advanced fuzzy matching handles game name variations
+- **🧠 AI-Powered Analysis**: G-Assist routes natural language to the plugin. The S-A-B-C-D-F tier still comes from local hardware scoring
+- **📈 Frame Rates**: A Steam player sample is used when it has at least 30 reports. Otherwise a similar-PC estimate is used for games in the measured table. The range is wide enough that it is not presented as an exact FPS. The S-A-B-C-D-F tier still comes from local hardware scoring, not from that FPS number.
+- **🔒 Local Matching**: GPU and CPU names stay on this PC. The frame-rate request sends only the Steam app id
+- **🎯 Steam-First Data**: Game requirements come from the Steam Store API
+- **🎯 Intelligent Game Matching**: Names are matched against Windows games from the last 30 days and the current 100 bestsellers, then the Steam store. A close or split title still lands on the published game.
 - **📊 Smart Performance Prediction**: Comprehensive hardware hierarchies
 - **💡 Intelligent Recommendations**: AI-generated optimization tips
 - 
 - **🤖 MCP Server**: Official Model Context Protocol (MCP) server for G-Assist integration
 - **🔄 JSON-Based Configuration**: All benchmark data externalized for easy maintenance
-- **🏃 Zero Setup**: Drop-in plugin with automatic RTX/GTX validation
+- **🏃 Protocol V2 Plugin**: `plugin.py` on G-Assist SDK 3.1.0. Commands keep answering pings while a Steam lookup runs
 
+
+## Recent changes
+
+Version 10.0 adds measured frame rates and an honest range around them.
+
+- **Steam player FPS.** `GetGameFrameRateStats` supplies the number when a hardware cluster has at least 30 reports. The line is labeled `Steam players`. The band is the measured average ± one standard deviation, and never narrower than ±8%.
+- **Similar-PC estimate.** When that sample is missing and the game is in `data/training_benchmarks.json`, FPS comes from a per-game, per-resolution curve: `log(fps) = a + b * log(passmark)`. The line says `estimated from a similar PC, native, ray tracing off`, and the band is ±20%. Games that are not in that table, and have no Steam sample, show FPS as Unknown.
+- **Display class.** If the monitor has substantially more pixels than the class used for the estimate (for example 3072×1728 treated as 1440p), the display line says which class the FPS number uses.
+- **Local matching.** GPU and CPU names stay on this PC. The Steam request sends only the app id. Set `STEAM_WEBAPI_KEY` or `canrun_config.steam_webapi_key`. The key is removed from logs.
+- **G-Assist SDK 3.1.0.** Protocol V2, JSON-RPC 2.0, length-prefixed messages. `manifest.json` uses `protocol_version` `"2.0"` and `executable` `plugin.py`.
+- **Hardening.** The Gradio app binds to `127.0.0.1`. Game names are stripped of control characters and capped at 120 characters. Cache files cannot leave the cache directory, and symlinks and files over 256 KB are refused. Steam app ids must be numeric.
+- **Estimate notice.** Every result starts with a notice that the check is an estimate and not a guarantee that the game will run or that the frame rate will match.
+- **Recent releases and bestsellers.** A saved list of Windows games from the last 30 days plus the current 100 bestsellers is checked before the store search, and kept for 6 hours. Refreshing that list does not delay the answer. A typed name that is the same title, or a split of one long word in it, uses that game so the check is scored instead of coming back unknown. "Dawn Walker" matches "The Blood of Dawnwalker" when that game is in the list. A short word such as "within" does not attach to a longer title. The local Steam library is still checked first. If the list has no similar title, store search retries the joined spelling.
 
 ## 📦 G-Assist Plugin Installation
 
-Following [Official NVIDIA G-Assist Plugin Standards](https://github.com/NVIDIA/G-Assist), CanRun uses the correct plugin architecture:
+CanRun follows the current [NVIDIA G-Assist](https://github.com/NVIDIA/G-Assist) plugin contract: Protocol V2, JSON-RPC 2.0, and `gassist_sdk` 3.1.0. G-Assist launches `plugin.py` directly. The SDK lives in `libs/gassist_sdk` and is added to `PYTHONPATH` by the engine.
 
 ```
 plugins/
 └── canrun/                          # Plugin directory name = invocation name
-    ├── g-assist-plugin-canrun.exe   # Main executable
-    ├── manifest.json                # Plugin configuration
-    ├── config.json                  # Settings & credentials
-    └── plugin.py                    # Source code (optional)
+    ├── plugin.py                    # Protocol V2 entry point
+    ├── manifest.json                # protocol_version 2.0
+    ├── config.json                  # Settings
+    ├── requirements.txt             # Runtime packages installed into libs/
+    ├── data/                        # Benchmark data
+    └── libs/
+        └── gassist_sdk/             # Vendored SDK 3.1.0
+```
+
+Install location:
+
+```
+%PROGRAMDATA%\NVIDIA Corporation\nvtopps\rise\plugins\canrun
 ```
 
 ### **🚀 AUTOMATIC INSTALLATION (RECOMMENDED)**
 
-**Simply run the installation script as Administrator:**
+**Run the installation script as Administrator:**
 
 ```bash
-# Navigate to canrun directory and run installer
 cd canrun
 install_g_assist_plugin.bat
 ```
 
 The installer will:
-- ✅ Automatically detect your G-Assist installation (NVIDIA App or Legacy)
-- ✅ Copy all required files to the correct plugin directory
-- ✅ Verify installation and test the executable
-- ✅ Provide usage instructions
+- Copy the plugin sources, manifest, data, and vendored SDK
+- Install `requirements.txt` into `libs/`
+- Verify `plugin.py`, `manifest.json`, and `libs/gassist_sdk`
 
 **Requirements:**
-- Administrator privileges (required for plugin installation)
-- NVIDIA App or Legacy G-Assist installed
+- Administrator privileges (required to write under `%PROGRAMDATA%`)
+- Python 3.12+ on PATH
+- NVIDIA G-Assist installed
 
 ### **📋 MANUAL INSTALLATION (ALTERNATIVE)**
 
-If you prefer manual installation or need to troubleshoot:
+**Step 1: Create the plugin directory**
 
-**Step 1: Locate G-Assist Plugins Directory**
-
-**Primary location (NVIDIA App):**
 ```
-%USERPROFILE%\AppData\Local\NVIDIA Corporation\NVIDIA App\plugins\
-```
-
-**Alternative location (Legacy):**
-```
-%PROGRAMDATA%\NVIDIA Corporation\nvtopps\rise\plugins\
+mkdir "%PROGRAMDATA%\NVIDIA Corporation\nvtopps\rise\plugins\canrun"
 ```
 
 **Step 2: Copy Plugin Files**
-```bash
-# Method 1: Copy entire canrun directory
-xcopy /E /I "canrun" "%USERPROFILE%\AppData\Local\NVIDIA Corporation\NVIDIA App\plugins\canrun"
 
-# Method 2: Manual file copy
-mkdir "%USERPROFILE%\AppData\Local\NVIDIA Corporation\NVIDIA App\plugins\canrun"
-copy "canrun\g-assist-plugin-canrun.exe" "%USERPROFILE%\AppData\Local\NVIDIA Corporation\NVIDIA App\plugins\canrun\"
-copy "canrun\manifest.json" "%USERPROFILE%\AppData\Local\NVIDIA Corporation\NVIDIA App\plugins\canrun\"
-copy "canrun\config.json" "%USERPROFILE%\AppData\Local\NVIDIA Corporation\NVIDIA App\plugins\canrun\"
-copy "canrun\data" "%USERPROFILE%\AppData\Local\NVIDIA Corporation\NVIDIA App\plugins\canrun\data\" /E
+```bash
+xcopy /E /I "canrun" "%PROGRAMDATA%\NVIDIA Corporation\nvtopps\rise\plugins\canrun"
+pip install -r "%PROGRAMDATA%\NVIDIA Corporation\nvtopps\rise\plugins\canrun\requirements.txt" -t "%PROGRAMDATA%\NVIDIA Corporation\nvtopps\rise\plugins\canrun\libs"
 ```
 
 **Step 3: Restart G-Assist**
 1. Close NVIDIA App / G-Assist completely
 2. Restart NVIDIA App
-3. Enable G-Assist if not already enabled
+3. Enable G-Assist if it is not already enabled
 
 **Step 4: Test Plugin**
 Try these commands:
-- "/canrun elden ring"
+- "can I run elden ring"
 - "canrun cyberpunk 2077"
 
 ### **Plugin Architecture Notes**
-- **Directory Name**: Must match plugin invocation name (`canrun`)
-- **Executable Name**: Must follow NVIDIA convention `g-assist-plugin-<name>.exe`
-- **Communication**: Windows pipes (stdin/stdout) for G-Assist integration
-- **CLI Mode**: Also supports direct command-line execution for testing
+- **Directory Name**: Must match the plugin invocation name (`canrun`)
+- **Executable**: `plugin.py` (`manifest.json` field `executable`)
+- **Protocol**: `protocol_version` `"2.0"`. Messages are JSON-RPC 2.0 with a 4-byte big-endian length prefix
+- **Persistent**: `true`, so the engine can ping the plugin while a Steam lookup runs
+- **CLI Mode**: `python plugin.py canrun "cyberpunk 2077" --json`
 
 ### **🔧 Troubleshooting**
 
 If the plugin is not detected by G-Assist:
 
-1. **Verify Installation Path**: Run the installation script again to ensure correct path
-2. **Check File Permissions**: Ensure all files were copied successfully
+1. **Verify Installation Path**: Run the installation script again
+2. **Check File Permissions**: Confirm `plugin.py`, `manifest.json`, and `libs/gassist_sdk` were copied
 3. **Restart G-Assist**: Completely close and restart NVIDIA App/G-Assist
-4. **Check Logs**: Review `%USERPROFILE%\canrun_plugin.log` for errors
-5. **Test CLI Mode**: Run `g-assist-plugin-canrun.exe canrun "cyberpunk 2077" --json` to verify functionality
+4. **Check Logs**: Review `%USERPROFILE%\canrun_plugin.log` and `gassist_sdk.log` in the plugin directory
+5. **Test CLI Mode**: Run `python plugin.py canrun "cyberpunk 2077" --json` from the plugin directory
+
+A Steam-backed FPS line looks like `93-139 FPS (Steam players)` or `93-139 FPS (estimated from a similar PC, native, ray tracing off)`. A heavier monitor adds `FPS estimate uses 1440p` on the display line. When neither Steam nor the measured table has the game, FPS is Unknown.
+
+### Steam Web API key
+
+Frame-rate stats require a key from [Steam Web API](https://steamcommunity.com/dev). Put it in the environment or in `config.json`:
+
+```json
+"canrun_config": {
+  "steam_webapi_key": "your-key-here"
+}
+```
+
+```bash
+set STEAM_WEBAPI_KEY=your-key-here
+```
+
+Leave the key out of git. An empty `steam_webapi_key` is fine: requirements still load, and a game in the measured table can still show a similar-PC estimate. Without a key and without a table row, FPS is Unknown.
 
 ## Installation and Setup
 
@@ -145,12 +170,7 @@ If the plugin is not detected by G-Assist:
 - Python 3.12+ (NVIDIA G-Assist requirement)
 - Windows 10/11 (for hardware detection)
 - NVIDIA GPU recommended for full G-Assist integration
-
-### Prerequisites
-- Python 3.12+ (NVIDIA G-Assist requirement)
-- Windows 10/11 (for hardware detection)
-- NVIDIA GPU recommended for optimal performance
-- **uv package manager** (required for dependency management)
+- **uv package manager** for the development install below
 
 ### Install uv Package Manager
 If you don't have `uv` installed:
@@ -159,30 +179,20 @@ If you don't have `uv` installed:
 pip install uv
 ```
 
-### Option 1: Default Lightweight Build (UPDATED - G-Assist Message Visibility Fix v8.8.8)
+### Option 1: G-Assist plugin (Protocol V2)
 
 ```bash
 # Clone repository
 git clone https://github.com/leksval/canrun
 cd canrun
 
-# Build executable with G-Assist communication fixes
-cd canrun
-uv run pyinstaller --onefile --name g-assist-plugin-canrun plugin.py --add-data "data;data" --add-data "config.json;." --add-data "data/*.pkl;data" --hidden-import canrun_engine --hidden-import canrun_hardware_detector --hidden-import canrun_game_fetcher --hidden-import canrun_game_matcher --hidden-import canrun_compatibility_analyzer --hidden-import canrun_ml_predictor --hidden-import canrun_model_loader --hidden-import g_assist_response_fixer --hidden-import GPUtil --hidden-import pynvml --hidden-import wmi --hidden-import cpuinfo --hidden-import psutil --hidden-import joblib --hidden-import pickle --hidden-import numpy --hidden-import pandas
+# Install the plugin for G-Assist (Administrator)
+install_g_assist_plugin.bat
 
-# Copy executable from dist to main directory
-copy dist\g-assist-plugin-canrun.exe g-assist-plugin-canrun.exe
-
-# Verify G-Assist communication fixes
-uv run python test/test_g_assist_fixes.py
-# Expected: 3/3 tests passed - confirms message visibility fixes
-
-# Test official G-Assist protocol compliance
-uv run python -m pytest test/test_official_g_assist_protocol.py -v
-# Expected: 6 passed - confirms G-Assist protocol compliance
-
-# Test plugin with JSON output (recommended for debugging)
-./g-assist-plugin-canrun.exe canrun "cyberpunk 2077" --json
+# Protocol check and CLI
+uv run python -m pytest test/test_official_g_assist_protocol.py test/test_g_assist_communication.py -v
+uv run python plugin.py initialize --json
+uv run python plugin.py canrun "cyberpunk 2077" --json
 ```
 
 
@@ -225,16 +235,8 @@ cd canrun
 # Run all tests with pytest using uv
 uv run python -m pytest test/ -v
 
-# Test official G-Assist protocol specifically
-uv run python -m pytest test/test_official_g_assist_protocol.py -v
-
-# Expected output: 6 passed in 4.14s
-# ✅ Protocol compliance with NVIDIA specifications
-# ✅ Executable validation and functionality
-# ✅ CLI mode operation
-# ✅ Message format compatibility
-# ✅ Directory structure requirements
-# ✅ ASCII output compliance
+# Protocol V2, Steam FPS cases, and security edge cases
+uv run python -m pytest test/test_official_g_assist_protocol.py test/test_g_assist_communication.py test/test_steam_fps_cases.py test/test_edge_cases.py -v
 ```
 
 ## 🤖 MCP Server Functionality
@@ -255,15 +257,14 @@ The MCP server exposes the following tools to G-Assist:
 ### Running the MCP Server
 
 ```bash
-# Start the MCP server with auto port discovery
+# Start the local UI. It binds to 127.0.0.1 only.
 python app.py
-
-# The server will be available at:
-# http://localhost:xxxx (where xxxx is an available port)
 ```
 
 
 ## 🧠 ML Pipeline
+
+The stacking ensemble below is kept for training experiments. The FPS number shown in G-Assist comes from Steam samples and the similar-PC curve described above, not from this model.
 
 ### **Final Production Accuracy:**
 - **Mean Absolute Error (MAE):** 13.79 FPS
@@ -360,22 +361,20 @@ XGBRegressor(device='cuda', tree_method='hist', n_estimators=500)
 - Fallback: Local cache (offline support, curated database)
 - Privacy-protected data sanitization throughout
 - Automatic game ID resolution and requirement parsing
+- Better title matching uses a saved list of Windows games from the last 30 days and the current 100 bestsellers. A similar or split name in that list is used, so the check is scored instead of left unknown. Refreshing the list does not delay the answer. The list is cached for 6 hours. The local Steam library is checked first.
 
-**3. ML-Powered FPS Prediction**
+**3. Frame-Rate Prediction**
 
-# Advanced Stacking Ensemble with GPU acceleration
-- Test Accuracy: 95.58 R² (improved with stacking ensemble)
-- Training Data: 1,848 verified benchmarks across 14 games
-- GPU Coverage: 44 NVIDIA cards (GTX 960 → RTX 5090)
-- Multi-resolution: 1080p, 1440p, 4K predictions
-- Advanced Features: Polynomial interactions, PassMark scores, VRAM ratios
-- GPU Training: XGBoost CUDA acceleration with device='cuda'
-- Ensemble Methods: RandomForest + GradientBoosting + ExtraTrees + Ridge
-- Meta-learner: BayesianRidge with statistical calibration
+# Steam sample, then a similar PC, then Unknown
+- Steam players: measured average ± one standard deviation, at least ±8%, when the cluster has 30 or more reports
+- Similar PC: per-game curve at 1080p, 1440p, or 4K, shown as ±20% and labeled native with ray tracing off
+- Unknown when the game is missing from both Steam and `data/training_benchmarks.json`
+- The display line names the resolution class when the monitor is heavier than that class
+- S-A-B-C-D-F tier stays the local weighted hardware score
 
 **4. MCP Server Implementation**
 # Model Context Protocol (MCP) server integration
-- Uses Gradio for both UI and MCP server
+- Uses Gradio for both UI and MCP server, bound to 127.0.0.1
 - Async function support for real-time analysis
 - Exposes game compatibility and hardware detection tools
 - G-Assist direct integration capability

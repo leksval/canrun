@@ -14,8 +14,11 @@ import platform
 
 # Platform detection
 IS_WINDOWS = platform.system() == "Windows"
-from canrun_engine import CanRunEngine
+from canrun_engine import CanRunEngine, sanitize_game_name
+from canrun_steam_fps import redact_secrets
 from plugin import CanRunGAssistPlugin
+
+LOCAL_ONLY_HOST = "127.0.0.1"
 
 # Configure logging
 logging.basicConfig(
@@ -32,13 +35,13 @@ def signal_handler(signum, frame):
 
 async def analyze_game(game_name):
     """Analyze game compatibility using the CanRun engine"""
+    game_name = sanitize_game_name(game_name or "")
     if not game_name:
         return "Please enter a game name to begin the analysis."
     
     try:
         plugin = CanRunGAssistPlugin()
         params = {"game_name": game_name, "force_refresh": True}
-        # Properly await the async method
         response = await plugin.check_game_compatibility(params)
         
         if response.get("success", False):
@@ -46,8 +49,8 @@ async def analyze_game(game_name):
         else:
             return response.get("message", "Could not analyze the game. Please check the game name and try again.")
     except Exception as e:
-        logger.error(f"Error analyzing game: {e}")
-        return f"An error occurred during analysis: {e}"
+        logger.error("Error analyzing game: %s", redact_secrets(e))
+        return "An error occurred during analysis. Details were written to the log."
 
 def detect_hardware():
     """Detect hardware specifications"""
@@ -60,8 +63,8 @@ def detect_hardware():
         else:
             return response.get("message", "Could not detect hardware specifications.")
     except Exception as e:
-        logger.error(f"Error detecting hardware: {e}")
-        return f"An error occurred during hardware detection: {e}"
+        logger.error("Error detecting hardware: %s", redact_secrets(e))
+        return "An error occurred during hardware detection. Details were written to the log."
 
 def get_logo_html():
     """Get HTML that displays the logo"""
@@ -158,7 +161,7 @@ def main():
     
     # Launch with auto port discovery
     launch_kwargs = {
-        "server_name": "0.0.0.0", 
+        "server_name": LOCAL_ONLY_HOST, 
         "share": False,
         "favicon_path": os.path.join(os.path.dirname(__file__), "logo.png"),
     }

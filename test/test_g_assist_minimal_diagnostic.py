@@ -9,7 +9,12 @@ import subprocess
 import sys
 import time
 import os
+import pytest
 from pathlib import Path
+
+pytestmark = pytest.mark.skip(
+    reason="Replaced by test_g_assist_communication.py, which speaks Protocol V2."
+)
 
 def test_minimal_response():
     """Test with the most minimal possible response that should work"""

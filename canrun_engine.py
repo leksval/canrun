@@ -4,6 +4,7 @@ Privacy-focused game compatibility analysis for NVIDIA RTX/GTX systems.
 Flattened structure with all dependencies bundled for PyInstaller compatibility.
 """
 
+import hashlib
 import logging
 import asyncio
 import json
@@ -19,6 +20,80 @@ from canrun_game_fetcher import CanRunGameFetcher, GameRequirements
 from canrun_game_matcher import CanRunGameMatcher
 from canrun_compatibility_analyzer import CanRunCompatibilityAnalyzer, CompatibilityAnalysis, ComponentAnalysis, ComponentType, CompatibilityLevel
 from canrun_ml_predictor import CanRunMLPredictor, PerformanceAssessment
+from canrun_steam_fps import SteamFpsClient
+
+MAX_GAME_NAME_LENGTH = 120
+MAX_CACHE_BYTES = 256 * 1024
+
+
+def sanitize_game_name(game_name: str) -> str:
+    """Drop control characters and cap length before the name is logged or fetched."""
+    if not isinstance(game_name, str):
+        game_name = str(game_name or "")
+    cleaned = "".join(ch for ch in game_name if ch.isprintable())
+    return " ".join(cleaned.split())[:MAX_GAME_NAME_LENGTH]
+
+
+def safe_cache_path(cache_dir: str, normalized_name: str) -> str:
+    """Build a cache file path that cannot leave cache_dir."""
+    slug = re.sub(r"[^a-z0-9]+", "-", (normalized_name or "").lower()).strip("-") or "game"
+    digest = hashlib.sha256((normalized_name or "").encode("utf-8")).hexdigest()[:12]
+    filename = f"{slug[:80]}-{digest}.json"
+    root = os.path.realpath(cache_dir)
+    path = os.path.realpath(os.path.join(root, filename))
+    if os.path.commonpath([root, path]) != root:
+        raise ValueError("cache path escaped the cache directory")
+    return path
+
+
+def cache_file_is_trusted(cache_dir: str, cache_file: str) -> bool:
+    """Reject symlinks, oversized files, and paths outside the cache directory."""
+    if os.path.islink(cache_file):
+        return False
+    root = os.path.realpath(cache_dir)
+    path = os.path.realpath(cache_file)
+    try:
+        if os.path.commonpath([root, path]) != root:
+            return False
+    except ValueError:
+        return False
+    if os.path.isfile(path) and os.path.getsize(path) > MAX_CACHE_BYTES:
+        return False
+    return True
+
+
+def _write_private_cache(path: str, payload: str) -> None:
+    """Write a cache file without following a symlink planted at that path."""
+    if os.path.islink(path):
+        raise OSError("refusing cache symlink")
+    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+    nofollow = getattr(os, "O_NOFOLLOW", 0)
+    try:
+        fd = os.open(path, flags | nofollow)
+    except OSError:
+        if os.path.islink(path):
+            raise
+        fd = os.open(path, flags)
+    with os.fdopen(fd, "w", encoding="utf-8") as handle:
+        handle.write(payload)
+
+
+def trusted_dataclass_kwargs(payload: Any, cls) -> Dict[str, Any]:
+    """Copy only fields the dataclass declares. Extra keys are dropped."""
+    if not isinstance(payload, dict):
+        raise ValueError("cache record is not an object")
+    from dataclasses import fields
+    allowed = {item.name for item in fields(cls)}
+    return {key: payload[key] for key in payload if key in allowed}
+
+
+def requirements_from_cache(payload: Any) -> GameRequirements:
+    """Build requirements from a cache object, dropping unknown keys and bad app ids."""
+    from canrun_steam_fps import valid_steam_app_id
+    picked = trusted_dataclass_kwargs(payload, GameRequirements)
+    if "steam_app_id" in picked:
+        picked["steam_app_id"] = valid_steam_app_id(str(picked["steam_app_id"]))
+    return GameRequirements(**picked)
 
 
 @dataclass
@@ -66,6 +141,7 @@ class CanRunEngine:
         self.game_matcher = CanRunGameMatcher()
         self.compatibility_analyzer = CanRunCompatibilityAnalyzer()
         self.ml_predictor = CanRunMLPredictor()
+        self.steam_fps = SteamFpsClient()
         
         # Create cache directory
         os.makedirs(cache_dir, exist_ok=True)
@@ -86,20 +162,24 @@ class CanRunEngine:
         Returns:
             Complete CanRun analysis result
         """
-        assert game_name and isinstance(game_name, str), "Game name must be a non-empty string"
-        assert isinstance(use_cache, bool), "Cache flag must be boolean"
-        
-        game_name = game_name.strip()
+        if not isinstance(game_name, str):
+            raise ValueError("Game name must be a non-empty string")
+        if not isinstance(use_cache, bool):
+            raise ValueError("Cache flag must be boolean")
+
+        game_name = sanitize_game_name(game_name)
+        if not game_name:
+            raise ValueError("Game name must be a non-empty string")
         start_time = datetime.now()
         
         self.logger.info(f"Starting G-Assist compatibility check for: {game_name}")
 
         # Check cache first
         if use_cache:
-            normalized_name = self.game_matcher.normalize_game_name(game_name)
-            cache_file = os.path.join(self.cache_dir, f"{normalized_name}.json")
+            cache_file = self._cache_file_for(game_name)
             cached_result = self._load_cache_file(cache_file)
-            if cached_result:
+            cached_fps = getattr(getattr(cached_result, "performance_prediction", None), "expected_fps", 0) or 0
+            if cached_result and cached_fps > 0:
                 self.logger.info(f"Returning cached result for '{game_name}'")
                 return cached_result
 
@@ -116,7 +196,7 @@ class CanRunEngine:
             game_name, hardware_specs, game_requirements
         )
         
-        # Predict performance using ML model
+        # FPS comes from Steam frame-rate stats for this app and PC.
         display_resolution = self._get_display_resolution(hardware_specs)
         detected_resolution_class = self._classify_resolution(display_resolution)
         
@@ -138,12 +218,25 @@ class CanRunEngine:
             "minimum_cpu": game_requirements.minimum_cpu,
             "recommended_cpu": game_requirements.recommended_cpu,
             "minimum_ram_gb": game_requirements.minimum_ram_gb,
-            "recommended_ram_gb": game_requirements.recommended_ram_gb
+            "recommended_ram_gb": game_requirements.recommended_ram_gb,
+            "steam_app_id": getattr(game_requirements, "steam_app_id", ""),
+            "resolution": detected_resolution_class,
         }
-        
-        performance_prediction = await asyncio.get_event_loop().run_in_executor(
-            None, self.ml_predictor.assess_performance, hardware_dict, game_requirements_dict
+
+        steam_estimate = await self.steam_fps.estimate(
+            appid=getattr(game_requirements, "steam_app_id", ""),
+            gpu_model=hardware_specs.gpu_model,
+            cpu_model=hardware_specs.cpu_model,
+            game_name=game_requirements.game_name,
+            resolution=detected_resolution_class,
         )
+        
+        def _assess():
+            return self.ml_predictor.assess_performance(
+                hardware_dict, game_requirements_dict, steam_estimate
+            )
+
+        performance_prediction = await asyncio.get_event_loop().run_in_executor(None, _assess)
         
         # Calculate analysis time
         analysis_time = int((datetime.now() - start_time).total_seconds() * 1000)
@@ -174,8 +267,10 @@ class CanRunEngine:
     
     async def batch_check_games(self, game_names: List[str], use_cache: bool = True) -> List[CanRunResult]:
         """Check compatibility for multiple games."""
-        assert isinstance(game_names, list), "Game names must be a list"
-        assert all(isinstance(name, str) for name in game_names), "All game names must be strings"
+        if not isinstance(game_names, list) or not all(isinstance(name, str) for name in game_names):
+            raise ValueError("Game names must be a list of strings")
+        if len(game_names) > 20:
+            raise ValueError("Too many games in one batch")
         
         results = []
         for game_name in game_names:
@@ -189,16 +284,16 @@ class CanRunEngine:
         return results
     
     def clear_cache(self) -> None:
-        """Clear all cached results."""
-        cache_files = [f for f in os.listdir(self.cache_dir) if f.endswith('.json')]
+        """Clear cached results that stay inside the cache directory."""
+        cache_files = self._listed_cache_files()
         for cache_file in cache_files:
-            os.remove(os.path.join(self.cache_dir, cache_file))
+            os.remove(cache_file)
         self.logger.info(f"Cleared {len(cache_files)} cache files")
     
     def get_cache_stats(self) -> Dict[str, int]:
         """Get cache statistics."""
-        cache_files = [f for f in os.listdir(self.cache_dir) if f.endswith('.json')]
-        total_size = sum(os.path.getsize(os.path.join(self.cache_dir, f)) for f in cache_files)
+        cache_files = self._listed_cache_files()
+        total_size = sum(os.path.getsize(path) for path in cache_files)
         
         return {
             'total_files': len(cache_files),
@@ -288,17 +383,49 @@ class CanRunEngine:
         # Use the hardware detector's resolution tier classification
         return self.hardware_detector.get_resolution_tier(width, height)
     
+    def _listed_cache_files(self) -> List[str]:
+        root = os.path.realpath(self.cache_dir)
+        if not os.path.isdir(root):
+            return []
+        paths = []
+        for name in os.listdir(root):
+            if not name.endswith(".json"):
+                continue
+            candidate = os.path.join(root, name)
+            if os.path.islink(candidate):
+                continue
+            path = os.path.realpath(candidate)
+            try:
+                if os.path.commonpath([root, path]) != root:
+                    continue
+            except ValueError:
+                continue
+            if os.path.isfile(path):
+                paths.append(path)
+        return paths
+
     def _load_cache_file(self, cache_file: str) -> Optional[CanRunResult]:
         """Load and validate a single cache file."""
-        if not os.path.isfile(cache_file):
+        if not cache_file_is_trusted(self.cache_dir, cache_file):
+            self.logger.warning("Refusing untrusted cache file")
+            return None
+        root = os.path.realpath(self.cache_dir)
+        path = os.path.realpath(cache_file)
+        try:
+            if os.path.commonpath([root, path]) != root:
+                self.logger.warning("Refusing cache path outside the cache directory")
+                return None
+        except ValueError:
+            return None
+        if not os.path.isfile(path):
             return None
         
         try:
-            mtime = os.path.getmtime(cache_file)
+            mtime = os.path.getmtime(path)
             if (datetime.now().timestamp() - mtime) > self.cache_duration.total_seconds():
                 return None
 
-            with open(cache_file, "r", encoding="utf-8") as f:
+            with open(path, "r", encoding="utf-8") as f:
                 data = json.load(f)
             
             return self._reconstruct_canrun_result(data)
@@ -309,48 +436,58 @@ class CanRunEngine:
     def _reconstruct_canrun_result(self, data: Dict[str, Any]) -> CanRunResult:
         """Reconstruct CanRunResult from dictionary data."""
         # Reconstruct nested dataclasses
-        hardware_specs = HardwareSpecs(**data['hardware_specs'])
-        game_requirements = GameRequirements(**data['game_requirements'])
+        hardware_specs = HardwareSpecs(**trusted_dataclass_kwargs(data.get("hardware_specs"), HardwareSpecs))
+        game_requirements = requirements_from_cache(data.get("game_requirements"))
         
         # Properly reconstruct CompatibilityAnalysis with ComponentAnalysis objects
         compat_data = data['compatibility_analysis']
         
         # Convert component_analyses from dicts to ComponentAnalysis objects
         component_analyses = []
-        if 'component_analyses' in compat_data:
-            for comp_dict in compat_data['component_analyses']:
-                # Convert component enum from string back to ComponentType
-                if isinstance(comp_dict.get('component'), str):
-                    comp_dict['component'] = ComponentType(comp_dict['component'])
-                component_analyses.append(ComponentAnalysis(**comp_dict))
+        raw_components = compat_data.get("component_analyses") or []
+        if not isinstance(raw_components, list) or len(raw_components) > 20:
+            raise ValueError("cache record has too many component rows")
+        for comp_dict in raw_components:
+            if not isinstance(comp_dict, dict):
+                raise ValueError("cache component row is not an object")
+            if isinstance(comp_dict.get("component"), str):
+                comp_dict["component"] = ComponentType(comp_dict["component"])
+            component_analyses.append(ComponentAnalysis(**trusted_dataclass_kwargs(comp_dict, ComponentAnalysis)))
         
-        # Convert bottlenecks from strings back to ComponentType enums
         bottlenecks = []
-        if 'bottlenecks' in compat_data:
-            for bottleneck in compat_data['bottlenecks']:
-                if isinstance(bottleneck, str):
-                    bottlenecks.append(ComponentType(bottleneck))
-                else:
-                    bottlenecks.append(bottleneck)
+        raw_bottlenecks = compat_data.get("bottlenecks") or []
+        if not isinstance(raw_bottlenecks, list) or len(raw_bottlenecks) > 20:
+            raise ValueError("cache record has too many bottlenecks")
+        for bottleneck in raw_bottlenecks:
+            if isinstance(bottleneck, str):
+                bottlenecks.append(ComponentType(bottleneck))
+            elif isinstance(bottleneck, ComponentType):
+                bottlenecks.append(bottleneck)
+            else:
+                raise ValueError("cache bottleneck is not a component name")
         
-        # Convert overall_compatibility from string back to CompatibilityLevel enum
-        overall_compatibility = compat_data['overall_compatibility']
+        overall_compatibility = compat_data["overall_compatibility"]
         if isinstance(overall_compatibility, str):
             overall_compatibility = CompatibilityLevel(overall_compatibility)
+        recommendations = compat_data.get("recommendations") or []
+        if not isinstance(recommendations, list) or len(recommendations) > 20:
+            raise ValueError("cache record has too many recommendations")
         
         compatibility_analysis = CompatibilityAnalysis(
-            game_name=compat_data['game_name'],
+            game_name=str(compat_data["game_name"])[:MAX_GAME_NAME_LENGTH],
             overall_compatibility=overall_compatibility,
-            can_run_minimum=compat_data['can_run_minimum'],
-            can_run_recommended=compat_data['can_run_recommended'],
+            can_run_minimum=bool(compat_data["can_run_minimum"]),
+            can_run_recommended=bool(compat_data["can_run_recommended"]),
             component_analyses=component_analyses,
             bottlenecks=bottlenecks,
-            overall_score=compat_data['overall_score'],
-            summary=compat_data['summary'],
-            recommendations=compat_data['recommendations']
+            overall_score=compat_data["overall_score"],
+            summary=str(compat_data.get("summary") or "")[:500],
+            recommendations=[str(item)[:300] for item in recommendations]
         )
         
-        performance_prediction = PerformanceAssessment(**data['performance_prediction'])
+        performance_prediction = PerformanceAssessment(
+            **trusted_dataclass_kwargs(data.get("performance_prediction"), PerformanceAssessment)
+        )
         
         return CanRunResult(
             game_name=data['game_name'],
@@ -364,19 +501,25 @@ class CanRunEngine:
             analysis_time_ms=data.get('analysis_time_ms', 0)
         )
     
+    def _cache_file_for(self, game_name: str) -> str:
+        normalized_name = self.game_matcher.normalize_game_name(game_name)
+        return safe_cache_path(self.cache_dir, normalized_name)
+
     def _save_cached_result(self, game_name: str, result: CanRunResult) -> None:
         """Save analysis result to cache."""
         normalized_name = self.game_matcher.normalize_game_name(game_name)
-        cache_file = os.path.join(self.cache_dir, f"{normalized_name}.json")
+        cache_file = safe_cache_path(self.cache_dir, normalized_name)
         
+        if not cache_file_is_trusted(self.cache_dir, cache_file):
+            self.logger.warning("Refusing to write an untrusted cache path")
+            return
         os.makedirs(self.cache_dir, exist_ok=True)
         
         try:
             result_dict = asdict(result)
             result_dict['game_name'] = normalized_name
-            
-            with open(cache_file, "w", encoding="utf-8") as f:
-                json.dump(result_dict, f, indent=2, default=str)
+            payload = json.dumps(result_dict, indent=2, default=str)
+            _write_private_cache(cache_file, payload)
                 
             self.logger.debug(f"Cached result for '{game_name}' as '{normalized_name}'")
         except Exception as e:
