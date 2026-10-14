@@ -131,9 +131,25 @@ env.bak/
 venv.bak/
 canrun-env/
 
-# Data directory (ignored to avoid Steam store / benchmark data copyright issues)
+# Proprietary, harvested, and generated data (Steam store pages, FPS
+# telemetry, training datasets, compiled models). Never commit these:
+# they include third-party Steam / SteamSpy / PassMark content.
 data/
+**/data/
 canrun/data/
+cache/
+**/cache/
+*.harvest.json
+steam_api_harvest.json
+clean_training_dataset.json
+model_evaluation_report.json
+ml_fps_model_unified.json
+training_benchmarks.json
+game_requirements.json
+steam_hardware_clusters.json
+legacy_v8_snapshot.json
+scripts/ds_pipeline/*.json
+scripts/ds_pipeline/legacy_v8_snapshot.json
 
 # Spyder project settings
 .spyderproject
