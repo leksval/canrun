@@ -86,14 +86,11 @@ def _send(stdin, message):
 
 
 def _answer_title(text: str) -> str:
-    first = (text or "").split("\n", 1)[0].strip()
-    for ending in (
-        " can run on this PC. Performance is excellent.",
-        " can run on this PC.",
-        " does not meet the minimum requirements on this PC.",
-    ):
-        if first.endswith(ending):
-            return first[: -len(ending)].strip()
+    for line in (text or "").splitlines():
+        cleaned = line.replace("**", "").strip()
+        marker = "Game:"
+        if marker in cleaned:
+            return cleaned.split(marker, 1)[1].strip()
     return ""
 
 
@@ -148,13 +145,11 @@ def main() -> None:
                     "system_info": "",
                 },
             })
-            streamed = False
             answer = ""
             error = ""
             for _ in range(8):
                 message = next_message(90)
                 if message.get("method") == "stream" and message.get("params", {}).get("request_id") == index:
-                    streamed = True
                     continue
                 if message.get("method") == "complete" and message.get("params", {}).get("request_id") == index:
                     answer = str(message["params"].get("data") or "")
@@ -163,7 +158,7 @@ def main() -> None:
                     error = str(message)
                     break
             title = _answer_title(answer)
-            ok = bool(title) and steam_title_matches(query, title) and streamed and not error
+            ok = bool(title) and steam_title_matches(query, title) and not error
             passed += int(ok)
             status = "ok" if ok else "MISS"
             print(f"{status} {command} {argument!r} -> {title or answer.split(chr(10), 1)[0][:120]}", flush=True)

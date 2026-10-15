@@ -6,17 +6,16 @@ NVIDIA G-Assist plugin for game compatibility checking.
 Speaks Protocol V2 (JSON-RPC 2.0) through gassist_sdk 3.1.0, and keeps a CLI for testing.
 """
 
+import argparse
+import asyncio
 import json
 import logging
 import os
-import asyncio
-import sys
-import argparse
 import re
+import sys
 import threading
 import time
 import traceback
-from typing import Optional
 
 _PLUGIN_DIR = os.path.dirname(os.path.abspath(__file__))
 _LIBS_PATH = os.path.join(_PLUGIN_DIR, "libs")
@@ -33,20 +32,26 @@ if _USER_VENDOR and os.path.isdir(_USER_VENDOR) and _USER_VENDOR not in sys.path
     sys.path.insert(0, _USER_VENDOR)
 
 # Data Types
-type Response = dict[bool, Optional[str]]
+type Response = dict[str, bool | str | None]
 
 LOG_FILE = os.path.join(os.environ.get("USERPROFILE", "."), 'canrun_plugin.log')
 logging.basicConfig(filename=LOG_FILE, level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-from gassist_sdk import Plugin
-from gassist_sdk.types import Context, SystemInfo, ErrorCode, JsonRpcResponse
+# Imported after sys.path includes this plugin and libs/.
+from gassist_sdk import Plugin  # noqa: E402
+from gassist_sdk.types import (  # noqa: E402
+    Context,
+    ErrorCode,
+    JsonRpcResponse,
+    SystemInfo,
+)
 
 # Import CanRun components - flat structure for G-Assist compliance
 try:
     from canrun_engine import CanRunEngine
     CANRUN_AVAILABLE = True
 except Exception as e:
-    logging.warning(f"CanRun engine not available: {e}")
+    logging.warning('CanRun engine not available: %s', e)
     CANRUN_AVAILABLE = False
 
 # Import G-Assist response fixer
@@ -56,7 +61,7 @@ try:
     )
     RESPONSE_FIXER_AVAILABLE = True
 except ImportError as e:
-    logging.warning(f"G-Assist response fixer not available: {e}")
+    logging.warning('G-Assist response fixer not available: %s', e)
     RESPONSE_FIXER_AVAILABLE = False
 
 # Fake game name used by the Protocol V2 subprocess test. Honored only when
@@ -71,29 +76,27 @@ def protocol_probe_requested(game_name: str) -> bool:
         and str(game_name or "").strip() == PROTOCOL_PROBE_GAME
     )
 
-def generate_failure_response(message: str = None) -> Response:
+def generate_failure_response(message: str | None = None) -> Response:
     """Generates a response indicating failure - G-ASSIST SAFE VERSION."""
     if RESPONSE_FIXER_AVAILABLE:
         return create_safe_g_assist_response(False, message)
-    else:
-        response = {'success': False}
-        if message:
-            # Basic ASCII cleaning fallback
-            clean_msg = ''.join(char for char in str(message) if ord(char) < 128)
-            response['message'] = clean_msg[:500]  # Limit length
-        return response
+    response = {'success': False}
+    if message:
+        # Basic ASCII cleaning fallback
+        clean_msg = ''.join(char for char in str(message) if ord(char) < 128)
+        response['message'] = clean_msg[:500]  # Limit length
+    return response
 
-def generate_success_response(message: str = None) -> Response:
+def generate_success_response(message: str | None = None) -> Response:
     """Generates a response indicating success - G-ASSIST SAFE VERSION."""
     if RESPONSE_FIXER_AVAILABLE:
         return create_safe_g_assist_response(True, message)
-    else:
-        response = {'success': True}
-        if message:
-            # Basic ASCII cleaning fallback
-            clean_msg = ''.join(char for char in str(message) if ord(char) < 128)
-            response['message'] = clean_msg[:500]  # Limit length
-        return response
+    response = {'success': True}
+    if message:
+        # Basic ASCII cleaning fallback
+        clean_msg = ''.join(char for char in str(message) if ord(char) < 128)
+        response['message'] = clean_msg[:500]  # Limit length
+    return response
 
 # Initialize CanRun engine globally
 canrun_engine = None
@@ -110,37 +113,44 @@ def initialize_canrun_engine():
             logging.info("CanRun engine initialized with complete feature set")
             return True
         except Exception as e:
-            logging.error(f"Failed to initialize CanRun engine: {e}")
+            logging.error('Failed to initialize CanRun engine: %s', e)
             canrun_engine = None
             return False
     return canrun_engine is not None
 
-async def execute_canrun_command(params: dict = None, context: dict = None, system_info: dict = None) -> dict:
-    """Command handler for canrun function - game compatibility analysis."""
+async def execute_canrun_command(
+    params: dict | None = None,
+    context: dict | None = None,  # noqa: ARG001
+    system_info: dict | None = None,  # noqa: ARG001
+) -> dict:
+    """Command handler for canrun function - game compatibility analysis.
+
+    context and system_info stay in the signature for G-Assist command callers.
+    """
     if not canrun_engine:
         return generate_failure_response("CanRun engine not available")
-    
+
     if not params:
         return generate_failure_response("Game name is required for CanRun analysis")
-    
+
     game_name = extract_game_name(params.get("game_name", ""))
     if not game_name:
         return generate_failure_response("Game name is required for CanRun analysis")
-    
+
     force_refresh = params.get("force_refresh", False)
     if isinstance(force_refresh, str):
         force_refresh = force_refresh.lower() == "true"
-    
-    logging.info(f"Starting CanRun analysis for: {game_name} (force_refresh: {force_refresh})")
-    
+
+    logging.info('Starting CanRun analysis for: %s (force_refresh: %s)', game_name, force_refresh)
+
     try:
         result = await canrun_engine.check_game_compatibility(game_name, use_cache=not force_refresh)
-        
+
         if result:
             formatted_result = format_canrun_response(result)
             return generate_success_response(formatted_result)
         return generate_success_response(_missing_game_reply(game_name))
-            
+
     except Exception as e:
         if "Requirements not found" in str(e):
             logging.info("No Steam requirements for %s", game_name)
@@ -166,21 +176,23 @@ def format_canrun_response(result):
         score = int(result.performance_prediction.score) if hasattr(result.performance_prediction, 'score') else 0
         can_run = result.can_run_game()
         exceeds_recommended = result.exceeds_recommended_requirements()
-        
+
         # Get game name
         original_query = result.game_name
         steam_api_name = result.game_requirements.steam_api_name if hasattr(result.game_requirements, 'steam_api_name') and result.game_requirements.steam_api_name else result.game_requirements.game_name
-        
+
         # Get performance details with ranges
         fps_min = getattr(result.performance_prediction, 'fps_min', None)
         fps_max = getattr(result.performance_prediction, 'fps_max', None)
         expected_fps = getattr(result.performance_prediction, 'expected_fps', None)
-        
+
         fps_source = getattr(result.performance_prediction, 'fps_source', '') or ''
         if fps_source == 'steam':
             source_note = " (Steam players)"
         elif fps_source == 'steam_similar':
             source_note = " (estimated from a similar PC, native, ray tracing off)"
+        elif fps_source == 'steam_scaled':
+            source_note = " (scaled from Steam players on a similar GPU, mixed settings)"
         elif fps_source == 'requirements':
             source_note = " (estimated from the recommended GPU for this resolution, ray tracing off)"
         elif fps_source == 'requirements_minimum':
@@ -190,43 +202,45 @@ def format_canrun_response(result):
         else:
             source_note = ""
 
-        # Display FPS as range if available, otherwise single value or unknown
+        refresh_hz = int(getattr(result.hardware_specs, "primary_monitor_refresh_hz", 0) or 0)
+        # Display FPS as range if available, otherwise single value or unknown.
+        # The high end stops at this screen's refresh rate.
         if fps_min and fps_max and fps_min != fps_max:
-            fps = f"{fps_min}-{fps_max} FPS{source_note}"
+            fps = _fps_range_text(int(fps_min), int(fps_max), refresh_hz, source_note)
             fps_line = f"**FPS:** {fps}"
         elif expected_fps and isinstance(expected_fps, (int, float)) and expected_fps > 0:
-            fps = f"~{int(expected_fps)} FPS{source_note}"
+            fps = _fps_range_text(int(expected_fps), int(expected_fps), refresh_hz, source_note)
             fps_line = f"**FPS:** {fps}"
         else:
             fps = "Unknown"
             fps_line = "FPS: **Unknown**. Steam has no player sample for this PC, and this game is not in the measured table."
-            
+
         settings = getattr(result.performance_prediction, 'recommended_settings', 'Unknown')
         recommended_resolution = getattr(result.performance_prediction, 'recommended_resolution', 'Unknown')
-        
+        from canrun_steam_fps import graphics_feature_lines
+        feature_lines = graphics_feature_lines(
+            fps_source,
+            int(expected_fps or 0),
+            int(fps_min or 0),
+            int(fps_max or 0),
+            getattr(result, "detected_resolution_class", "") or "",
+            getattr(result.hardware_specs, "gpu_model", "") or "",
+            int(getattr(result.hardware_specs, "gpu_vram_gb", 0) or 0),
+            bool(getattr(result.hardware_specs, "supports_dlss", False)),
+            bool(getattr(result.hardware_specs, "supports_rtx", False)),
+            steam_api_name or result.game_name,
+            refresh_hz,
+        )
+        feature_block = "".join(f"\n• {line}" for line in feature_lines)
+
         # Get actual resolution from hardware specs
         actual_resolution = result.hardware_specs.primary_monitor_resolution
         display_note = _heavier_display_note(
             actual_resolution,
             getattr(result, "detected_resolution_class", ""),
         )
-        
-        if can_run and exceeds_recommended:
-            verdict = f"{steam_api_name} can run on this PC. Performance is excellent."
-        elif can_run:
-            verdict = f"{steam_api_name} can run on this PC."
-        else:
-            verdict = f"{steam_api_name} does not meet the minimum requirements on this PC."
 
-        # The notice is first so the estimate is not read as a promise.
-        # The following lines are plain text. G-Assist shows them in the reasoning output,
-        # and an unclosed bold marker there was being cut off as "output: comp...".
-        message = f"""{_ESTIMATE_NOTICE}
-
-{verdict}
-Score: {tier} tier, {score}/100. {fps_line.replace('**', '')}
-
-🎮 **Game:** {steam_api_name}
+        message = f"""🎮 **Game:** {steam_api_name}
 
 💻 **YOUR SYSTEM**
 • **GPU:** {result.hardware_specs.gpu_model} ({result.hardware_specs.gpu_vram_gb}GB)
@@ -235,7 +249,7 @@ Score: {tier} tier, {score}/100. {fps_line.replace('**', '')}
 • **Display:** {actual_resolution} @ {result.hardware_specs.primary_monitor_refresh_hz}Hz{display_note}
 
 🎯 **GAME REQUIREMENTS**"""
-        
+
         if exceeds_recommended:
             # System exceeds recommended - only show recommended requirements
             message += f"""
@@ -264,28 +278,28 @@ Score: {tier} tier, {score}/100. {fps_line.replace('**', '')}
 • **CPU:** {result.game_requirements.recommended_cpu}"""
             message += f"""
 • **RAM:** {result.game_requirements.recommended_ram_gb}GB"""
-        
+
         # 3. EXPECTED PERFORMANCE
         message += f"""
 
 ⚡ **PERFORMANCE**
-• {fps_line}
+• {fps_line}{feature_block}
 • **Settings:** {settings}
 • **Resolution:** {recommended_resolution}
 • **Score:** {tier} Tier ({score}/100)
 
 🔧 **OPTIMIZE**"""
-        
+
         if hasattr(result.performance_prediction, 'upgrade_suggestions') and result.performance_prediction.upgrade_suggestions:
             for suggestion in result.performance_prediction.upgrade_suggestions[:2]:
                 message += f"""
 • {suggestion}"""
         else:
             if can_run:
-                if result.hardware_specs.supports_dlss:
+                if not feature_lines and result.hardware_specs.supports_dlss:
                     message += """
 • Enable DLSS Quality mode for higher framerates"""
-                if result.hardware_specs.supports_rtx:
+                if not feature_lines and result.hardware_specs.supports_rtx:
                     message += """
 • Enable RTX ray tracing for enhanced visual quality"""
                 message += """
@@ -294,13 +308,13 @@ Score: {tier} tier, {score}/100. {fps_line.replace('**', '')}
                 message += """
 • Upgrade GPU to meet minimum requirements
 • Check RAM meets minimum requirements"""
-        
+
         # Add note if different game was found
         if steam_api_name.lower() != original_query.lower():
             message += f"""
 
 📝 Note: Showing results for {steam_api_name}"""
-        
+
         # 5. VERDICT - At bottom for visibility when scrolling!
         message += """
 
@@ -311,11 +325,12 @@ Score: {tier} tier, {score}/100. {fps_line.replace('**', '')}
             message += "🎯 **VERDICT:** CAN RUN"
         else:
             message += "🎯 **VERDICT:** CANNOT RUN"
-        
+
+        message += f"\n\n{_ESTIMATE_NOTICE}"
         return message.strip()
-        
+
     except Exception as e:
-        logging.error(f"Error formatting CanRun response: {e}")
+        logging.error('Error formatting CanRun response: %s', e)
         return f"""🎮 CANRUN ANALYSIS: {getattr(result, 'game_name', 'Unknown Game')}
 
 ✅ Analysis completed but formatting error occurred.
@@ -408,6 +423,21 @@ def collect_hardware_report() -> dict:
     return generate_success_response(format_hardware_report(hw_specs))
 
 
+def _fps_range_text(fps_min: int, fps_max: int, refresh_hz: int, source_note: str) -> str:
+    """Cap the shown maximum at this monitor. Say what a faster screen could show."""
+    note = source_note or ""
+    if refresh_hz > 0 and fps_max > refresh_hz:
+        if fps_min >= refresh_hz:
+            shown = f"{refresh_hz} FPS on this {refresh_hz} Hz screen{note}"
+        else:
+            shown = f"{fps_min}-{refresh_hz} FPS on this {refresh_hz} Hz screen{note}"
+        uncapped = f"{fps_min}-{fps_max}" if fps_min != fps_max else str(fps_max)
+        return f"{shown}. On a faster monitor, about {uncapped}."
+    if fps_min != fps_max:
+        return f"{fps_min}-{fps_max} FPS{note}"
+    return f"~{fps_min} FPS{note}"
+
+
 def _heavier_display_note(resolution: str, resolution_class: str) -> str:
     """Say when the FPS class is lighter than the monitor, so the range is not read as exact."""
     match = re.match(r"(\d+)\s*x\s*(\d+)", str(resolution or ""), re.IGNORECASE)
@@ -449,7 +479,9 @@ def extract_game_name(user_input: str) -> str:
             if lowered.startswith(prefix):
                 game_name = game_name[len(prefix):].strip()
                 break
-    return game_name.rstrip("?").strip(" .")
+    from canrun_game_fetcher import prefer_default_title
+
+    return prefer_default_title(game_name.rstrip("?").strip(" ."))
 
 
 def execute_initialize_command() -> dict:
@@ -458,8 +490,7 @@ def execute_initialize_command() -> dict:
     success = initialize_canrun_engine()
     if success:
         return generate_success_response('CanRun plugin initialized successfully')
-    else:
-        return generate_failure_response('Failed to initialize CanRun engine')
+    return generate_failure_response('Failed to initialize CanRun engine')
 
 def execute_shutdown_command() -> dict:
     """Command handler for shutdown function."""
@@ -475,7 +506,7 @@ def cli_mode():
         is_pyinstaller_arg = any(arg.startswith(pattern) for pattern in pyinstaller_patterns)
         if not is_pyinstaller_arg:
             filtered_argv.append(arg)
-    
+
     parser = argparse.ArgumentParser(description='CanRun Plugin CLI Mode')
     parser.add_argument('command', choices=['canrun', 'detect_hardware', 'initialize', 'shutdown'],
                         help='Command to execute')
@@ -485,9 +516,9 @@ def cli_mode():
                         help='Force refresh game data from Steam API')
     parser.add_argument('--json', action='store_true',
                         help='Output in JSON format')
-    
+
     args = parser.parse_args(filtered_argv)
-    
+
     # Initialize the engine
     if not initialize_canrun_engine():
         result = generate_failure_response("Failed to initialize CanRun engine")
@@ -496,7 +527,7 @@ def cli_mode():
         else:
             print(f"Error: {result['message']}")
         return 1
-    
+
     # Execute the command
     if args.command == 'initialize':
         result = execute_initialize_command()
@@ -512,7 +543,7 @@ def cli_mode():
             result = _run_async(execute_canrun_command(params))
     else:
         result = generate_failure_response(f"Unknown command: {args.command}")
-    
+
     # Output the result
     if args.json:
         print(json.dumps(result, indent=2))
@@ -521,13 +552,13 @@ def cli_mode():
             print(result.get('message', 'Command executed successfully'))
         else:
             print(f"Error: {result.get('message', 'Command failed')}")
-    
+
     return 0 if result.get('success') else 1
 
 class CanRunPlugin(Plugin):
     """Protocol V2 plugin. Command work runs off the reader thread so pings still get answers."""
 
-    def __init__(self, name: str, version: str = "10.0", description: str = ""):
+    def __init__(self, name: str, version: str = "12.0.0", description: str = ""):
         import signal
         previous_int = signal.getsignal(signal.SIGINT)
         previous_term = signal.getsignal(signal.SIGTERM)
@@ -551,7 +582,7 @@ class CanRunPlugin(Plugin):
         context_data = params.get("context") or []
         system_info_data = params.get("system_info") or ""
 
-        logging.info(f"Executing command: {function_name}")
+        logging.info('Executing command: %s', function_name)
 
         cmd = self._commands.get(function_name)
         if cmd is None:
@@ -588,7 +619,7 @@ class CanRunPlugin(Plugin):
                 result = self._call_handler(cmd.handler, arguments, context, system_info)
                 self._send_complete(request.id, True, result, self._keep_session)
             except Exception as exc:
-                logging.error(f"Command execution error: {exc}\n{traceback.format_exc()}")
+                logging.error('Command execution error: %s\n%s', exc, traceback.format_exc())
                 self._send_error(request.id, ErrorCode.PLUGIN_ERROR, str(exc))
             finally:
                 self._current_request_id = None
@@ -608,8 +639,6 @@ def check_compatibility(game_name: str = "", force_refresh: bool = False) -> str
     """Complete CanRun analysis for a game name."""
     raw_name = str(game_name or "").strip()
     name = extract_game_name(raw_name)
-    label = name or "this game"
-    get_plugin().stream(f"Checking Steam for {label}, then comparing it with this PC.")
     if protocol_probe_requested(raw_name) or protocol_probe_requested(name):
         time.sleep(1.0)
         return "protocol-probe-ok"
@@ -644,7 +673,7 @@ def get_plugin() -> CanRunPlugin:
     if _plugin is None:
         _plugin = CanRunPlugin(
             name="canrun",
-            version="10.0",
+            version="12.0.0",
             description="Says whether a Steam game can run on this PC and gives an FPS range when one is known.",
         )
         _plugin.command(
@@ -702,12 +731,12 @@ class CanRunGAssistPlugin:
         """Check game compatibility - wrapper for MCP server."""
         return await execute_canrun_command(params)
 
-    def detect_hardware(self, params: dict) -> dict:
-        """Detect hardware for the Gradio app."""
+    def detect_hardware(self, params: dict) -> dict:  # noqa: ARG002
+        """Detect hardware for the Gradio app. params is unused; the signature stays stable."""
         try:
             return collect_hardware_report()
         except Exception as e:
-            return generate_failure_response(f"Hardware detection error: {str(e)}")
+            return generate_failure_response(f"Hardware detection error: {e!s}")
 
 
 if __name__ == '__main__':

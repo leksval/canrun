@@ -337,6 +337,16 @@ def test_suggest_skips_a_wrong_first_hit():
     assert _app_id_from_search_body("dawnwalker", body) == "3751260"
 
 
+def test_bare_cyberpunk_selects_2077():
+    items = [
+        {"name": "Cyberpunk", "id": "1", "type": "app"},
+        {"name": "Cyberpunk 2077: Phantom Liberty", "id": "2138330", "type": "dlc"},
+        {"name": "Cyberpunk 2077", "id": "1091500", "type": "app"},
+    ]
+    assert matching_steam_result("cyberpunk", items) == "1091500"
+    assert matching_steam_result("Cyberpunk 2077", items) == "1091500"
+
+
 def test_suggest_prefers_the_closer_base_game():
     items = [
         {"name": "Dawnwalker", "id": "9", "type": "demo"},
@@ -483,7 +493,7 @@ def test_security_malformed_steam_payload_does_not_raise():
     assert buckets[0].report_count == 0
     assert buckets[0].stddev == 0.0
     estimate = resolve_fps("RTX 4070", "cpu", payload, api_available=True, cluster_map={"clusters": {}})
-    assert estimate.fps_source in {"steam", "steam_similar", "unknown"}
+    assert estimate.fps_source in {"steam", "steam_scaled", "unknown"}
 
 
 def test_security_protocol_probe_requires_explicit_env(monkeypatch):
@@ -502,6 +512,10 @@ def test_edge_extract_game_name():
     assert extract_game_name("Can I run Diablo IV?") == "Diablo IV"
     assert extract_game_name("can my pc run Hogwarts Legacy") == "Hogwarts Legacy"
     assert extract_game_name("") == ""
+    assert extract_game_name("can I run cyberpunk") == "Cyberpunk 2077"
+    assert extract_game_name("cyberpunk?") == "Cyberpunk 2077"
+    assert extract_game_name("Cyberpunk 2077") == "Cyberpunk 2077"
+    assert extract_game_name("cyberpunk phantom liberty") == "cyberpunk phantom liberty"
 
 
 def test_edge_fps_ranges_are_clamped_and_ordered():
@@ -566,8 +580,8 @@ def test_new_game_fps_scales_from_the_recommended_gpu():
     assert kept.fps_max == 120
     similar = scale_from_reference(100, 1, 10000, 10000, 1.0)
     assert similar.expected_fps == 100
-    assert similar.fps_min == 80
-    assert similar.fps_max == 120
+    assert similar.fps_min == 70
+    assert similar.fps_max == 130
 
 
 def test_edge_invalid_cpu_pattern_is_skipped():
@@ -648,7 +662,7 @@ def test_optimization_cached_fps_resolution_stays_fast():
 
 
 def _plugin_with_capture():
-    plugin = CanRunPlugin("canrun", version="10.0")
+    plugin = CanRunPlugin("canrun", version="12.0.0")
     sent = []
 
     class Protocol:

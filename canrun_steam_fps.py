@@ -21,23 +21,33 @@ import re
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import aiohttp
-
 
 logger = logging.getLogger(__name__)
 
 STATS_URL = "https://api.steampowered.com/IGamePerformanceStatsService/GetGameFrameRateStats/v1/"
-MIN_REPORTS = 30
+MIN_REPORTS = 10
 STEAM_MIN_RELATIVE_SPREAD = 0.08
-SIMILAR_RELATIVE_SPREAD = 0.20
+# Range half-widths that held about 90% of held-out rows in
+# data/training_benchmarks.json, one per kind of estimate.
+CURVE_RELATIVE_SPREAD = {"1080p": 0.20, "1440p": 0.20, "4K": 0.25}
+SCALED_RELATIVE_SPREAD = 0.30
+# Store-spec estimates blend the v9 model (unseen-game 80% band is about
+# ±4.5% / ±5.5% / ±6%) with the older spec heuristic. The shown range stays
+# wider than that synthetic band and wider than Steam's ±8% player floor,
+# because settings and scene noise are not in the training loss. It is
+# narrower than the old ±35/40/50 heuristic-only floor.
+REQUIREMENTS_RELATIVE_SPREAD = {"1080p": 0.20, "1440p": 0.22, "4K": 0.25}
 FPS_FLOOR = 1
 FPS_CEILING = 1000
 PASSMARK_BAND = (0.5, 1.5)
 
 SOURCE_STEAM = "steam"
 SOURCE_SIMILAR = "steam_similar"
+# Another GPU's Steam players, scaled by PassMark. Their settings are mixed.
+SOURCE_SCALED = "steam_scaled"
 SOURCE_REQUIREMENTS = "requirements"
 SOURCE_REQUIREMENTS_MINIMUM = "requirements_minimum"
 SOURCE_REQUIREMENTS_UNSPECIFIED = "requirements_unspecified"
@@ -155,7 +165,7 @@ def measured_range(mean_fps: float, stddev: float) -> FpsEstimate:
     return _spread_band(mean_fps, spread)
 
 
-def cpu_bottleneck_factor(cpu_passmark: Optional[int]) -> float:
+def cpu_bottleneck_factor(cpu_passmark: int | None) -> float:
     """Same CPU factor the formula predictor uses for a weak CPU."""
     if cpu_passmark is None:
         return 1.0
@@ -168,18 +178,23 @@ def cpu_bottleneck_factor(cpu_passmark: Optional[int]) -> float:
 
 def scale_from_reference(
     mean_fps: float,
-    stddev: float,
+    stddev: float,  # noqa: ARG001
     user_passmark: int,
     reference_passmark: int,
     cpu_factor: float,
+    spread: float = SCALED_RELATIVE_SPREAD,
 ) -> FpsEstimate:
-    """Scale a measured game result by relative GPU strength, then CPU factor."""
+    """Scale a measured game result by relative GPU strength, then CPU factor.
+
+    Callers pass the measured stddev. The band is a relative spread instead,
+    because the PassMark step adds more error than the player spread.
+    """
     if reference_passmark <= 0:
         return unknown_estimate()
     multiplier = ((user_passmark / reference_passmark) ** 0.85) * cpu_factor
     scaled = mean_fps * multiplier
-    estimate = _spread_band(scaled, abs(scaled) * SIMILAR_RELATIVE_SPREAD)
-    estimate.fps_source = SOURCE_SIMILAR
+    estimate = _spread_band(scaled, abs(scaled) * spread)
+    estimate.fps_source = SOURCE_SCALED
     return estimate
 
 
@@ -197,36 +212,54 @@ def _data_file(filename: str) -> Path:
     return here / "data" / filename
 
 
-def _config_files() -> List[Path]:
+def _env_files() -> list[Path]:
     here = Path(__file__).parent
     return [
-        here / "config.json",
-        here.parent / "config.json",
-        Path.cwd() / "config.json",
-        Path.cwd() / "canrun" / "config.json",
+        here / ".env",
+        here.parent / ".env",
+        Path.cwd() / ".env",
+        Path.cwd() / "canrun" / ".env",
     ]
 
 
-def load_steam_webapi_key() -> str:
-    """Key from STEAM_WEBAPI_KEY, otherwise canrun_config.steam_webapi_key."""
-    env_key = os.environ.get("STEAM_WEBAPI_KEY", "").strip()
-    if env_key:
-        return env_key
-    for path in _config_files():
+def load_dotenv_vars(env_paths: list[Path] | None = None) -> dict[str, str]:
+    """Parse KEY=VALUE pairs from .env files without third-party dependencies."""
+    paths = _env_files() if env_paths is None else env_paths
+    parsed: dict[str, str] = {}
+    for path in paths:
         try:
             if not path.is_file():
                 continue
-            data = json.loads(path.read_text(encoding="utf-8"))
-            key = data.get("canrun_config", {}).get("steam_webapi_key", "")
-            if isinstance(key, str) and key.strip():
-                return key.strip()
-        except (OSError, json.JSONDecodeError):
+            for raw_line in path.read_text(encoding="utf-8").splitlines():
+                line = raw_line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, value = line.split("=", 1)
+                key = key.strip()
+                value = value.strip()
+                if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+                    value = value[1:-1]
+                if key and key not in parsed:
+                    parsed[key] = value
+        except OSError:
             continue
+    return parsed
+
+
+def load_steam_webapi_key() -> str:
+    """Developer key from STEAM_WEBAPI_KEY env var or local .env file."""
+    env_key = os.environ.get("STEAM_WEBAPI_KEY", "").strip()
+    if env_key:
+        return env_key
+    dotenv_vars = load_dotenv_vars()
+    dotenv_key = dotenv_vars.get("STEAM_WEBAPI_KEY", "").strip()
+    if dotenv_key:
+        return dotenv_key
     return ""
 
 
 @lru_cache(maxsize=1)
-def load_cluster_map() -> Dict[str, Any]:
+def load_cluster_map() -> dict[str, Any]:
     path = _data_file("steam_hardware_clusters.json")
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
@@ -240,10 +273,10 @@ def load_cluster_map() -> Dict[str, Any]:
 
 
 @lru_cache(maxsize=1)
-def load_gpu_passmarks() -> Dict[str, int]:
+def load_gpu_passmarks() -> dict[str, int]:
     """Normalized GPU name -> PassMark G3D from gpu_hierarchy.json."""
     path = _data_file("gpu_hierarchy.json")
-    passmarks: Dict[str, int] = {}
+    passmarks: dict[str, int] = {}
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
@@ -257,9 +290,9 @@ def load_gpu_passmarks() -> Dict[str, int]:
 
 
 @lru_cache(maxsize=1)
-def load_cpu_patterns() -> List[tuple]:
+def load_cpu_patterns() -> list[tuple]:
     path = _data_file("cpu_benchmarks.json")
-    patterns: List[tuple] = []
+    patterns: list[tuple] = []
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
@@ -302,11 +335,11 @@ def gpu_vendor(name: str) -> str:
     return "unknown"
 
 
-def lookup_gpu_passmark(name: str, passmarks: Dict[str, int]) -> Optional[int]:
+def lookup_gpu_passmark(name: str, passmarks: dict[str, int]) -> int | None:
     return passmarks.get(normalize_gpu(name))
 
 
-def requirement_passmarks(gpu_passmarks: Optional[Dict[str, int]] = None) -> Dict[str, int]:
+def requirement_passmarks(gpu_passmarks: dict[str, int] | None = None) -> dict[str, int]:
     """Hierarchy scores plus the extra cards that show up in Steam requirement lines."""
     combined = dict(load_gpu_passmarks() if gpu_passmarks is None else gpu_passmarks)
     for name, score in _EXTRA_GPU_PASSMARKS.items():
@@ -315,8 +348,12 @@ def requirement_passmarks(gpu_passmarks: Optional[Dict[str, int]] = None) -> Dic
 
 
 def _requirement_haystack(text: str) -> str:
-    """One lowercase line, with 'GTX 3060' and '1660Ti' written like the table."""
-    raw = (text or "").lower().replace("гб", "gb").replace("®", " ")
+    """One lowercase line, with 'GTX 3060' and '1660Ti' written like the table.
+
+    The Cyrillic abbreviation for gigabytes is rewritten to ``gb`` before
+    non-ASCII characters are removed. Those two letters are not a Latin typo.
+    """
+    raw = (text or "").lower().replace("гб", "gb").replace("®", " ")  # noqa: RUF001
     raw = re.sub(r"[^a-z0-9]+", " ", raw)
     raw = re.sub(r"(\d)\s*gb\b", r"\1gb", raw)
     raw = re.sub(r"(\d{3,4})\s*(ti|super)\b", r"\1 \2", raw)
@@ -325,7 +362,7 @@ def _requirement_haystack(text: str) -> str:
     return f" {re.sub(r'\s+', ' ', raw).strip()} "
 
 
-def first_known_gpu(text: str, passmarks: Dict[str, int]) -> Optional[tuple]:
+def first_known_gpu(text: str, passmarks: dict[str, int]) -> tuple | None:
     """GPU named in a requirements line. A longer card name beats a shorter overlap."""
     haystack = _requirement_haystack(text)
     matches: list[tuple] = []
@@ -336,8 +373,7 @@ def first_known_gpu(text: str, passmarks: Dict[str, int]) -> Optional[tuple]:
             continue
         matches.append((index, index + len(needle), name, int(score)))
     if not matches:
-        family = _closest_family_gpu(haystack, passmarks)
-        return family
+        return _closest_family_gpu(haystack, passmarks)
     matches.sort(key=lambda row: (row[1] - row[0]), reverse=True)
     kept: list[tuple] = []
     for match in matches:
@@ -348,16 +384,16 @@ def first_known_gpu(text: str, passmarks: Dict[str, int]) -> Optional[tuple]:
     return kept[0][2], kept[0][3]
 
 
-def _closest_family_gpu(haystack: str, passmarks: Dict[str, int]) -> Optional[tuple]:
+def _closest_family_gpu(haystack: str, passmarks: dict[str, int]) -> tuple | None:
     """Map a near-miss model, such as GTX 1090 or RTX 8090, onto the closest real card."""
-    families: Dict[str, list[tuple]] = {}
+    families: dict[str, list[tuple]] = {}
     for name, score in passmarks.items():
         match = re.match(r"(rtx|gtx|rx)\s+(\d{3,4})\b", name)
         if not match:
             continue
         families.setdefault(match.group(1), []).append((int(match.group(2)), name, int(score)))
     found = re.findall(r"\b(rtx|gtx|rx)\s+(\d{3,4})\b", haystack)
-    best: Optional[tuple] = None
+    best: tuple | None = None
     for family, number_text in found:
         number = int(number_text)
         options = families.get(family) or []
@@ -377,19 +413,33 @@ def _closest_family_gpu(haystack: str, passmarks: Dict[str, int]) -> Optional[tu
     return best[1], best[2]
 
 
+@lru_cache(maxsize=1)
+def _load_two_stage_ml_predictor():
+    try:
+        from canrun_model_loader import LightweightMLPredictor
+
+        predictor = LightweightMLPredictor()
+        if predictor.is_loaded and predictor.has_two_stage_trees:
+            return predictor
+    except Exception:
+        pass
+    return None
+
+
 def estimate_from_requirements(
     user_gpu: str,
     user_cpu: str,
     recommended_gpu: str = "",
     minimum_gpu: str = "",
-    resolution: Optional[str] = None,
-    gpu_passmarks: Optional[Dict[str, int]] = None,
-    cpu_patterns: Optional[List[tuple]] = None,
+    resolution: str | None = None,
+    gpu_passmarks: dict[str, int] | None = None,
+    cpu_patterns: list[tuple] | None = None,
+    game_name: str = "",
 ) -> FpsEstimate:
     """FPS for a game with no player sample, scaled from its published GPU spec.
 
-    The recommended card is taken as 60 FPS at 1080p. The minimum card is 30.
-    The user's GPU and the monitor class move that anchor. Ray tracing is off.
+    Combines the physics power-law prior (recommended card = 60 FPS at 1080p,
+    minimum card = 30 FPS) with the Two-Stage Log-Ridge + Monotonic GBDT model.
     """
     if gpu_passmarks is None:
         gpu_passmarks = load_gpu_passmarks()
@@ -400,10 +450,11 @@ def estimate_from_requirements(
     if not user_passmark:
         return unknown_estimate()
     spec = first_known_gpu(recommended_gpu, cards)
+    min_spec = first_known_gpu(minimum_gpu, cards)
     target = _REQUIREMENTS_TARGET_FPS
     source = SOURCE_REQUIREMENTS
     if spec is None:
-        spec = first_known_gpu(minimum_gpu, cards)
+        spec = min_spec
         target = _MINIMUM_TARGET_FPS
         source = SOURCE_REQUIREMENTS_MINIMUM
     if spec is None:
@@ -417,15 +468,36 @@ def estimate_from_requirements(
         return unknown_estimate()
     resolution_key = _normalize_resolution(resolution) or "1080p"
     anchor = target * _RESOLUTION_FACTOR.get(resolution_key, 1.0)
-    cpu_factor = cpu_bottleneck_factor(lookup_cpu_passmark(user_cpu, cpu_patterns))
-    estimate = scale_from_reference(anchor, 0, user_passmark, spec[1], cpu_factor)
+    spread = REQUIREMENTS_RELATIVE_SPREAD.get(resolution_key, REQUIREMENTS_RELATIVE_SPREAD["1080p"])
+    cpu_pm = lookup_cpu_passmark(user_cpu, cpu_patterns)
+    cpu_factor = cpu_bottleneck_factor(cpu_pm)
+    estimate = scale_from_reference(anchor, 0, user_passmark, spec[1], cpu_factor, spread)
+
+    predictor = _load_two_stage_ml_predictor()
+    if predictor is not None and source in {SOURCE_REQUIREMENTS, SOURCE_REQUIREMENTS_MINIMUM}:
+        rec_pm = float(spec[1]) if source == SOURCE_REQUIREMENTS else float(spec[1]) * 1.65
+        min_pm = float(min_spec[1]) if min_spec else (rec_pm / 1.65)
+        x_vec = predictor.extract_feature_vector(
+            gpu_passmark=float(user_passmark),
+            cpu_passmark=float(cpu_pm or 28000),
+            gpu_name=normalize_gpu(user_gpu),
+            resolution=resolution_key,
+            rec_gpu_passmark=rec_pm,
+            min_gpu_passmark=min_pm,
+            game_name=str(game_name or ""),
+        )
+        tree_fps = predictor.predict_two_stage_from_features(x_vec)
+        if tree_fps is not None and tree_fps > 0:
+            blended_fps = 0.78 * float(estimate.expected_fps) + 0.22 * float(tree_fps)
+            estimate = _spread_band(blended_fps, blended_fps * spread)
+
     if estimate.expected_fps > _REQUIREMENTS_FPS_CAP:
-        estimate = _spread_band(_REQUIREMENTS_FPS_CAP, _REQUIREMENTS_FPS_CAP * SIMILAR_RELATIVE_SPREAD)
+        estimate = _spread_band(_REQUIREMENTS_FPS_CAP, _REQUIREMENTS_FPS_CAP * spread)
     estimate.fps_source = source
     return estimate
 
 
-def lookup_cpu_passmark(name: str, patterns: List[tuple]) -> Optional[int]:
+def lookup_cpu_passmark(name: str, patterns: list[tuple]) -> int | None:
     if not name or not name.strip() or len(name) > 200:
         return None
     for pattern, score in patterns:
@@ -464,14 +536,14 @@ def _as_float(value: Any, default: float = 0.0) -> float:
         return default
 
 
-def _first(row: Dict[str, Any], *keys: str) -> Any:
+def _first(row: dict[str, Any], *keys: str) -> Any:
     for key in keys:
         if key in row and row[key] not in (None, ""):
             return row[key]
     return None
 
 
-def parse_frame_rate_payload(payload: Optional[Dict[str, Any]]) -> List[FrameRateBucket]:
+def parse_frame_rate_payload(payload: dict[str, Any] | None) -> list[FrameRateBucket]:
     """Parse GetGameFrameRateStats JSON, including optional hardware names."""
     if not isinstance(payload, dict):
         return []
@@ -484,7 +556,7 @@ def parse_frame_rate_payload(payload: Optional[Dict[str, Any]]) -> List[FrameRat
     if not isinstance(rows, list):
         return []
 
-    buckets: List[FrameRateBucket] = []
+    buckets: list[FrameRateBucket] = []
     for row in rows:
         if not isinstance(row, dict):
             continue
@@ -509,7 +581,7 @@ def parse_frame_rate_payload(payload: Optional[Dict[str, Any]]) -> List[FrameRat
     return buckets
 
 
-def apply_cluster_labels(buckets: List[FrameRateBucket], cluster_map: Dict[str, Any]) -> None:
+def apply_cluster_labels(buckets: list[FrameRateBucket], cluster_map: dict[str, Any]) -> None:
     clusters = cluster_map.get("clusters", {}) if isinstance(cluster_map, dict) else {}
     if not isinstance(clusters, dict):
         return
@@ -544,9 +616,9 @@ def _passmark_distance(user_passmark: int, reference_passmark: int) -> int:
     return abs(user_passmark - reference_passmark)
 
 
-def steam_client_roots() -> List[Path]:
+def steam_client_roots() -> list[Path]:
     """Steam client directories on this PC."""
-    roots: List[Path] = []
+    roots: list[Path] = []
     program_files = os.environ.get("PROGRAMFILES(X86)")
     if program_files:
         roots.append(Path(program_files) / "Steam")
@@ -556,9 +628,9 @@ def steam_client_roots() -> List[Path]:
     return roots
 
 
-def read_local_cluster_id() -> Optional[str]:
+def read_local_cluster_id() -> str | None:
     """Read this PC's hardware cluster id from the Steam client config, if present."""
-    candidates: List[Path] = []
+    candidates: list[Path] = []
     for root in steam_client_roots():
         candidates.append(root / "config" / "config.vdf")
         userdata = root / "userdata"
@@ -586,7 +658,7 @@ def read_local_cluster_id() -> Optional[str]:
     return None
 
 
-def fit_log_fps_curve(points: List[tuple]) -> Optional[tuple]:
+def fit_log_fps_curve(points: list[tuple]) -> tuple | None:
     """Fit log(fps) = a + b * log(passmark). Needs two positive rows."""
     usable = [(float(passmark), float(fps)) for passmark, fps in points if passmark and fps and float(passmark) > 0 and float(fps) > 0]
     count = len(usable)
@@ -608,10 +680,10 @@ def fit_log_fps_curve(points: List[tuple]) -> Optional[tuple]:
     return intercept, slope
 
 
-def load_benchmark_table() -> Dict[tuple, List[tuple]]:
+def load_benchmark_table() -> dict[tuple, list[tuple]]:
     """Measured FPS rows keyed by (game, resolution)."""
     path = _data_file("training_benchmarks.json")
-    table: Dict[tuple, List[tuple]] = {}
+    table: dict[tuple, list[tuple]] = {}
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
@@ -639,7 +711,7 @@ def load_benchmark_table() -> Dict[tuple, List[tuple]]:
     return table
 
 
-def _normalize_resolution(resolution: Optional[str]) -> Optional[str]:
+def _normalize_resolution(resolution: str | None) -> str | None:
     text = re.sub(r"[^a-z0-9]+", "", (resolution or "").lower())
     if text in {"4k", "2160p", "3840x2160"}:
         return "4K"
@@ -648,6 +720,126 @@ def _normalize_resolution(resolution: Optional[str]) -> Optional[str]:
     if text in {"1080p", "1920x1080", "fhd"}:
         return "1080p"
     return None
+
+
+_NATIVE_ESTIMATE_SOURCES = {
+    SOURCE_SIMILAR,
+    SOURCE_REQUIREMENTS,
+    SOURCE_REQUIREMENTS_MINIMUM,
+    SOURCE_REQUIREMENTS_UNSPECIFIED,
+}
+# NVIDIA's stated multipliers, not a review average.
+# Frame generation inserts one frame per rendered frame (2×).
+# Multi frame generation is 4× in compatible games and up to 6× in select games.
+# https://www.nvidia.com/en-us/geforce/news/dlss-4-5-dynamic-multi-frame-generation-6x-mode-released/
+_FRAME_GEN_EXTRA = 1
+_MULTI_FRAME_GEN_EXTRA = (3, 5)
+# Path tracing replaces raster lighting. Games that ship it (Cyberpunk
+# Overdrive, Alan Wake 2, Black Myth) typically cost about 2× to 3× the
+# raster rate with upscaling off. NVIDIA does not publish one multiplier.
+_PATH_TRACE_COST = (2.0, 3.0)
+
+
+def nvidia_rtx_generation(gpu_name: str) -> str:
+    """Return 20, 30, 40, or 50 from an RTX model name. Empty when it is not one."""
+    match = re.search(r"\brtx\s*([2345])\d{3}\b", (gpu_name or "").lower())
+    if not match:
+        return ""
+    return {"2": "20", "3": "30", "4": "40", "5": "50"}[match.group(1)]
+
+
+def dlss_label(gpu_name: str) -> str:
+    """Newest practical Super Resolution on this GPU.
+
+    DLSS 4.5 runs on every RTX card. RTX 20 and 30 lack FP8, so NVIDIA
+    recommends Model K (DLSS 4) there. RTX 40 and 50 run DLSS 4.5.
+    """
+    generation = nvidia_rtx_generation(gpu_name)
+    if generation in {"40", "50"}:
+        return "DLSS 4.5"
+    if generation in {"20", "30"}:
+        return "DLSS 4"
+    return "DLSS"
+
+
+def _about_fps(value: float) -> int:
+    """Nearest 5 FPS, so a side note does not look more precise than the sample."""
+    if value <= 0:
+        return 0
+    return int(value / 5 + 0.5) * 5
+
+
+def graphics_feature_lines(
+    fps_source: str,
+    expected_fps: int,
+    fps_min: int,
+    fps_max: int,
+    resolution: str | None,
+    gpu_name: str,
+    vram_gb: int = 0,
+    supports_dlss: bool = False,
+    supports_rtx: bool = False,
+    game_name: str | None = None,
+    refresh_hz: int = 0,
+) -> list[str]:
+    """Side notes for DLSS and path tracing. The main FPS figure stays native.
+
+    Steam player samples, and estimates scaled from them, already mix
+    settings, so they get no note. The DLSS extras are NVIDIA's multipliers:
+    frame generation is 2×, multi frame generation is 4× to 6×, and Dynamic
+    mode aims at this screen's refresh. Path tracing is a typical 2× to 3×
+    cost on an RTX card, not a measurement of this game.
+    """
+    del vram_gb, game_name
+    if fps_source not in _NATIVE_ESTIMATE_SOURCES or not supports_dlss:
+        return []
+    native = float(expected_fps or 0)
+    if native <= 0 and fps_min and fps_max:
+        native = (float(fps_min) + float(fps_max)) / 2
+    if native <= 0:
+        return []
+    if fps_source != SOURCE_SIMILAR and native >= _REQUIREMENTS_FPS_CAP:
+        return []
+
+    version = dlss_label(gpu_name)
+    modes = "Quality, Balanced, Performance"
+    if _normalize_resolution(resolution) == "4K":
+        modes += ", Ultra Performance"
+    lines = [f"{version}: {modes}."]
+    generation = nvidia_rtx_generation(gpu_name)
+    if generation == "40":
+        extra = _about_fps(native * _FRAME_GEN_EXTRA)
+        if extra >= 5:
+            lines.append(f"{version} frame gen: around {extra} FPS more (2×).")
+    elif generation == "50":
+        low = _about_fps(native * _MULTI_FRAME_GEN_EXTRA[0])
+        high = _about_fps(native * _MULTI_FRAME_GEN_EXTRA[1])
+        if high >= 5:
+            if low >= high:
+                lines.append(f"{version} multi frame gen: around {high} FPS more (4× to 6×).")
+            else:
+                lines.append(f"{version} multi frame gen: around {low} to {high} FPS more (4× to 6×).")
+        if refresh_hz and native < refresh_hz:
+            lines.append(f"{version} Dynamic mode aims at this {int(refresh_hz)} Hz screen.")
+    if supports_rtx:
+        path_line = _path_tracing_line(native)
+        if path_line:
+            lines.append(path_line)
+    return lines
+
+
+def _path_tracing_line(native: float) -> str:
+    """FPS given up when path tracing makes the frame about 2× to 3× heavier."""
+    less_low = _about_fps(native - native / _PATH_TRACE_COST[0])
+    less_high = _about_fps(native - native / _PATH_TRACE_COST[1])
+    if less_high < 5:
+        return ""
+    if less_low >= less_high:
+        return f"Path tracing: around {less_high} FPS less (typically about 2× to 3× heavier)."
+    return (
+        f"Path tracing: around {less_low} to {less_high} FPS less "
+        "(typically about 2× to 3× heavier)."
+    )
 
 
 def _normalize_game_key(name: str) -> str:
@@ -669,7 +861,7 @@ def _normalize_game_key(name: str) -> str:
     return "".join(tokens)
 
 
-def match_benchmark_game(game_name: Optional[str], games: List[str]) -> Optional[str]:
+def match_benchmark_game(game_name: str | None, games: list[str]) -> str | None:
     query = _normalize_game_key(game_name or "")
     if not query:
         return None
@@ -685,7 +877,7 @@ def match_benchmark_game(game_name: Optional[str], games: List[str]) -> Optional
     return None
 
 
-def _benchmark_points(game_name: Optional[str], resolution: Optional[str], table: Optional[Dict[tuple, List[tuple]]] = None) -> List[tuple]:
+def _benchmark_points(game_name: str | None, resolution: str | None, table: dict[tuple, list[tuple]] | None = None) -> list[tuple]:
     resolved = _normalize_resolution(resolution)
     if not game_name or not resolved:
         return []
@@ -698,7 +890,7 @@ def _benchmark_points(game_name: Optional[str], resolution: Optional[str], table
     return list(table.get((matched, resolved), []))
 
 
-def leave_one_out_fps(game_name: str, resolution: str, gpu_model: str) -> Optional[float]:
+def leave_one_out_fps(game_name: str, resolution: str, gpu_model: str) -> float | None:
     """Curve prediction with this GPU removed from the fit."""
     points = _benchmark_points(game_name, resolution)
     target_passmark = None
@@ -718,7 +910,7 @@ def leave_one_out_fps(game_name: str, resolution: str, gpu_model: str) -> Option
     return _cap_at_tied_leaders(prediction, points)
 
 
-def _cap_at_tied_leaders(prediction: float, points: List[tuple]) -> float:
+def _cap_at_tied_leaders(prediction: float, points: list[tuple]) -> float:
     """Keep a tied top score, such as Elden Ring's 60 FPS cap, from being extrapolated."""
     ranked = sorted(points, key=lambda row: row[1], reverse=True)
     if len(ranked) < 2:
@@ -728,20 +920,21 @@ def _cap_at_tied_leaders(prediction: float, points: List[tuple]) -> float:
     return prediction
 
 
-def _estimate_from_curve(prediction: float) -> FpsEstimate:
-    estimate = _spread_band(prediction, abs(prediction) * SIMILAR_RELATIVE_SPREAD)
+def _estimate_from_curve(prediction: float, resolution: str | None) -> FpsEstimate:
+    spread = CURVE_RELATIVE_SPREAD.get(_normalize_resolution(resolution) or "", CURVE_RELATIVE_SPREAD["1080p"])
+    estimate = _spread_band(prediction, abs(prediction) * spread)
     estimate.fps_source = SOURCE_SIMILAR
     return estimate
 
 
 def calibrated_similar_fps(
-    game_name: Optional[str],
-    resolution: Optional[str],
+    game_name: str | None,
+    resolution: str | None,
     gpu_model: str,
-    gpu_passmarks: Dict[str, int],
+    gpu_passmarks: dict[str, int],
     *,
-    exclude_gpu: Optional[str] = None,
-) -> Optional[FpsEstimate]:
+    exclude_gpu: str | None = None,
+) -> FpsEstimate | None:
     """Shipped similar-PC estimate. exclude_gpu drops that card from the fit."""
     points = _benchmark_points(game_name, resolution)
     if not points:
@@ -762,28 +955,28 @@ def calibrated_similar_fps(
         return None
     intercept, slope = fitted
     prediction = math.exp(intercept + slope * math.log(user_passmark))
-    return _estimate_from_curve(_cap_at_tied_leaders(prediction, points))
+    return _estimate_from_curve(_cap_at_tied_leaders(prediction, points), resolution)
 
 
 def resolve_fps(
     gpu_model: str,
     cpu_model: str,
-    payload: Optional[Dict[str, Any]],
+    payload: dict[str, Any] | None,
     *,
     api_available: bool = True,
-    local_cluster_id: Optional[str] = None,
-    cluster_map: Optional[Dict[str, Any]] = None,
-    reference_gpu: Optional[str] = None,
-    gpu_passmarks: Optional[Dict[str, int]] = None,
-    cpu_patterns: Optional[List[tuple]] = None,
-    game_name: Optional[str] = None,
-    resolution: Optional[str] = None,
-    exclude_gpu: Optional[str] = None,
+    local_cluster_id: str | None = None,
+    cluster_map: dict[str, Any] | None = None,
+    reference_gpu: str | None = None,
+    gpu_passmarks: dict[str, int] | None = None,
+    cpu_patterns: list[tuple] | None = None,
+    game_name: str | None = None,
+    resolution: str | None = None,
+    exclude_gpu: str | None = None,
 ) -> FpsEstimate:
     """
     Pick an FPS figure for this GPU and CPU.
 
-    An exact Steam bucket with at least 30 reports wins. Otherwise a
+    An exact Steam bucket with at least 10 reports wins. Otherwise a
     per-game, per-resolution curve is used when that game was measured.
     Games without that curve keep the 0.85 scale from the nearest Steam bucket.
     """
@@ -858,14 +1051,14 @@ def resolve_fps(
 
 
 def _closest_similar_bucket(
-    buckets: List[FrameRateBucket],
+    buckets: list[FrameRateBucket],
     gpu_model: str,
-    user_passmark: Optional[int],
-    gpu_passmarks: Dict[str, int],
-) -> Optional[FrameRateBucket]:
+    user_passmark: int | None,
+    gpu_passmarks: dict[str, int],
+) -> FrameRateBucket | None:
     if not user_passmark:
         return None
-    candidates: List[FrameRateBucket] = []
+    candidates: list[FrameRateBucket] = []
     for bucket in buckets:
         if bucket.report_count < MIN_REPORTS or not bucket.gpu_name:
             continue
@@ -891,10 +1084,10 @@ def _closest_similar_bucket(
 
 
 def _survey_leader_estimate(
-    buckets: List[FrameRateBucket],
-    user_passmark: Optional[int],
+    buckets: list[FrameRateBucket],
+    user_passmark: int | None,
     reference_gpu: str,
-    gpu_passmarks: Dict[str, int],
+    gpu_passmarks: dict[str, int],
     cpu_factor: float,
 ) -> FpsEstimate:
     """Scale the busiest unlabeled bucket as if it were the survey-leading GPU."""
@@ -917,7 +1110,7 @@ def _survey_leader_estimate(
 class SteamFpsClient:
     """Fetches Steam frame-rate stats and resolves them for the local PC."""
 
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: str | None = None):
         self.api_key = load_steam_webapi_key() if api_key is None else api_key.strip()
 
     async def estimate(
@@ -925,8 +1118,8 @@ class SteamFpsClient:
         appid: str,
         gpu_model: str,
         cpu_model: str,
-        game_name: Optional[str] = None,
-        resolution: Optional[str] = None,
+        game_name: str | None = None,
+        resolution: str | None = None,
     ) -> FpsEstimate:
         app_id = valid_steam_app_id(appid)
         payload = None
@@ -946,16 +1139,18 @@ class SteamFpsClient:
             resolution=resolution,
         )
 
-    async def _fetch(self, appid: str) -> Optional[Dict[str, Any]]:
+    async def _fetch(self, appid: str) -> dict[str, Any] | None:
         timeout = aiohttp.ClientTimeout(total=10, connect=5)
         params = {"key": self.api_key, "appid": appid, "format": "json"}
         try:
-            async with aiohttp.ClientSession(timeout=timeout) as session:
-                async with session.get(STATS_URL, params=params) as response:
-                    if response.status != 200:
-                        logger.warning("Steam frame-rate stats returned HTTP %s", response.status)
-                        return None
-                    return await response.json(content_type=None)
+            async with (
+                aiohttp.ClientSession(timeout=timeout) as session,
+                session.get(STATS_URL, params=params) as response,
+            ):
+                if response.status != 200:
+                    logger.warning("Steam frame-rate stats returned HTTP %s", response.status)
+                    return None
+                return await response.json(content_type=None)
         except (aiohttp.ClientError, TimeoutError, json.JSONDecodeError) as exc:
             logger.warning(
                 "Steam frame-rate stats request failed: %s",

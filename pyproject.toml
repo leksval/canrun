@@ -1,6 +1,6 @@
 [project]
 name = "canrun"
-version = "9.0"
+version = "12.0.0"
 description = "CanRun Game Compatibility Analysis System"
 requires-python = ">=3.10"
 dependencies = [
@@ -60,6 +60,25 @@ allow-direct-references = true
 testpaths = ["test", "canrun/test"]
 pythonpath = ["."]
 addopts = "-v --tb=short"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+
+[tool.ruff.lint.isort]
+# Flat plugin modules are imported by filename, not as canrun.*
+known-first-party = [
+    "canrun_compatibility_analyzer",
+    "canrun_engine",
+    "canrun_game_fetcher",
+    "canrun_game_matcher",
+    "canrun_hardware_detector",
+    "canrun_ml_predictor",
+    "canrun_model_loader",
+    "canrun_steam_fps",
+    "g_assist_response_fixer",
+    "plugin",
+]
 
 [dependency-groups]
 dev = [
