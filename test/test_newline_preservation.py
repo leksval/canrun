@@ -66,8 +66,6 @@ def test_newline_preservation():
         assert '\n' in cleaned, "Newlines should be preserved"
         
         print("✅ PASS")
-    
-    return True
 
 def test_g_assist_response_newlines():
     """Test that G-Assist response creation preserves newlines."""
@@ -109,7 +107,6 @@ def test_g_assist_response_newlines():
     assert any("VERDICT" in line for line in lines), "Verdict should be present"
     
     print("✅ PASS - Newlines preserved in G-Assist response")
-    return True
 
 def test_emoji_and_newline_combination():
     """Test that emojis and newlines work together correctly."""
@@ -136,7 +133,6 @@ def test_emoji_and_newline_combination():
     
     print(f"Cleaned text: {repr(cleaned)}")
     print("✅ PASS - Emojis and newlines work together")
-    return True
 
 def main():
     """Run all newline preservation tests."""
