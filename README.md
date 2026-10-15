@@ -34,6 +34,8 @@ AVAILABLE on official Nvidia g-assist mod marketplace:  [mod.io/canrun](https://
 
 [![CanRun trending on the NVIDIA G-Assist hub](docs/g-assist-trending.jpg)](https://mod.io/g/g-assist/m/canrun2#description)
 
+## Demo
+
 ![R3](https://github.com/user-attachments/assets/79a68ba5-a4d9-493c-bea5-d455edadf627)
 
 ## ✨ Key Features
