@@ -9,7 +9,8 @@ import os
 # Add canrun to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from plugin import format_canrun_response
+from plugin import _fps_range_text, format_canrun_response
+from canrun_steam_fps import graphics_feature_lines
 from canrun_engine import CanRunResult
 from canrun_hardware_detector import HardwareSpecs
 from canrun_game_fetcher import GameRequirements
@@ -161,8 +162,8 @@ def test_unknown_fps_display():
     
     # Should show "Unknown"
     assert "FPS: **Unknown**" in formatted_response
-    assert formatted_response.startswith("Estimate only. CanRun does not guarantee")
-    assert formatted_response.index("Estimate only.") < formatted_response.index("Score:")
+    assert formatted_response.startswith("🎮 **Game:**")
+    assert formatted_response.index("🎯 **VERDICT:**") < formatted_response.index("Estimate only.")
 
 
 def test_high_resolution_systems():
@@ -187,19 +188,111 @@ def test_high_resolution_systems():
 
 
 def test_steam_player_source_label():
-    """Steam measurements name the player sample."""
+    """Steam measurements name the player sample and skip the DLSS side note."""
     result = create_test_result_with_custom_resolution_and_fps()
     result.performance_prediction.fps_source = "steam"
     formatted_response = format_canrun_response(result)
     assert "75-95 FPS (Steam players)" in formatted_response
+    assert "FPS more" not in formatted_response
+    assert "Ray tracing:" not in formatted_response
+    assert "Path tracing:" not in formatted_response
 
 
 def test_similar_pc_source_label():
-    """Scaled estimates say they come from a similar PC."""
+    """Scaled estimates say they come from a similar PC and add a DLSS side note."""
     result = create_test_result_with_custom_resolution_and_fps()
     result.performance_prediction.fps_source = "steam_similar"
     formatted_response = format_canrun_response(result)
     assert "75-95 FPS (estimated from a similar PC, native, ray tracing off)" in formatted_response
+    assert "DLSS 4.5: Quality, Balanced, Performance, Ultra Performance." in formatted_response
+    assert "DLSS 4.5 frame gen: around 85 FPS more (2×)." in formatted_response
+    assert "Path tracing: around 45 to 55 FPS less (typically about 2× to 3× heavier)." in formatted_response
+    assert "Ray tracing:" not in formatted_response
+
+
+def test_scaled_steam_estimate_is_not_called_native():
+    """Other players' mixed settings are not a native figure, so no DLSS note is added."""
+    result = create_test_result_with_custom_resolution_and_fps()
+    result.performance_prediction.fps_source = "steam_scaled"
+    formatted_response = format_canrun_response(result)
+    assert "75-95 FPS (scaled from Steam players on a similar GPU, mixed settings)" in formatted_response
+    assert "native" not in formatted_response
+    assert "FPS more" not in formatted_response
+
+
+def test_dlss_note_follows_nvidia_multipliers():
+    """Side notes use NVIDIA's multipliers and the GPU's actual features."""
+    quality_1080 = graphics_feature_lines(
+        "requirements", 60, 48, 72, "1080p", "RTX 2060", 6, True, True
+    )
+    quality_text = "\n".join(quality_1080)
+    assert quality_1080[0] == "DLSS 4: Quality, Balanced, Performance."
+    assert "Path tracing: around 30 to 40 FPS less (typically about 2× to 3× heavier)." in quality_text
+    assert "frame gen" not in quality_text
+    assert "Ray tracing:" not in quality_text
+    assert all("\n" not in line for line in quality_1080)
+
+    high_rate = graphics_feature_lines(
+        "steam_similar", 160, 140, 180, "1080p", "RTX 4070", 12, True, True
+    )
+    high_text = "\n".join(high_rate)
+    assert "DLSS 4.5: Quality, Balanced, Performance." in high_text
+    assert "DLSS 4.5 frame gen: around 160 FPS more (2×)." in high_text
+    assert "Path tracing: around 80 to 105 FPS less (typically about 2× to 3× heavier)." in high_text
+
+    blackwell = graphics_feature_lines(
+        "steam_similar", 80, 64, 96, "4K", "RTX 5070", 12, True, True, None, 144
+    )
+    blackwell_text = "\n".join(blackwell)
+    assert "DLSS 4.5: Quality, Balanced, Performance, Ultra Performance." in blackwell_text
+    assert "DLSS 4.5 multi frame gen: around 240 to 400 FPS more (4× to 6×)." in blackwell_text
+    assert "DLSS 4.5 Dynamic mode aims at this 144 Hz screen." in blackwell_text
+    assert "Path tracing: around 40 to 55 FPS less (typically about 2× to 3× heavier)." in blackwell_text
+
+    assert graphics_feature_lines("steam", 80, 70, 90, "4K", "RTX 4090", 24, True, True) == []
+    assert graphics_feature_lines("steam_scaled", 80, 64, 96, "4K", "RTX 4090", 24, True, True) == []
+    assert graphics_feature_lines("steam_similar", 80, 70, 90, "1080p", "GTX 1660", 6, False, False) == []
+
+    capped = graphics_feature_lines("requirements", 240, 192, 288, "1080p", "RTX 4090", 24, True, True)
+    assert capped == []
+
+    older = graphics_feature_lines("requirements", 90, 72, 108, "720p", "RTX 3060", 12, True, True)
+    assert older == [
+        "DLSS 4: Quality, Balanced, Performance.",
+        "Path tracing: around 45 to 60 FPS less (typically about 2× to 3× heavier).",
+    ]
+    no_rtx = graphics_feature_lines("requirements", 90, 72, 108, "1080p", "RTX 3060", 12, True, False)
+    assert no_rtx == ["DLSS 4: Quality, Balanced, Performance."]
+
+
+def test_answer_starts_with_the_formatted_card():
+    """The plain score header is not repeated ahead of the formatted card."""
+    result = create_test_result_with_custom_resolution_and_fps()
+    formatted = format_canrun_response(result)
+    assert formatted.startswith("🎮 **Game:**")
+    assert "can run on this PC" not in formatted.split("🎮 **Game:**", 1)[0]
+    assert formatted.count("Estimate only.") == 1
+    assert formatted.rstrip().endswith("or that you will see this frame rate.")
+
+
+def test_fps_max_stops_at_this_screen_refresh_rate():
+    """This monitor's refresh rate is the ceiling. A faster screen can show the rest."""
+    assert _fps_range_text(120, 200, 144, " (Steam players)") == (
+        "120-144 FPS on this 144 Hz screen (Steam players). On a faster monitor, about 120-200."
+    )
+    assert _fps_range_text(160, 180, 144, "") == (
+        "144 FPS on this 144 Hz screen. On a faster monitor, about 160-180."
+    )
+    assert _fps_range_text(75, 95, 165, " (Steam players)") == "75-95 FPS (Steam players)"
+
+    result = create_test_result_with_custom_resolution_and_fps()
+    result.hardware_specs.primary_monitor_refresh_hz = 144
+    result.performance_prediction.fps_min = 120
+    result.performance_prediction.fps_max = 200
+    result.performance_prediction.fps_source = "steam"
+    formatted = format_canrun_response(result)
+    assert "120-144 FPS on this 144 Hz screen (Steam players)." in formatted
+    assert "On a faster monitor, about 120-200." in formatted
 
 
 def test_heavier_display_notes_the_fps_class():

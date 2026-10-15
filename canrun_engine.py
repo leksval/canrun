@@ -4,21 +4,28 @@ Privacy-focused game compatibility analysis for NVIDIA RTX/GTX systems.
 Flattened structure with all dependencies bundled for PyInstaller compatibility.
 """
 
-import hashlib
-import logging
 import asyncio
+import hashlib
 import json
+import logging
 import os
 import re
-from typing import Dict, List, Optional, Tuple, Any
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
+from typing import Any
+
+from canrun_compatibility_analyzer import (
+    CanRunCompatibilityAnalyzer,
+    CompatibilityAnalysis,
+    CompatibilityLevel,
+    ComponentAnalysis,
+    ComponentType,
+)
+from canrun_game_fetcher import CanRunGameFetcher, GameRequirements, prefer_default_title
+from canrun_game_matcher import CanRunGameMatcher
 
 # Import local modules from canrun directory
 from canrun_hardware_detector import CanRunHardwareDetector, HardwareSpecs
-from canrun_game_fetcher import CanRunGameFetcher, GameRequirements
-from canrun_game_matcher import CanRunGameMatcher
-from canrun_compatibility_analyzer import CanRunCompatibilityAnalyzer, CompatibilityAnalysis, ComponentAnalysis, ComponentType, CompatibilityLevel
 from canrun_ml_predictor import CanRunMLPredictor, PerformanceAssessment
 from canrun_steam_fps import SteamFpsClient
 
@@ -31,7 +38,7 @@ def sanitize_game_name(game_name: str) -> str:
     if not isinstance(game_name, str):
         game_name = str(game_name or "")
     cleaned = "".join(ch for ch in game_name if ch.isprintable())
-    return " ".join(cleaned.split())[:MAX_GAME_NAME_LENGTH]
+    return prefer_default_title(cleaned)[:MAX_GAME_NAME_LENGTH]
 
 
 def safe_cache_path(cache_dir: str, normalized_name: str) -> str:
@@ -57,9 +64,7 @@ def cache_file_is_trusted(cache_dir: str, cache_file: str) -> bool:
             return False
     except ValueError:
         return False
-    if os.path.isfile(path) and os.path.getsize(path) > MAX_CACHE_BYTES:
-        return False
-    return True
+    return not (os.path.isfile(path) and os.path.getsize(path) > MAX_CACHE_BYTES)
 
 
 def _write_private_cache(path: str, payload: str) -> None:
@@ -78,7 +83,7 @@ def _write_private_cache(path: str, payload: str) -> None:
         handle.write(payload)
 
 
-def trusted_dataclass_kwargs(payload: Any, cls) -> Dict[str, Any]:
+def trusted_dataclass_kwargs(payload: Any, cls) -> dict[str, Any]:
     """Copy only fields the dataclass declares. Extra keys are dropped."""
     if not isinstance(payload, dict):
         raise ValueError("cache record is not an object")
@@ -108,19 +113,19 @@ class CanRunResult:
     detected_resolution_class: str
     cache_used: bool
     analysis_time_ms: int
-    
-    def get_minimum_requirements_status(self) -> Dict[str, Any]:
+
+    def get_minimum_requirements_status(self) -> dict[str, Any]:
         """Get clear status about minimum requirements compliance."""
         return self.compatibility_analysis.get_minimum_requirements_status()
-    
+
     def get_runnable_status_message(self) -> str:
         """Get simple runnable status message for CANRUN."""
         return self.compatibility_analysis.get_runnable_status()
-    
+
     def can_run_game(self) -> bool:
         """Check if the game can run on minimum requirements."""
         return self.compatibility_analysis.can_run_minimum
-    
+
     def exceeds_recommended_requirements(self) -> bool:
         """Check if system exceeds recommended requirements."""
         return self.compatibility_analysis.can_run_recommended
@@ -128,13 +133,16 @@ class CanRunResult:
 
 class CanRunEngine:
     """Main CanRun engine for NVIDIA G-Assist plugin compatibility."""
-    
-    def __init__(self, cache_dir: str = "cache", enable_llm: bool = True):
-        """Initialize CanRun engine with all components."""
+
+    def __init__(self, cache_dir: str = "cache", enable_llm: bool = True):  # noqa: ARG002
+        """Initialize CanRun engine with all components.
+
+        enable_llm is accepted so existing callers keep working. Scoring stays local.
+        """
         self.logger = logging.getLogger(__name__)
         self.cache_dir = cache_dir
         self.cache_duration = timedelta(minutes=15)
-        
+
         # Initialize components
         self.hardware_detector = CanRunHardwareDetector()
         self.game_fetcher = CanRunGameFetcher()
@@ -142,23 +150,23 @@ class CanRunEngine:
         self.compatibility_analyzer = CanRunCompatibilityAnalyzer()
         self.ml_predictor = CanRunMLPredictor()
         self.steam_fps = SteamFpsClient()
-        
+
         # Create cache directory
         os.makedirs(cache_dir, exist_ok=True)
-        
+
         # Session hardware cache
-        self._hardware_cache: Optional[HardwareSpecs] = None
-        
+        self._hardware_cache: HardwareSpecs | None = None
+
         self.logger.info("CanRun engine initialized for G-Assist plugin")
-    
+
     async def check_game_compatibility(self, game_name: str, use_cache: bool = True) -> CanRunResult:
         """
         Main entry point for game compatibility checking.
-        
+
         Args:
             game_name: Name of the game to check
             use_cache: Whether to use cached results
-            
+
         Returns:
             Complete CanRun analysis result
         """
@@ -171,8 +179,8 @@ class CanRunEngine:
         if not game_name:
             raise ValueError("Game name must be a non-empty string")
         start_time = datetime.now()
-        
-        self.logger.info(f"Starting G-Assist compatibility check for: {game_name}")
+
+        self.logger.info('Starting G-Assist compatibility check for: %s', game_name)
 
         # Check cache first
         if use_cache:
@@ -180,7 +188,7 @@ class CanRunEngine:
             cached_result = self._load_cache_file(cache_file)
             cached_fps = getattr(getattr(cached_result, "performance_prediction", None), "expected_fps", 0) or 0
             if cached_result and cached_fps > 0:
-                self.logger.info(f"Returning cached result for '{game_name}'")
+                self.logger.info("Returning cached result for '%s'", game_name)
                 return cached_result
 
         # Fetch game requirements from Steam API
@@ -190,16 +198,16 @@ class CanRunEngine:
 
         # Get hardware specifications
         hardware_specs = await self._get_hardware_specs()
-        
+
         # Analyze compatibility
         compatibility_analysis = await self._analyze_compatibility(
             game_name, hardware_specs, game_requirements
         )
-        
+
         # FPS comes from Steam frame-rate stats for this app and PC.
         display_resolution = self._get_display_resolution(hardware_specs)
         detected_resolution_class = self._classify_resolution(display_resolution)
-        
+
         hardware_dict = {
             "gpu_model": hardware_specs.gpu_model,
             "gpu_vram_gb": hardware_specs.gpu_vram_gb,
@@ -210,7 +218,7 @@ class CanRunEngine:
             "display_width": display_resolution.get('width', 1920),
             "display_height": display_resolution.get('height', 1080)
         }
-        
+
         game_requirements_dict = {
             "game_name": game_requirements.game_name,
             "minimum_gpu": game_requirements.minimum_gpu,
@@ -230,17 +238,17 @@ class CanRunEngine:
             game_name=game_requirements.game_name,
             resolution=detected_resolution_class,
         )
-        
+
         def _assess():
             return self.ml_predictor.assess_performance(
                 hardware_dict, game_requirements_dict, steam_estimate
             )
 
         performance_prediction = await asyncio.get_event_loop().run_in_executor(None, _assess)
-        
+
         # Calculate analysis time
         analysis_time = int((datetime.now() - start_time).total_seconds() * 1000)
-        
+
         # Create result
         result = CanRunResult(
             game_name=game_name,
@@ -253,67 +261,67 @@ class CanRunEngine:
             cache_used=False,
             analysis_time_ms=analysis_time
         )
-        
+
         # Cache result
         if use_cache:
             self._save_cached_result(game_name, result)
-        
-        self.logger.info(f"G-Assist analysis completed for {game_name} in {analysis_time}ms")
+
+        self.logger.info('G-Assist analysis completed for %s in %sms', game_name, analysis_time)
         return result
-    
+
     async def get_hardware_info(self) -> HardwareSpecs:
         """Get current hardware specifications."""
         return await self._get_hardware_specs()
-    
-    async def batch_check_games(self, game_names: List[str], use_cache: bool = True) -> List[CanRunResult]:
+
+    async def batch_check_games(self, game_names: list[str], use_cache: bool = True) -> list[CanRunResult]:
         """Check compatibility for multiple games."""
         if not isinstance(game_names, list) or not all(isinstance(name, str) for name in game_names):
             raise ValueError("Game names must be a list of strings")
         if len(game_names) > 20:
             raise ValueError("Too many games in one batch")
-        
+
         results = []
         for game_name in game_names:
             try:
                 result = await self.check_game_compatibility(game_name, use_cache)
                 results.append(result)
             except Exception as e:
-                self.logger.error(f"Batch check failed for {game_name}: {e}")
+                self.logger.error('Batch check failed for %s: %s', game_name, e)
                 results.append(self._create_error_result(game_name, str(e)))
-        
+
         return results
-    
+
     def clear_cache(self) -> None:
         """Clear cached results that stay inside the cache directory."""
         cache_files = self._listed_cache_files()
         for cache_file in cache_files:
             os.remove(cache_file)
-        self.logger.info(f"Cleared {len(cache_files)} cache files")
-    
-    def get_cache_stats(self) -> Dict[str, int]:
+        self.logger.info('Cleared %s cache files', len(cache_files))
+
+    def get_cache_stats(self) -> dict[str, int]:
         """Get cache statistics."""
         cache_files = self._listed_cache_files()
         total_size = sum(os.path.getsize(path) for path in cache_files)
-        
+
         return {
             'total_files': len(cache_files),
             'total_size_bytes': total_size,
             'total_size_mb': round(total_size / (1024 * 1024), 2)
         }
-    
+
     async def _get_hardware_specs(self) -> HardwareSpecs:
         """Get hardware specifications with session caching."""
         if self._hardware_cache is None:
             self._hardware_cache = await self.hardware_detector.get_hardware_specs()
         return self._hardware_cache
-    
+
     async def _fetch_game_requirements(self, game_name: str) -> GameRequirements:
         """Fetch game requirements from Steam API."""
         requirements = await self.game_fetcher.fetch_requirements(game_name)
         if requirements is None:
             raise ValueError(f"Requirements not found for {game_name}")
         return requirements
-    
+
     async def _analyze_compatibility(self, game_name: str,
                                    hardware_specs: HardwareSpecs,
                                    game_requirements: GameRequirements) -> CompatibilityAnalysis:
@@ -336,7 +344,7 @@ class CanRunEngine:
             "supports_dlss": hardware_specs.supports_dlss,
             "nvidia_driver_version": hardware_specs.nvidia_driver_version
         }
-        
+
         game_requirements_dict = {
             "game_name": game_requirements.game_name,
             "minimum_gpu": game_requirements.minimum_gpu,
@@ -354,14 +362,13 @@ class CanRunEngine:
             "minimum_os": game_requirements.minimum_os,
             "recommended_os": game_requirements.recommended_os
         }
-        
-        analysis = await asyncio.get_event_loop().run_in_executor(
+
+        return await asyncio.get_event_loop().run_in_executor(
             None, self.compatibility_analyzer.analyze_compatibility,
             game_name, hardware_dict, game_requirements_dict
         )
-        return analysis
-    
-    def _get_display_resolution(self, hardware_specs: HardwareSpecs) -> Dict[str, int]:
+
+    def _get_display_resolution(self, _hardware_specs: HardwareSpecs) -> dict[str, int]:
         """Get display resolution from hardware detector."""
         try:
             # Use the hardware detector's proper display resolution method
@@ -371,19 +378,19 @@ class CanRunEngine:
                 'height': display_info.get('height', 1080)
             }
         except Exception as e:
-            self.logger.warning(f"Display resolution detection failed: {e}")
+            self.logger.warning('Display resolution detection failed: %s', e)
             # Fallback to default
             return {'width': 1920, 'height': 1080}
-    
-    def _classify_resolution(self, display_resolution: Dict[str, int]) -> str:
+
+    def _classify_resolution(self, display_resolution: dict[str, int]) -> str:
         """Classify resolution for performance prediction using hardware detector."""
         width = display_resolution.get('width', 1920)
         height = display_resolution.get('height', 1080)
-        
+
         # Use the hardware detector's resolution tier classification
         return self.hardware_detector.get_resolution_tier(width, height)
-    
-    def _listed_cache_files(self) -> List[str]:
+
+    def _listed_cache_files(self) -> list[str]:
         root = os.path.realpath(self.cache_dir)
         if not os.path.isdir(root):
             return []
@@ -404,7 +411,7 @@ class CanRunEngine:
                 paths.append(path)
         return paths
 
-    def _load_cache_file(self, cache_file: str) -> Optional[CanRunResult]:
+    def _load_cache_file(self, cache_file: str) -> CanRunResult | None:
         """Load and validate a single cache file."""
         if not cache_file_is_trusted(self.cache_dir, cache_file):
             self.logger.warning("Refusing untrusted cache file")
@@ -419,29 +426,29 @@ class CanRunEngine:
             return None
         if not os.path.isfile(path):
             return None
-        
+
         try:
             mtime = os.path.getmtime(path)
             if (datetime.now().timestamp() - mtime) > self.cache_duration.total_seconds():
                 return None
 
-            with open(path, "r", encoding="utf-8") as f:
+            with open(path, encoding="utf-8") as f:
                 data = json.load(f)
-            
+
             return self._reconstruct_canrun_result(data)
         except Exception as e:
-            self.logger.warning(f"Failed to load cache file {cache_file}: {e}")
+            self.logger.warning('Failed to load cache file %s: %s', cache_file, e)
             return None
-    
-    def _reconstruct_canrun_result(self, data: Dict[str, Any]) -> CanRunResult:
+
+    def _reconstruct_canrun_result(self, data: dict[str, Any]) -> CanRunResult:
         """Reconstruct CanRunResult from dictionary data."""
         # Reconstruct nested dataclasses
         hardware_specs = HardwareSpecs(**trusted_dataclass_kwargs(data.get("hardware_specs"), HardwareSpecs))
         game_requirements = requirements_from_cache(data.get("game_requirements"))
-        
+
         # Properly reconstruct CompatibilityAnalysis with ComponentAnalysis objects
         compat_data = data['compatibility_analysis']
-        
+
         # Convert component_analyses from dicts to ComponentAnalysis objects
         component_analyses = []
         raw_components = compat_data.get("component_analyses") or []
@@ -453,7 +460,7 @@ class CanRunEngine:
             if isinstance(comp_dict.get("component"), str):
                 comp_dict["component"] = ComponentType(comp_dict["component"])
             component_analyses.append(ComponentAnalysis(**trusted_dataclass_kwargs(comp_dict, ComponentAnalysis)))
-        
+
         bottlenecks = []
         raw_bottlenecks = compat_data.get("bottlenecks") or []
         if not isinstance(raw_bottlenecks, list) or len(raw_bottlenecks) > 20:
@@ -465,14 +472,14 @@ class CanRunEngine:
                 bottlenecks.append(bottleneck)
             else:
                 raise ValueError("cache bottleneck is not a component name")
-        
+
         overall_compatibility = compat_data["overall_compatibility"]
         if isinstance(overall_compatibility, str):
             overall_compatibility = CompatibilityLevel(overall_compatibility)
         recommendations = compat_data.get("recommendations") or []
         if not isinstance(recommendations, list) or len(recommendations) > 20:
             raise ValueError("cache record has too many recommendations")
-        
+
         compatibility_analysis = CompatibilityAnalysis(
             game_name=str(compat_data["game_name"])[:MAX_GAME_NAME_LENGTH],
             overall_compatibility=overall_compatibility,
@@ -484,11 +491,11 @@ class CanRunEngine:
             summary=str(compat_data.get("summary") or "")[:500],
             recommendations=[str(item)[:300] for item in recommendations]
         )
-        
+
         performance_prediction = PerformanceAssessment(
             **trusted_dataclass_kwargs(data.get("performance_prediction"), PerformanceAssessment)
         )
-        
+
         return CanRunResult(
             game_name=data['game_name'],
             timestamp=data['timestamp'],
@@ -500,7 +507,7 @@ class CanRunEngine:
             cache_used=data.get('cache_used', True),
             analysis_time_ms=data.get('analysis_time_ms', 0)
         )
-    
+
     def _cache_file_for(self, game_name: str) -> str:
         normalized_name = self.game_matcher.normalize_game_name(game_name)
         return safe_cache_path(self.cache_dir, normalized_name)
@@ -509,29 +516,29 @@ class CanRunEngine:
         """Save analysis result to cache."""
         normalized_name = self.game_matcher.normalize_game_name(game_name)
         cache_file = safe_cache_path(self.cache_dir, normalized_name)
-        
+
         if not cache_file_is_trusted(self.cache_dir, cache_file):
             self.logger.warning("Refusing to write an untrusted cache path")
             return
         os.makedirs(self.cache_dir, exist_ok=True)
-        
+
         try:
             result_dict = asdict(result)
             result_dict['game_name'] = normalized_name
             payload = json.dumps(result_dict, indent=2, default=str)
             _write_private_cache(cache_file, payload)
-                
-            self.logger.debug(f"Cached result for '{game_name}' as '{normalized_name}'")
+
+            self.logger.debug("Cached result for '%s' as '%s'", game_name, normalized_name)
         except Exception as e:
-            self.logger.warning(f"Failed to save cache for {game_name}: {e}")
-    
+            self.logger.warning('Failed to save cache for %s: %s', game_name, e)
+
     def _create_error_result(self, game_name: str, error_message: str) -> CanRunResult:
         """Create an error result for failed analysis."""
         # Create minimal error components
         error_hardware = HardwareSpecs(
             gpu_model="Unknown",
             gpu_vram_gb=0,
-            cpu_model="Unknown", 
+            cpu_model="Unknown",
             cpu_cores=0,
             cpu_threads=0,
             ram_total_gb=0,
@@ -542,16 +549,16 @@ class CanRunEngine:
             os_version="Unknown",
             directx_version="Unknown"
         )
-        
+
         error_requirements = GameRequirements(
             game_name=game_name,
             minimum_cpu="Unknown",
-            minimum_gpu="Unknown", 
+            minimum_gpu="Unknown",
             minimum_ram_gb=0,
             minimum_vram_gb=0,
             minimum_storage_gb=0
         )
-        
+
         error_compatibility = CompatibilityAnalysis(
             game_name=game_name,
             overall_compatibility="INCOMPATIBLE",
@@ -563,7 +570,7 @@ class CanRunEngine:
             summary=f"Error: {error_message}",
             recommendations=["Please retry the analysis"]
         )
-        
+
         error_performance = PerformanceAssessment(
             score=0,
             tier="F",
@@ -574,7 +581,7 @@ class CanRunEngine:
             bottlenecks=[],
             upgrade_suggestions=["Please retry the analysis"]
         )
-        
+
         return CanRunResult(
             game_name=game_name,
             timestamp=datetime.now().isoformat(),
@@ -586,15 +593,15 @@ class CanRunEngine:
             cache_used=False,
             analysis_time_ms=0
         )
-    
+
     def check_compatibility(self, game_name: str) -> bool:
         """
         Simple synchronous compatibility check for testing and basic integration.
         Uses quick assessment without async complexity.
-        
+
         Args:
             game_name: Name of the game to check
-            
+
         Returns:
             True if game can run on minimum requirements, False otherwise
         """
@@ -606,20 +613,20 @@ class CanRunEngine:
                 'gpu_model': 'RTX 4070',  # Reasonable default
                 'cpu_cores': 8
             }
-            
+
             game_requirements = {
                 'game_name': game_name,
                 'minimum_ram_gb': 8,    # Conservative estimate
                 'minimum_gpu': 'GTX 1060'
             }
-            
+
             # Use quick compatibility check from analyzer
             result = self.compatibility_analyzer.quick_compatibility_check(
                 hardware_dict, game_requirements
             )
-            
+
             return result.get('can_run', False)
-            
+
         except Exception as e:
-            self.logger.debug(f"Quick compatibility check failed for {game_name}: {e}")
+            self.logger.debug('Quick compatibility check failed for %s: %s', game_name, e)
             return True  # Default to optimistic for testing
