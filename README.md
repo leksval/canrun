@@ -28,7 +28,9 @@ tags:
 
 **CanRun** is an RTX/GTX-exclusive G-Assist plugin that instantly tells you if your PC can run any game with an advanced **S-A-B-C-D-F tier system** and enhanced Steam integration.
 
-AVAILABLE on official Nvidia g-assist mod marketplace:  [mod.io/canrun](https://mod.io/g/g-assist/m/canrun2#description). The next marketplace upload is **version 12.0.0**.
+AVAILABLE on official Nvidia g-assist mod marketplace:  [mod.io/canrun](https://mod.io/g/g-assist/m/canrun2#description). CanRun is trending and top rated on the [G-Assist hub](https://mod.io/g/g-assist). The next marketplace upload is **version 12.0.0**.
+
+[![CanRun trending on the NVIDIA G-Assist hub](docs/g-assist-trending.jpg)](https://mod.io/g/g-assist/m/canrun2#description)
 
 ![R3](https://github.com/user-attachments/assets/79a68ba5-a4d9-493c-bea5-d455edadf627)
 
