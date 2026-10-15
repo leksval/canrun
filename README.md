@@ -24,6 +24,8 @@ tags:
   [![Steam API](https://img.shields.io/badge/Steam%20API-Integrated-blue.svg)](https://steamcommunity.com/dev)
   [![MCP Server](https://img.shields.io/badge/MCP%20Server-Enabled-brightgreen.svg)](https://developer.nvidia.com/mcp)
 
+[![CanRun](docs/canrun-logo.jpg)](https://mod.io/g/g-assist/m/canrun2#description)
+
 ## 🚀 Overview
 
 **CanRun** is an RTX/GTX-exclusive G-Assist plugin that instantly tells you if your PC can run any game with an advanced **S-A-B-C-D-F tier system** and enhanced Steam integration.
