@@ -326,6 +326,7 @@ BUILD_README.md
 canrun_diagnostic.log
 
 # Debug and testing files
+p.out
 *_DEBUG_*
 *_TEST_GUIDE.md
 *_ROADMAP.md
