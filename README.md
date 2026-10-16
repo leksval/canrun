@@ -60,43 +60,9 @@ AVAILABLE on official Nvidia g-assist mod marketplace:  [mod.io/canrun](https://
 
 ## Recent changes
 
-Version **12.1.0** is the release we will deploy to the [G-Assist Hub on mod.io](https://mod.io/g/g-assist/m/canrun2#description). The marketplace zip follows the official NVIDIA plugin layout. Build it with `pack_g_assist_zip.bat`.
+**12.1.0** is the current release. Release notes live with the [G-Assist Hub release](https://mod.io/g/g-assist/m/canrun2#description). In short: titles match on whole words, more GeForce cards are recognized, and the same FPS model was checked on independent benchmarks (15.2% median error end to end).
 
-### **New in v12.1: Real-world accuracy testing, correct game matching, more GPUs**
-- **Tested on outside data:** The cross-validation scores in v12.0 below come from CanRun's own benchmark suite. On independent measurements the full app is off by a median of **15.2%** (TechPowerUp, 308 results, end to end), **28.6%** (TechSpot, NVIDIA cards) and **30.7%** (OpenML user reports). See [Real-World Accuracy](#real-world-accuracy-on-independent-benchmarks).
-- **Whole-word title matching:** A typed title only matches a benchmark curve on whole words, and a sequel never falls back to the original game. The old substring matcher sent "Silent Hill 2" and "Star Wars Outlaws" to an unrelated game's curve, and "Assassin's Creed Mirage" to "RAGE". Fixing it cut end-to-end error from 35.1% to 15.2%.
-- **More GPUs recognized:** PassMark G3D scores were added for GeForce RTX 50, 40 Super and 3050, Radeon RX 5000 to 9000, and Intel Arc. Names with a memory size, such as "RX 7600 XT 16GB", fall back to the base card.
-- **Same ML model:** The FPS model is unchanged from v12.0 ([`grasant/canrun-fps-predictor`](https://huggingface.co/grasant/canrun-fps-predictor) v1.0).
-
-### **New in v12.0: v9.0 Two-Stage Monotonic ML Engine & 636,225-Row Training Suite**
-- **Why the model was changed:** The legacy v8.0 model memorized `game_name` and `gpu_model` IDs across only 15 games (675 lookup entries). When tested on **unseen games** (5-Fold `GroupKFold` by `game_name`), legacy v8.0 collapsed to **$R^2 = 0.0932$**, **`30.38%` MAPE** (`30.85 FPS` MAE), and **`11.17%` physical monotonicity violations** (sometimes predicting lower FPS for a faster GPU).
-- **What replaced it & key benefits:** We replaced v8.0 with the **v9.0 Two-Stage Log-Space Physics Ridge Prior + Monotonic Residual GBDT + Empirical Bayes Shrinkage** architecture trained on **21 leak-free continuous domain features**. The cross-validation numbers below are measured on CanRun's own, mostly generated training suite; see v12.1 above for real-world error.
-  - **6.8× lower unseen-game error:** Leave-Games-Out CV improves from **$R^2 = 0.0932$ → $0.9589$**, cutting MAPE from **`30.38%` → `4.48%`** (`1.19%` MdAPE, `3.97 FPS` MAE).
-  - **28× lower unseen-GPU error:** Leave-GPUs-Out CV improves from **$R^2 = 0.0949$ → $0.9987$**, cutting MAPE from **`30.35%` → `1.08%`** (`0.55%` MdAPE, `0.90 FPS` MAE).
-  - **Physical monotonicity (`0.00%–0.02%` violation rate):** Enforced directional monotonic constraints ensure a faster GPU/CPU or lower resolution never predicts lower FPS.
-  - **100% keyless & zero-ML-dependency runtime:** Compiled to pure JSON (`data/ml_fps_model_unified.json`) and evaluated in `<1 ms` in pure Python—no `scikit-learn`, `xgboost`, or `pickle` at runtime, and end users never need a `STEAM_WEBAPI_KEY`.
-- **Expanded Steam API data sources:** Using the developer `.env` `STEAM_WEBAPI_KEY` and public Steam APIs (`ISteamChartsService/GetMostPlayedGames`, `GetGamesByConcurrentPlayers`, `GetTopReleasesPages`, `IStoreService/GetAppList`, `IStoreBrowseService/GetItems`, `IGamePerformanceStatsService/GetGameFrameRateStats`, `store.steampowered.com/api/appdetails`, `api/featuredcategories`, `search/results`, and `SteamSpy`), the training pipeline builds **636,225 training rows** (**127,245 `GPU × Game × Resolution` curves**) across **1,697 Steam games**, **25 GPUs**, **3 resolutions**, and **5 CPU tiers**. Most of these curves are generated, not measured: 21 games come from published benchmarks, 58 are hand-calibrated, and 1,618 follow a fixed rule on the store's recommended GPU (990 of them on placeholder specs picked by release year). See [Training data](https://huggingface.co/grasant/canrun-fps-predictor#training-data) on the model card.
-DLSS side notes use NVIDIA's own multipliers and do not change the main FPS number. They appear only after a native estimate (the benchmark-table curve or the store spec), and only on an RTX card. A Steam player line and a scaled Steam line get no note, because those players may already be using DLSS. There is no DLSS line when an estimate is already at the 240 FPS cap.
-
-- **DLSS 4.5** on RTX 40 and 50. **DLSS 4** on RTX 20 and 30. NVIDIA recommends Model K there, because those GPUs lack FP8 and the newer Super Resolution models cost more performance.
-- **Modes:** Quality, Balanced, Performance. At 4K the list also includes Ultra Performance.
-- **Frame generation** (RTX 40): one extra frame per rendered frame, so 2×. An 85 FPS estimate reads `DLSS 4.5 frame gen: around 85 FPS more (2×).`
-- **Multi frame generation** (RTX 50): 4× in compatible games, up to 6× in select games. An 80 FPS estimate reads `DLSS 4.5 multi frame gen: around 240 to 400 FPS more (4× to 6×).`
-- **Dynamic mode** (RTX 50): aims at this screen's refresh rate. `DLSS 4.5 Dynamic mode aims at this 144 Hz screen.`
-- **Path tracing** (RTX): typically about 2× to 3× heavier than the raster estimate, with upscaling off. An 85 FPS estimate reads `Path tracing: around 45 to 55 FPS less (typically about 2× to 3× heavier).` The main FPS number stays the native estimate. NVIDIA does not publish one path-tracing cost for every game, so this is a typical range.
-
-Version 11.0.0 shipped the thin marketplace zip and the measured FPS ranges.
-
-Version 10.0 adds measured frame rates and an honest range around them.
-
-- **Steam player FPS.** `GetGameFrameRateStats` supplies the number when a hardware cluster has at least 10 reports. The line is labeled `Steam players`. The band is the measured average ± one standard deviation, and never narrower than ±8%.
-- **Similar-PC estimate.** When that sample is missing and the game is in `data/training_benchmarks.json`, FPS comes from a per-game, per-resolution curve: `log(fps) = a + b * log(passmark)`. The line says `estimated from a similar PC, native, ray tracing off`, and the band is ±20% (±25% at 4K). Games that are not in that table, and have no Steam sample, get an estimate from the ML model using the game's Steam store minimum and recommended specs.
-- **Display class.** If the monitor has substantially more pixels than the class used for the estimate (for example 3072×1728 treated as 1440p), the display line says which class the FPS number uses.
-- **Local matching & keyless runtime.** GPU and CPU names stay on this PC. End users do **not** need a `STEAM_WEBAPI_KEY` or any `config.json` key edit: the plugin fetches game requirements from the public Steam Store API (`store.steampowered.com`) and predicts frame rates locally using the pre-compiled **1,697-game benchmark curve table** and **Two-Stage Log-Ridge + Monotonic GBDT** JSON model (`data/ml_fps_model_unified.json`). Developers running the offline data-science harvest pipeline can optionally configure `STEAM_WEBAPI_KEY` in a local gitignored `.env` file.
-- **G-Assist SDK 3.1.0.** Protocol V2, JSON-RPC 2.0, length-prefixed messages. `manifest.json` uses `protocol_version` `"2.0"` and `executable` `plugin.py`.
-- **Hardening.** The Gradio app binds to `127.0.0.1`. Game names are stripped of control characters and capped at 120 characters. Cache files cannot leave the cache directory, and symlinks and files over 256 KB are refused. Steam app ids must be numeric.
-- **Estimate notice.** Every result ends with a notice that the check is an estimate and not a guarantee that the game will run or that the frame rate will match.
-- **Recent releases and bestsellers.** A saved list of Windows games from the last 30 days plus the current 100 bestsellers is checked before the store search, and kept for 6 hours. Refreshing that list does not delay the answer. A typed name that is the same title, or a split of one long word in it, uses that game so the check is scored instead of coming back unknown. "Dawn Walker" matches "The Blood of Dawnwalker" when that game is in the list. A short word such as "within" does not attach to a longer title. The local Steam library is still checked first. If the list has no similar title, store search retries the joined spelling.
+The model card is [grasant/canrun-fps-predictor](https://huggingface.co/grasant/canrun-fps-predictor) v1.0.
 
 ## 📦 G-Assist Plugin Installation
 
