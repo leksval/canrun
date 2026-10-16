@@ -635,7 +635,7 @@ The side note runs only after a native estimate (the table curve or the store sp
 ---
 ## Live Demo, download and test locally for real hardvare evaluation as MCP server
 [LINK](https://huggingface.co/spaces/grasant/canrun)
-![HF Space Demo](image.png)
+<img width="1373" height="1095" alt="image" src="https://github.com/user-attachments/assets/b1c702c7-037a-43e0-acff-fd4b94a4524a" />
 
 ---
 
