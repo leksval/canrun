@@ -667,14 +667,31 @@ def auto_detect(user_input: str = "") -> str:
 _plugin = None
 
 
+def _manifest_identity() -> tuple[str, str, str]:
+    """Name, version, and description from manifest.json.
+
+    mod.io installs the plugin in a folder named with the version, and G-Assist
+    uses that folder name. The manifest name has to be the same string.
+    """
+    path = os.path.join(_PLUGIN_DIR, "manifest.json")
+    with open(path, encoding="utf-8") as handle:
+        data = json.load(handle)
+    return (
+        str(data.get("name") or "canrun-12.1.0"),
+        str(data.get("version") or "12.1.0"),
+        str(data.get("description") or ""),
+    )
+
+
 def get_plugin() -> CanRunPlugin:
     """Build the Protocol V2 plugin and register manifest commands once."""
     global _plugin
     if _plugin is None:
+        name, version, description = _manifest_identity()
         _plugin = CanRunPlugin(
-            name="canrun",
-            version="12.1.0",
-            description="Says whether a Steam game can run on this PC and gives an FPS range when one is known.",
+            name=name,
+            version=version,
+            description=description,
         )
         _plugin.command(
             "check_compatibility",

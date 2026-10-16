@@ -17,7 +17,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DIST = ROOT / "dist"
-PLUGIN_FOLDER = "canrun"
+def plugin_folder(version: str) -> str:
+    """mod.io installs the zip's root folder under this name, version included."""
+    return f"canrun-{version}"
 
 PLUGIN_PY = [
     "plugin.py",
@@ -129,7 +131,7 @@ def _install_requirements(libs: Path) -> None:
         raise SystemExit(f"pip install failed with {result.returncode}")
 
 
-def _assert_official_layout(staging: Path, zip_path: Path) -> None:
+def _assert_official_layout(staging: Path, zip_path: Path, folder: str) -> None:
     staged = [path.relative_to(staging).as_posix() for path in staging.rglob("*") if path.is_file()]
     leaked = [name for name in staged if _is_excluded_data(Path(name).name) or "/.env" in f"/{name}"]
     if leaked:
@@ -138,14 +140,14 @@ def _assert_official_layout(staging: Path, zip_path: Path) -> None:
     with zipfile.ZipFile(zip_path) as archive:
         names = [name for name in archive.namelist() if not name.endswith("/")]
     roots = {name.split("/", 1)[0] for name in names}
-    if roots != {PLUGIN_FOLDER}:
-        raise SystemExit(f"Zip must contain exactly one root folder {PLUGIN_FOLDER!r}, found {sorted(roots)}")
+    if roots != {folder}:
+        raise SystemExit(f"Zip must contain exactly one root folder {folder!r}, found {sorted(roots)}")
     leaked = [name for name in names if _is_excluded_data(Path(name).name)]
     if leaked:
         raise SystemExit(f"Training or harvest files were zipped: {leaked}")
 
-    data_names = sorted(name for name in names if name.startswith(f"{PLUGIN_FOLDER}/data/"))
-    expected = {f"{PLUGIN_FOLDER}/data/{name}" for name in DATA_JSON}
+    data_names = sorted(name for name in names if name.startswith(f"{folder}/data/"))
+    expected = {f"{folder}/data/{name}" for name in DATA_JSON}
     if set(data_names) != expected:
         raise SystemExit(f"data/ contents {data_names} do not match the runtime tables {sorted(expected)}")
 
@@ -185,7 +187,7 @@ def stage(staging: Path) -> list[str]:
     return skipped
 
 
-def write_zip(staging: Path, zip_path: Path) -> None:
+def write_zip(staging: Path, zip_path: Path, folder: str) -> None:
     if zip_path.exists():
         zip_path.unlink()
     # G-Assist Hub requires exactly one root folder. A flat archive, or a
@@ -193,17 +195,18 @@ def write_zip(staging: Path, zip_path: Path) -> None:
     with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         for path in sorted(staging.rglob("*")):
             if path.is_file():
-                archive.write(path, f"{PLUGIN_FOLDER}/{path.relative_to(staging).as_posix()}")
+                archive.write(path, f"{folder}/{path.relative_to(staging).as_posix()}")
 
 
 def main() -> None:
     version = _plugin_version()
-    staging = DIST / f"canrun-{version}"
-    zip_path = DIST / f"canrun-{version}.zip"
+    folder = plugin_folder(version)
+    staging = DIST / folder
+    zip_path = DIST / f"{folder}.zip"
     DIST.mkdir(exist_ok=True)
     skipped = stage(staging)
-    write_zip(staging, zip_path)
-    _assert_official_layout(staging, zip_path)
+    write_zip(staging, zip_path, folder)
+    _assert_official_layout(staging, zip_path, folder)
 
     files = [path for path in staging.rglob("*") if path.is_file()]
     bytes_on_disk = sum(path.stat().st_size for path in files)

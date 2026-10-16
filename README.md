@@ -115,7 +115,9 @@ To build the standalone `dist/g-assist-plugin-canrun.exe` instead, use the proje
 
 ```bash
 .venv\Scripts\python.exe -m PyInstaller g-assist-plugin-canrun.spec --noconfirm --clean
-``` The archive has a single `canrun/` root folder, which is what the G-Assist Hub installer requires. After installing or updating, restart G-Assist from the NVIDIA overlay (IGO).
+```
+
+The archive has a single `canrun-<version>/` root folder. mod.io installs that folder by name, version included, and G-Assist launches the plugin under that same name. After installing or updating, restart G-Assist from the NVIDIA overlay (IGO).
 
 CanRun follows the current [NVIDIA G-Assist](https://github.com/NVIDIA/G-Assist) plugin contract: Protocol V2, JSON-RPC 2.0, and `gassist_sdk` 3.1.0. G-Assist launches `plugin.py` directly. The SDK is vendored at `libs/gassist_sdk`. The engine adds `libs/` to `PYTHONPATH`. `plugin.py` also adds the plugin directory to `sys.path`, because modules next to it are not on that path.
 

@@ -1,6 +1,6 @@
 {
   "manifestVersion": 1,
-  "name": "canrun",
+  "name": "canrun-12.1.0",
   "version": "12.1.0",
   "description": "Says whether a Steam game can run on this PC and gives an FPS range when one is known.",
   "executable": "plugin.py",
