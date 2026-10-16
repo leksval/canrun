@@ -240,9 +240,13 @@ build/
 dist/
 
 # Large executables. GitHub rejects a file over 100MB.
+<<<<<<< HEAD
 # Keep one copy: the plugin exe at the repo root. dist/ stays ignored.
 *.exe
 !/g-assist-plugin-canrun.exe
+=======
+*.exe
+>>>>>>> f8a69785216231b2b7c90a61ec1067430c1ba871
 
 # Additional large file protections (GitHub 100MB limit)
 # Machine learning models and training data

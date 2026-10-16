@@ -34,11 +34,10 @@ STEAM_MIN_RELATIVE_SPREAD = 0.08
 # data/training_benchmarks.json, one per kind of estimate.
 CURVE_RELATIVE_SPREAD = {"1080p": 0.20, "1440p": 0.20, "4K": 0.25}
 SCALED_RELATIVE_SPREAD = 0.30
-# Store-spec estimates blend the v9 model (unseen-game 80% band is about
-# ±4.5% / ±5.5% / ±6%) with the older spec heuristic. The shown range stays
-# wider than that synthetic band and wider than Steam's ±8% player floor,
-# because settings and scene noise are not in the training loss. It is
-# narrower than the old ±35/40/50 heuristic-only floor.
+# Store-spec estimates come from the v9 model alone when it is loaded; the
+# spec heuristic is only the fallback. On 182 measured TechPowerUp results for
+# unseen games the model's median error was about 15% (heuristic about 19%),
+# so the shown range stays far wider than the model's synthetic ±4.5–6% band.
 REQUIREMENTS_RELATIVE_SPREAD = {"1080p": 0.20, "1440p": 0.22, "4K": 0.25}
 FPS_FLOOR = 1
 FPS_CEILING = 1000
@@ -54,25 +53,23 @@ SOURCE_REQUIREMENTS_UNSPECIFIED = "requirements_unspecified"
 # Requirement estimates stop at a high-refresh ceiling. A 1000 FPS figure
 # would only mean "this PC is far past a weak spec", not a measured rate.
 _REQUIREMENTS_FPS_CAP = 240
-# Cards Steam pages name that are not in the NVIDIA hierarchy. Scores sit on
-# the same PassMark scale as the cards already in that file.
+# Cards Steam pages name that are not in the GPU hierarchy. Scores are
+# PassMark G3D averages, the same scale as that file.
 _EXTRA_GPU_PASSMARKS = {
-    "gtx 1060": 10080,
-    "gtx 750 ti": 3800,
-    "gtx 750": 3200,
-    "gtx 660": 4800,
-    "gtx 560": 2200,
-    "gts 450": 1800,
+    "gtx 1060": 10016,
+    "gtx 750 ti": 3900,
+    "gtx 750": 3281,
+    "gtx 660": 4043,
+    "gtx 560": 2775,
+    "gts 450": 1353,
     "geforce 7600 gs": 400,
-    "rx 6800": 25086,
-    "rx 6600": 14500,
-    "rx 580": 10080,
-    "rx 480": 9200,
-    "rx 460": 5500,
-    "rx 550": 4500,
-    "r7 370": 4500,
-    "hd 5750": 900,
-    "mx150": 2500,
+    "rx 580": 8781,
+    "rx 480": 8525,
+    "rx 460": 4096,
+    "rx 550": 2702,
+    "r7 370": 4483,
+    "hd 5750": 1174,
+    "mx150": 2246,
     "vega 8": 2200,
     "iris xe": 2800,
     "uhd graphics 630": 1400,
@@ -282,7 +279,7 @@ def load_gpu_passmarks() -> dict[str, int]:
     except (OSError, json.JSONDecodeError) as exc:
         logger.warning("Could not read GPU hierarchy: %s", exc)
         return passmarks
-    for section in ("nvidia", "amd"):
+    for section in ("nvidia", "amd", "intel"):
         for name, info in data.get(section, {}).items():
             if isinstance(info, dict) and "passmark_g3d" in info:
                 passmarks[normalize_gpu(name)] = int(info["passmark_g3d"])
@@ -336,7 +333,17 @@ def gpu_vendor(name: str) -> str:
 
 
 def lookup_gpu_passmark(name: str, passmarks: dict[str, int]) -> int | None:
-    return passmarks.get(normalize_gpu(name))
+    """Exact name first, then without a memory size or a trailing 'graphics'.
+
+    'RTX 5060 Ti 8GB' keeps its own entry, while 'RX 7600 XT 16GB' and
+    'Intel Arc B580 Graphics' fall back to the base card.
+    """
+    key = normalize_gpu(name)
+    if key in passmarks:
+        return passmarks[key]
+    base = re.sub(r"\s\d+\s?gb\b", "", key)
+    base = re.sub(r"\sgraphics$", "", base).strip()
+    return passmarks.get(base)
 
 
 def requirement_passmarks(gpu_passmarks: dict[str, int] | None = None) -> dict[str, int]:
@@ -358,7 +365,8 @@ def _requirement_haystack(text: str) -> str:
     raw = re.sub(r"(\d)\s*gb\b", r"\1gb", raw)
     raw = re.sub(r"(\d{3,4})\s*(ti|super)\b", r"\1 \2", raw)
     raw = re.sub(r"\bgtx\s+((?:20|30|40|50)\d{2}(?:\s+ti|\s+super)?)\b", r"rtx \1", raw)
-    raw = re.sub(r"\b(?:nvidia|geforce)\s+(\d{3,4})(?!\d)", r"rtx \1", raw)
+    raw = re.sub(r"\b(?:nvidia|geforce)\s+((?:20|30|40|50)\d{2})(?!\d)", r"rtx \1", raw)
+    raw = re.sub(r"\b(?:nvidia|geforce)\s+([6-9]\d{2}|1[06]\d{2})(?!\d)", r"gtx \1", raw)
     return f" {re.sub(r'\s+', ' ', raw).strip()} "
 
 
@@ -438,8 +446,9 @@ def estimate_from_requirements(
 ) -> FpsEstimate:
     """FPS for a game with no player sample, scaled from its published GPU spec.
 
-    Combines the physics power-law prior (recommended card = 60 FPS at 1080p,
-    minimum card = 30 FPS) with the Two-Stage Log-Ridge + Monotonic GBDT model.
+    Uses the Two-Stage Log-Ridge + Monotonic GBDT model when it is loaded and the
+    page names a GPU. Otherwise falls back to the power-law prior (recommended
+    card = 60 FPS at 1080p, minimum card = 30 FPS).
     """
     if gpu_passmarks is None:
         gpu_passmarks = load_gpu_passmarks()
@@ -488,8 +497,7 @@ def estimate_from_requirements(
         )
         tree_fps = predictor.predict_two_stage_from_features(x_vec)
         if tree_fps is not None and tree_fps > 0:
-            blended_fps = 0.78 * float(estimate.expected_fps) + 0.22 * float(tree_fps)
-            estimate = _spread_band(blended_fps, blended_fps * spread)
+            estimate = _spread_band(float(tree_fps), float(tree_fps) * spread)
 
     if estimate.expected_fps > _REQUIREMENTS_FPS_CAP:
         estimate = _spread_band(_REQUIREMENTS_FPS_CAP, _REQUIREMENTS_FPS_CAP * spread)
@@ -842,9 +850,10 @@ def _path_tracing_line(native: float) -> str:
     )
 
 
-def _normalize_game_key(name: str) -> str:
-    """Lowercase title with sequel numerals folded, so Diablo IV matches diablo 4."""
-    cleaned = re.sub(r"[^a-z0-9]+", " ", (name or "").lower())
+def _game_tokens(name: str) -> list[str]:
+    """Lowercase title words with sequel numerals folded, so Diablo IV matches diablo 4."""
+    cleaned = re.sub(r"['\u2019]", "", (name or "").lower())
+    cleaned = re.sub(r"[^a-z0-9]+", " ", cleaned)
     numerals = {
         "i": "1",
         "ii": "2",
@@ -857,21 +866,42 @@ def _normalize_game_key(name: str) -> str:
         "ix": "9",
         "x": "10",
     }
-    tokens = [numerals.get(token, token) for token in cleaned.split() if token]
-    return "".join(tokens)
+    return [numerals.get(token, token) for token in cleaned.split() if token]
+
+
+def _normalize_game_key(name: str) -> str:
+    return "".join(_game_tokens(name))
+
+
+def _contains_title(longer: list[str], shorter: list[str]) -> bool:
+    """Whole-word run of ``shorter`` inside ``longer``, not followed by a sequel number."""
+    size = len(shorter)
+    for start in range(len(longer) - size + 1):
+        if longer[start:start + size] == shorter:
+            following = longer[start + size] if start + size < len(longer) else ""
+            if not following.isdigit():
+                return True
+    return False
 
 
 def match_benchmark_game(game_name: str | None, games: list[str]) -> str | None:
-    query = _normalize_game_key(game_name or "")
+    if game_name in games:
+        return game_name
+    query_tokens = _game_tokens(game_name or "")
+    query = "".join(query_tokens)
     if not query:
         return None
-    keyed = [(_normalize_game_key(game), game) for game in games]
-    for norm, game in keyed:
-        if norm == query:
+    keyed = [(_game_tokens(game), game) for game in games]
+    for tokens, game in keyed:
+        if "".join(tokens) == query:
             return game
     if len(query) < 4:
         return None
-    hits = [game for norm, game in keyed if query in norm or norm in query]
+    hits = [
+        game for tokens, game in keyed
+        if len("".join(tokens)) >= 4
+        and (_contains_title(tokens, query_tokens) or _contains_title(query_tokens, tokens))
+    ]
     if len(hits) == 1:
         return hits[0]
     return None

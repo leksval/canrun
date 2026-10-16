@@ -27,11 +27,15 @@ from canrun_game_fetcher import (
 from canrun_game_matcher import CanRunGameMatcher
 from canrun_steam_fps import (
     SteamFpsClient,
+    first_known_gpu,
     load_gpu_passmarks,
     lookup_cpu_passmark,
+    lookup_gpu_passmark,
+    match_benchmark_game,
     measured_range,
     parse_frame_rate_payload,
     redact_secrets,
+    requirement_passmarks,
     resolve_fps,
     scale_from_reference,
     valid_steam_app_id,
@@ -42,6 +46,52 @@ from plugin import (
     extract_game_name,
     protocol_probe_requested,
 )
+
+
+@pytest.mark.parametrize(
+    ("line", "expected"),
+    [
+        ("NVIDIA 9800 GT 1GB / AMD HD 4870 1GB (DX 10, 10.1, 11)", None),
+        ("NVIDIA GeForce 8600/9600GT, ATI/AMD Radeon HD2600/3600", None),
+        ("NVIDIA GeForce 760, AMD Radeon R7 270X, or better", "gtx 7"),
+        ("NVIDIA GeForce 1060 6GB", "gtx 1060"),
+        ("NVIDIA GeForce 3060", "rtx 3060"),
+    ],
+)
+def test_requirement_line_never_turns_an_old_card_into_a_new_one(line, expected):
+    found = first_known_gpu(line, requirement_passmarks())
+    if expected is None:
+        assert found is None or not found[0].startswith("rtx")
+    else:
+        assert found is not None and found[0].startswith(expected)
+
+
+@pytest.mark.parametrize(("name", "expected"), [
+    ("AMD Radeon RX 9070 XT", 26924),
+    ("NVIDIA GeForce RTX 4080 SUPER", 34211),
+    ("Intel(R) Arc(TM) B580 Graphics", 16099),
+    ("AMD Radeon RX 7600 XT 16GB", 17356),
+    ("NVIDIA GeForce RTX 5060 Ti 16GB", 22621),
+    ("NVIDIA GeForce RTX 5060 Ti 8GB", 21833),
+    ("Radeon RX 9060 XT 8GB", 19663),
+])
+def test_gpu_lookup_covers_current_cards_and_memory_variants(name, expected):
+    assert lookup_gpu_passmark(name, load_gpu_passmarks()) == expected
+
+
+@pytest.mark.parametrize(("typed", "expected"), [
+    ("Silent Hill 2", None),
+    ("Assassin's Creed Mirage", None),
+    ("Stalker 2", None),
+    ("Witcher 3", "The Witcher 3: Wild Hunt"),
+    ("Space Marine 2", "Warhammer 40,000: Space Marine 2"),
+    ("Baldurs Gate 3", "Baldur's Gate 3"),
+    ("中华料理大王", "中华料理大王"),
+])
+def test_benchmark_title_match_needs_whole_words(typed, expected):
+    games = ["中华料理大王", "RAGE", "S.T.A.L.K.E.R.", "The Witcher 3: Wild Hunt",
+             "Warhammer 40,000: Space Marine 2", "Baldur's Gate 3", "Silent Hill"]
+    assert match_benchmark_game(typed, games) == expected
 
 
 def test_security_cache_path_cannot_escape_directory():
@@ -662,7 +712,7 @@ def test_optimization_cached_fps_resolution_stays_fast():
 
 
 def _plugin_with_capture():
-    plugin = CanRunPlugin("canrun", version="12.0.0")
+    plugin = CanRunPlugin("canrun", version="12.1.0")
     sent = []
 
     class Protocol:

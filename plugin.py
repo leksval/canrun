@@ -558,7 +558,7 @@ def cli_mode():
 class CanRunPlugin(Plugin):
     """Protocol V2 plugin. Command work runs off the reader thread so pings still get answers."""
 
-    def __init__(self, name: str, version: str = "12.0.0", description: str = ""):
+    def __init__(self, name: str, version: str = "12.1.0", description: str = ""):
         import signal
         previous_int = signal.getsignal(signal.SIGINT)
         previous_term = signal.getsignal(signal.SIGTERM)
@@ -673,7 +673,7 @@ def get_plugin() -> CanRunPlugin:
     if _plugin is None:
         _plugin = CanRunPlugin(
             name="canrun",
-            version="12.0.0",
+            version="12.1.0",
             description="Says whether a Steam game can run on this PC and gives an FPS range when one is known.",
         )
         _plugin.command(

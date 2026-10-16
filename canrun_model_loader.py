@@ -119,7 +119,7 @@ class LightweightMLPredictor:
                 with hierarchy_path.open(encoding="utf-8") as f:
                     hierarchy_data = json.load(f)
                     self.gpu_hierarchy = {}
-                    for vendor in ("nvidia", "amd"):
+                    for vendor in ("nvidia", "amd", "intel"):
                         vendor_gpus = hierarchy_data.get(vendor, {})
                         if not isinstance(vendor_gpus, dict):
                             continue

@@ -1,0 +1,10 @@
+# Runtime dependencies for the G-Assist plugin.
+# Installed into libs/ by install_g_assist_plugin.bat and scripts/pack_g_assist_zip.py.
+# Matches NVIDIA's layout: plugin.py, manifest.json, config.json, requirements.txt, libs/.
+# gassist_sdk is vendored under libs/gassist_sdk and is not on PyPI.
+# numpy, joblib, beautifulsoup4, and asyncio-throttle are not imported at runtime.
+aiohttp>=3.12.15
+py-cpuinfo>=9.0.0
+psutil>=5.0.0
+pynvml; platform_system=="Windows"
+wmi; platform_system=="Windows"

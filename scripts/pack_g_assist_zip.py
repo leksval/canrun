@@ -81,7 +81,7 @@ DROP_DIST_INFO = {
 
 def _plugin_version() -> str:
     manifest = json.loads((ROOT / "manifest.json").read_text(encoding="utf-8"))
-    return str(manifest.get("version") or "12.0.0")
+    return str(manifest.get("version") or "12.1.0")
 
 
 def _is_excluded_data(name: str) -> bool:

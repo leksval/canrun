@@ -159,13 +159,22 @@ class CanRunEngine:
 
         self.logger.info("CanRun engine initialized for G-Assist plugin")
 
-    async def check_game_compatibility(self, game_name: str, use_cache: bool = True) -> CanRunResult:
+    async def check_game_compatibility(
+        self,
+        game_name: str,
+        use_cache: bool = True,
+        hardware_specs: HardwareSpecs | None = None,
+        display_resolution: dict[str, int] | None = None,
+    ) -> CanRunResult:
         """
         Main entry point for game compatibility checking.
 
         Args:
             game_name: Name of the game to check
-            use_cache: Whether to use cached results
+            use_cache: Whether to use cached results. The cache is keyed by game
+                only, so callers passing hardware_specs must set this to False.
+            hardware_specs: Hardware to check instead of this PC's
+            display_resolution: {'width', 'height'} to use instead of this PC's display
 
         Returns:
             Complete CanRun analysis result
@@ -196,8 +205,8 @@ class CanRunEngine:
         if game_requirements is None:
             raise ValueError(f"Game requirements not found for '{game_name}'")
 
-        # Get hardware specifications
-        hardware_specs = await self._get_hardware_specs()
+        if hardware_specs is None:
+            hardware_specs = await self._get_hardware_specs()
 
         # Analyze compatibility
         compatibility_analysis = await self._analyze_compatibility(
@@ -205,7 +214,8 @@ class CanRunEngine:
         )
 
         # FPS comes from Steam frame-rate stats for this app and PC.
-        display_resolution = self._get_display_resolution(hardware_specs)
+        if display_resolution is None:
+            display_resolution = self._get_display_resolution(hardware_specs)
         detected_resolution_class = self._classify_resolution(display_resolution)
 
         hardware_dict = {

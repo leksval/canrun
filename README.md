@@ -17,7 +17,7 @@ tags:
 ---
 <table> <tr> <td width="110" valign="middle"> <img width="100" height="100" alt="canrun_logo" src="https://github.com/user-attachments/assets/239082bd-d5ca-427b-b235-5326299f3104" /> </td> <td valign="middle"> <h1 style="display:inline-block; vertical-align:middle; margin:0; padding:0;">  CanRun - System Spec Game Compatibility Checker </h1> </td> </tr> </table>
   
-  [![Version](https://img.shields.io/badge/version-12.0.0-blue.svg)](https://github.com/canrun/canrun)
+  [![Version](https://img.shields.io/badge/version-12.1.0-blue.svg)](https://github.com/canrun/canrun)
   [![Python](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/downloads/)
   [![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
   [![G-Assist](https://img.shields.io/badge/G--Assist-Official%20Protocol%20Verified-brightgreen.svg)](https://www.nvidia.com/en-us/geforce/technologies/g-assist/)
@@ -30,9 +30,11 @@ tags:
 
 **CanRun** is an RTX/GTX-exclusive G-Assist plugin that instantly tells you if your PC can run any game with an advanced **S-A-B-C-D-F tier system** and enhanced Steam integration.
 
-AVAILABLE on official Nvidia g-assist mod marketplace:  [mod.io/canrun](https://mod.io/g/g-assist/m/canrun2#description). CanRun is trending and top rated on the [G-Assist hub](https://mod.io/g/g-assist). The next marketplace upload is **version 12.0.0**.
+AVAILABLE on official Nvidia g-assist mod marketplace:  [mod.io/canrun](https://mod.io/g/g-assist/m/canrun2#description). CanRun is trending and top rated on the [G-Assist hub](https://mod.io/g/g-assist). The next marketplace upload is **version 12.1.0**.
 
 [![CanRun trending on the NVIDIA G-Assist hub](docs/g-assist-trending.jpg)](https://mod.io/g/g-assist/m/canrun2#description)
+
+## Demo
 
 ![R3](https://github.com/user-attachments/assets/79a68ba5-a4d9-493c-bea5-d455edadf627)
 
@@ -44,7 +46,7 @@ AVAILABLE on official Nvidia g-assist mod marketplace:  [mod.io/canrun](https://
 - **⭐ S-A-B-C-D-F Tier System**: Advanced performance classification with weighted scoring
 - 
 - **🧠 AI-Powered Analysis**: G-Assist routes natural language to the plugin. The S-A-B-C-D-F tier still comes from local hardware scoring
-- **📈 Frame Rates**: A Steam player sample is used when it has at least 10 reports. Otherwise a similar-PC estimate is used for games in the measured table. The range is wide enough that it is not presented as an exact FPS. The S-A-B-C-D-F tier still comes from local hardware scoring, not from that FPS number.
+- **📈 Frame Rates**: A Steam player sample is used when it has at least 10 reports. Otherwise a similar-PC estimate is used for games in the benchmark table, and the ML model estimates every other game from its Steam store specs. The range is wide enough that it is not presented as an exact FPS. On independent benchmarks the median error is 15–30% (see [Real-World Accuracy](#real-world-accuracy-on-independent-benchmarks)). The S-A-B-C-D-F tier still comes from local hardware scoring, not from that FPS number.
 - **🔒 Local Matching**: GPU and CPU names stay on this PC. The frame-rate request sends only the Steam app id
 - **🎯 Steam-First Data**: Game requirements come from the Steam Store API
 - **🎯 Intelligent Game Matching**: Names are matched against Windows games from the last 30 days and the current 100 bestsellers, then the Steam store. A close or split title still lands on the published game.
@@ -58,18 +60,23 @@ AVAILABLE on official Nvidia g-assist mod marketplace:  [mod.io/canrun](https://
 
 ## Recent changes
 
-Version **12.0.0** is the release we will deploy to the [G-Assist Hub on mod.io](https://mod.io/g/g-assist/m/canrun2#description). The marketplace zip follows the official NVIDIA plugin layout. Build it with `pack_g_assist_zip.bat`.
+Version **12.1.0** is the release we will deploy to the [G-Assist Hub on mod.io](https://mod.io/g/g-assist/m/canrun2#description). The marketplace zip follows the official NVIDIA plugin layout. Build it with `pack_g_assist_zip.bat`.
 
-### **New in v12.0: v9.0 Two-Stage Monotonic ML Engine & 623,475-Point Multi-Endpoint Steam API Dataset**
-- **Why the model was changed:** The legacy v8.0 model memorized `game_name` and `gpu_model` IDs across only 15 games (675 lookup entries). When tested on **unseen games** (5-Fold `GroupKFold` by `game_name`), legacy v8.0 collapsed to **$R^2 = 0.0302$**, **`30.97%` MAPE** (`30.73 FPS` MAE), and **`11.13%` physical monotonicity violations** (sometimes predicting lower FPS for a faster GPU).
-- **What replaced it & key benefits:** We replaced v8.0 with the **v9.0 Two-Stage Log-Space Physics Ridge Prior + Monotonic Residual GBDT + Empirical Bayes Shrinkage** architecture trained on **18 leak-free continuous domain features**:
-  - **6.4× lower unseen-game error:** Leave-Games-Out CV improves from **$R^2 = 0.0302$ → $0.9424$**, cutting MAPE from **`30.97%` → `4.82%`** (`1.13%` MdAPE, `4.25 FPS` MAE).
-  - **29.2× lower unseen-GPU error:** Leave-GPUs-Out CV improves from **$R^2 = 0.0320$ → $0.9988$**, cutting MAPE from **`30.94%` → `1.06%`** (`0.51%` MdAPE, `0.86 FPS` MAE).
+### **New in v12.1: Real-world accuracy testing, correct game matching, more GPUs**
+- **Tested on outside data:** The cross-validation scores in v12.0 below come from CanRun's own benchmark suite. On independent measurements the full app is off by a median of **15.2%** (TechPowerUp, 308 results, end to end), **28.6%** (TechSpot, NVIDIA cards) and **30.7%** (OpenML user reports). See [Real-World Accuracy](#real-world-accuracy-on-independent-benchmarks).
+- **Whole-word title matching:** A typed title only matches a benchmark curve on whole words, and a sequel never falls back to the original game. The old substring matcher sent "Silent Hill 2" and "Star Wars Outlaws" to an unrelated game's curve, and "Assassin's Creed Mirage" to "RAGE". Fixing it cut end-to-end error from 35.1% to 15.2%.
+- **More GPUs recognized:** PassMark G3D scores were added for GeForce RTX 50, 40 Super and 3050, Radeon RX 5000 to 9000, and Intel Arc. Names with a memory size, such as "RX 7600 XT 16GB", fall back to the base card.
+- **Same ML model:** The FPS model is unchanged from v12.0 ([`grasant/canrun-fps-predictor`](https://huggingface.co/grasant/canrun-fps-predictor) v1.0).
+
+### **New in v12.0: v9.0 Two-Stage Monotonic ML Engine & 636,225-Row Training Suite**
+- **Why the model was changed:** The legacy v8.0 model memorized `game_name` and `gpu_model` IDs across only 15 games (675 lookup entries). When tested on **unseen games** (5-Fold `GroupKFold` by `game_name`), legacy v8.0 collapsed to **$R^2 = 0.0932$**, **`30.38%` MAPE** (`30.85 FPS` MAE), and **`11.17%` physical monotonicity violations** (sometimes predicting lower FPS for a faster GPU).
+- **What replaced it & key benefits:** We replaced v8.0 with the **v9.0 Two-Stage Log-Space Physics Ridge Prior + Monotonic Residual GBDT + Empirical Bayes Shrinkage** architecture trained on **21 leak-free continuous domain features**. The cross-validation numbers below are measured on CanRun's own, mostly generated training suite; see v12.1 above for real-world error.
+  - **6.8× lower unseen-game error:** Leave-Games-Out CV improves from **$R^2 = 0.0932$ → $0.9589$**, cutting MAPE from **`30.38%` → `4.48%`** (`1.19%` MdAPE, `3.97 FPS` MAE).
+  - **28× lower unseen-GPU error:** Leave-GPUs-Out CV improves from **$R^2 = 0.0949$ → $0.9987$**, cutting MAPE from **`30.35%` → `1.08%`** (`0.55%` MdAPE, `0.90 FPS` MAE).
   - **Physical monotonicity (`0.00%–0.02%` violation rate):** Enforced directional monotonic constraints ensure a faster GPU/CPU or lower resolution never predicts lower FPS.
   - **100% keyless & zero-ML-dependency runtime:** Compiled to pure JSON (`data/ml_fps_model_unified.json`) and evaluated in `<1 ms` in pure Python—no `scikit-learn`, `xgboost`, or `pickle` at runtime, and end users never need a `STEAM_WEBAPI_KEY`.
-- **Expanded Steam API data sources (`923.7×` more data):** Using the developer `.env` `STEAM_WEBAPI_KEY` and public Steam APIs (`ISteamChartsService/GetMostPlayedGames`, `GetGamesByConcurrentPlayers`, `GetTopReleasesPages`, `IStoreService/GetAppList`, `IStoreBrowseService/GetItems`, `IGamePerformanceStatsService/GetGameFrameRateStats`, `store.steampowered.com/api/appdetails`, `api/featuredcategories`, `search/results`, and `SteamSpy`), the training pipeline harvests **1,664 unique Steam AppIDs** and builds **623,475 clean training records** (**124,695 primary `GPU × Game × Resolution` curves**) across **1,663 Steam games**, **25 GPUs**, **3 resolutions**, and **5 CPU tiers**.
-
-DLSS side notes use NVIDIA's own multipliers and do not change the main FPS number. They appear only after a native estimate (the measured-table curve or the store spec), and only on an RTX card. A Steam player line and a scaled Steam line get no note, because those players may already be using DLSS. There is no DLSS line when an estimate is already at the 240 FPS cap.
+- **Expanded Steam API data sources:** Using the developer `.env` `STEAM_WEBAPI_KEY` and public Steam APIs (`ISteamChartsService/GetMostPlayedGames`, `GetGamesByConcurrentPlayers`, `GetTopReleasesPages`, `IStoreService/GetAppList`, `IStoreBrowseService/GetItems`, `IGamePerformanceStatsService/GetGameFrameRateStats`, `store.steampowered.com/api/appdetails`, `api/featuredcategories`, `search/results`, and `SteamSpy`), the training pipeline builds **636,225 training rows** (**127,245 `GPU × Game × Resolution` curves**) across **1,697 Steam games**, **25 GPUs**, **3 resolutions**, and **5 CPU tiers**. Most of these curves are generated, not measured: 21 games come from published benchmarks, 58 are hand-calibrated, and 1,618 follow a fixed rule on the store's recommended GPU (990 of them on placeholder specs picked by release year). See [Training data](https://huggingface.co/grasant/canrun-fps-predictor#training-data) on the model card.
+DLSS side notes use NVIDIA's own multipliers and do not change the main FPS number. They appear only after a native estimate (the benchmark-table curve or the store spec), and only on an RTX card. A Steam player line and a scaled Steam line get no note, because those players may already be using DLSS. There is no DLSS line when an estimate is already at the 240 FPS cap.
 
 - **DLSS 4.5** on RTX 40 and 50. **DLSS 4** on RTX 20 and 30. NVIDIA recommends Model K there, because those GPUs lack FP8 and the newer Super Resolution models cost more performance.
 - **Modes:** Quality, Balanced, Performance. At 4K the list also includes Ultra Performance.
@@ -83,9 +90,9 @@ Version 11.0.0 shipped the thin marketplace zip and the measured FPS ranges.
 Version 10.0 adds measured frame rates and an honest range around them.
 
 - **Steam player FPS.** `GetGameFrameRateStats` supplies the number when a hardware cluster has at least 10 reports. The line is labeled `Steam players`. The band is the measured average ± one standard deviation, and never narrower than ±8%.
-- **Similar-PC estimate.** When that sample is missing and the game is in `data/training_benchmarks.json`, FPS comes from a per-game, per-resolution curve: `log(fps) = a + b * log(passmark)`. The line says `estimated from a similar PC, native, ray tracing off`, and the band is ±20% (±25% at 4K). Games that are not in that table, and have no Steam sample, show FPS as Unknown.
+- **Similar-PC estimate.** When that sample is missing and the game is in `data/training_benchmarks.json`, FPS comes from a per-game, per-resolution curve: `log(fps) = a + b * log(passmark)`. The line says `estimated from a similar PC, native, ray tracing off`, and the band is ±20% (±25% at 4K). Games that are not in that table, and have no Steam sample, get an estimate from the ML model using the game's Steam store minimum and recommended specs.
 - **Display class.** If the monitor has substantially more pixels than the class used for the estimate (for example 3072×1728 treated as 1440p), the display line says which class the FPS number uses.
-- **Local matching & keyless runtime.** GPU and CPU names stay on this PC. End users do **not** need a `STEAM_WEBAPI_KEY` or any `config.json` key edit: the plugin fetches game requirements from the public Steam Store API (`store.steampowered.com`) and predicts frame rates locally using the pre-compiled **1,663-game benchmark curve table** and **Two-Stage Log-Ridge + Monotonic GBDT** JSON model (`data/ml_fps_model_unified.json`). Developers running the offline data-science harvest pipeline can optionally configure `STEAM_WEBAPI_KEY` in a local gitignored `.env` file.
+- **Local matching & keyless runtime.** GPU and CPU names stay on this PC. End users do **not** need a `STEAM_WEBAPI_KEY` or any `config.json` key edit: the plugin fetches game requirements from the public Steam Store API (`store.steampowered.com`) and predicts frame rates locally using the pre-compiled **1,697-game benchmark curve table** and **Two-Stage Log-Ridge + Monotonic GBDT** JSON model (`data/ml_fps_model_unified.json`). Developers running the offline data-science harvest pipeline can optionally configure `STEAM_WEBAPI_KEY` in a local gitignored `.env` file.
 - **G-Assist SDK 3.1.0.** Protocol V2, JSON-RPC 2.0, length-prefixed messages. `manifest.json` uses `protocol_version` `"2.0"` and `executable` `plugin.py`.
 - **Hardening.** The Gradio app binds to `127.0.0.1`. Game names are stripped of control characters and capped at 120 characters. Cache files cannot leave the cache directory, and symlinks and files over 256 KB are refused. Steam app ids must be numeric.
 - **Estimate notice.** Every result ends with a notice that the check is an estimate and not a guarantee that the game will run or that the frame rate will match.
@@ -102,7 +109,13 @@ cd canrun
 pack_g_assist_zip.bat
 ```
 
-The zip is `dist/canrun-<version>.zip` (currently `dist/canrun-12.0.0.zip`). Upload that file to mod.io. The archive has a single `canrun/` root folder, which is what the G-Assist Hub installer requires. After installing or updating, restart G-Assist from the NVIDIA overlay (IGO).
+The zip is `dist/canrun-<version>.zip` (currently `dist/canrun-12.1.0.zip`). Upload that file to mod.io.
+
+To build the standalone `dist/g-assist-plugin-canrun.exe` instead, use the project venv, which has the GPU detection packages:
+
+```bash
+.venv\Scripts\python.exe -m PyInstaller g-assist-plugin-canrun.spec --noconfirm --clean
+``` The archive has a single `canrun/` root folder, which is what the G-Assist Hub installer requires. After installing or updating, restart G-Assist from the NVIDIA overlay (IGO).
 
 CanRun follows the current [NVIDIA G-Assist](https://github.com/NVIDIA/G-Assist) plugin contract: Protocol V2, JSON-RPC 2.0, and `gassist_sdk` 3.1.0. G-Assist launches `plugin.py` directly. The SDK is vendored at `libs/gassist_sdk`. The engine adds `libs/` to `PYTHONPATH`. `plugin.py` also adds the plugin directory to `sys.path`, because modules next to it are not on that path.
 
@@ -185,7 +198,7 @@ If the plugin is not detected by G-Assist:
 4. **Check Logs**: Review `%USERPROFILE%\canrun_plugin.log` and `gassist_sdk.log` in the plugin directory
 5. **Test CLI Mode**: Run `python plugin.py canrun "cyberpunk 2077" --json` from the plugin directory
 
-A Steam-backed FPS line looks like `93-139 FPS (Steam players)` or `93-139 FPS (estimated from a similar PC, native, ray tracing off)`. A heavier monitor adds `FPS estimate uses 1440p` on the display line. When neither Steam nor the measured table has the game, FPS is Unknown.
+A Steam-backed FPS line looks like `93-139 FPS (Steam players)` or `93-139 FPS (estimated from a similar PC, native, ray tracing off)`. A heavier monitor adds `FPS estimate uses 1440p` on the display line. When neither Steam nor the benchmark table has the game, the ML model estimates FPS from the store specs, for example `53-83 FPS (estimated from the recommended GPU for this resolution, ray tracing off)`.
 
 ### Keyless Runtime & Developer `.env` Setup
 
@@ -300,12 +313,14 @@ python app.py
 
 ## 🧠 ML Pipeline
 
-CanRun v12.0 ships the **v9.0 Two-Stage Log-Space Physics Ridge Prior + Monotonic Residual GBDT + Empirical Bayes Shrinkage** architecture (`data/ml_fps_model_unified.json`). At runtime, the compiled model is evaluated in **100% pure Python** (`canrun_model_loader.py` and `canrun_steam_fps.py`) with zero `scikit-learn`, `xgboost`, or `pickle` runtime dependencies.
+CanRun v12.1 ships the **v9.0 Two-Stage Log-Space Physics Ridge Prior + Monotonic Residual GBDT + Empirical Bayes Shrinkage** architecture (`data/ml_fps_model_unified.json`). At runtime, the compiled model is evaluated in **100% pure Python** (`canrun_model_loader.py` and `canrun_steam_fps.py`) with zero `scikit-learn`, `xgboost`, or `pickle` runtime dependencies.
 
 ### **Why We Changed the Model (Legacy v8.0 vs. New v9.0 / v1.0 Production Release) & By How Much It Improved**
 
 #### **Can We Hit +98% Without Hurting Generalization?**
 **Yes on the scores that matter for a shipped plugin. No on raw-FPS Leave-Games-Out $R^2$, unless we cheat.**
+
+All scores in this table are cross-validation on CanRun's own benchmark suite, whose curves share one collection pipeline. They do not carry over to outside data, where the median error is 15–30%. See [Real-World Accuracy](#real-world-accuracy-on-independent-benchmarks).
 
 | What “+98%” usually means | New v9.0 score | Already ≥ 98%? | Safe to push higher? |
 | :--- | :---: | :---: | :--- |
@@ -339,7 +354,7 @@ Evaluated across **`636,225` hardware-game-resolution records** (`1,697` Steam g
 #### **4 Core Architectural Reasons Why the New Model Wins**
 1. **Eliminated Target Leakage & Game-ID Memorization:**
    - **Problem in Old v8.0:** The legacy v8.0 model encoded `game_name` and `gpu_model` identifiers directly and relied on a 675-entry static lookup table across only 15 games. While random train/test splits on those 15 memorized games reported an inflated $R^2$ (`0.9866`), rigorous **5-Fold `GroupKFold` by `game_name` (Leave-Games-Out)** proved it failed on unseen games ($R^2 = 0.0932$, $\text{MAPE} = 30.38\%$, $\text{MAE} = 30.85\text{ FPS}$).
-   - **Benefit in New v9.0:** Zero game names, AppIDs, or GPU strings are fed into the regressor. Instead, v9.0 learns from **18 continuous physical & hardware-headroom ratios** (user GPU/CPU PassMark vs. official Steam minimum/recommended specs, pixel count ratio, VRAM/RAM headroom, and GPU architecture tier), achieving **$R^2 = 0.9539$** and **`4.57%` MAPE** on completely unseen games.
+   - **Benefit in New v9.0:** Zero game names, AppIDs, or GPU strings are fed into the regressor. Instead, v9.0 learns from **21 continuous physical & hardware-headroom ratios** (user GPU/CPU PassMark vs. official Steam minimum/recommended specs, pixel count ratio, VRAM/RAM headroom, and GPU architecture tier), achieving **$R^2 = 0.9589$** and **`4.48%` MAPE** on unseen games in the training suite.
 2. **Enforced Physical Monotonicity Invariants:**
    - **Problem in Old v8.0:** Unconstrained trees and corrupted benchmark rows caused **`11.17%` monotonicity violations**, occasionally predicting lower FPS for a faster GPU on the same game and resolution.
    - **Benefit in New v9.0:** Stage-2 EDA gates repair cross-game duplicate rows and PassMark inversions prior to training, and Stage-4 enforces directional monotonic constraints (`+1` on hardware PassMark/VRAM/headroom, `-1` on resolution pixels), reducing monotonicity violations to **`0.00%`** on both unseen GPUs and unseen games.
@@ -347,11 +362,13 @@ Evaluated across **`636,225` hardware-game-resolution records** (`1,697` Steam g
    - **Problem in Old v8.0:** Relying on live authenticated telemetry at runtime required users to obtain and paste a `steam_webapi_key`, while shipping `scikit-learn`/`joblib` `.pkl` files bloated the plugin and risked Python ABI mismatches.
    - **Benefit in New v9.0:** Both the Level-0 Ridge weights and Level-1 GBDT decision trees are compiled into pure JSON (`data/ml_fps_model_unified.json`) and traversed in `<1 ms` using standard-library Python. End users need **no API key** in `config.json`.
 4. **Calibrated Split-Conformal Prediction Intervals:**
-   - **Benefit in New v9.0:** Prediction ranges (`fps_min` to `fps_max`) are calibrated using out-of-fold log-residual quantiles per resolution (`1080p`, `1440p`, `4K`) to guarantee $\mathbf{80.0\%}$ empirical coverage on held-out games and GPUs (compared to only `20.89%` coverage in Old v8.0).
+   - **Benefit in New v9.0:** Prediction ranges (`fps_min` to `fps_max`) are calibrated using out-of-fold log-residual quantiles per resolution (`1080p`, `1440p`, `4K`) to give $\mathbf{80.0\%}$ empirical coverage on held-out games and GPUs inside the benchmark suite (compared to only `20.89%` coverage in Old v8.0). On independent benchmarks the band is far too narrow: it held the measured FPS only 15.4% of the time on TechPowerUp. The plugin shows its own wider range instead.
 
 ### **Training Data Description (`636,225` Records Across `1,697` Steam Games)**
 
 The training dataset (`data/clean_training_dataset.json`, kept local via `.gitignore` to respect Steam data copyrights) is a structured 4-dimensional panel dataset spanning **`Game × GPU × Resolution × CPU`**.
+
+**Most of it is generated, not measured.** Every game gets a curve `FPS = anchor_4090 × (PassMark / 38,192)^β` over 25 GPUs and 3 resolutions. The anchor and exponent come from published benchmarks for 21 games, are set by hand for 58, and follow a fixed rule on the store's recommended GPU for the other 1,618, of which 990 use placeholder specs picked by release year. The curves are then expanded over 5 CPU tiers. Because the targets for about 95% of games are a function of the model's own inputs, the cross-validation scores in this section mostly show that the model learned that rule. Real-world error is 15–40% (see [Real-World Accuracy](#real-world-accuracy-on-independent-benchmarks)).
 
 #### **1. Multi-Endpoint Steam API & Benchmark Data Sources (10 Sources)**
 Using the developer `.env` `STEAM_WEBAPI_KEY` alongside public Steam Store and SteamSpy APIs, `scripts/ds_pipeline/collect_and_audit.py` ingests and cross-validates **10 distinct sources**:
@@ -421,7 +438,7 @@ Every statistical and machine-learning technique in the v9.0 pipeline was select
 - **Why it was used:** Decision tree ensembles (`XGBoost`, `LightGBM`, `HistGradientBoosting`) are piecewise-constant step functions—they **cannot extrapolate** beyond the minimum or maximum feature values seen during training, and they produce jagged staircase predictions when interpolating across sparse hardware tiers. Conversely, a pure linear model in log-space (`M2`: Log-Ridge Prior Only, $R^2 = 0.8969$, $\text{MAPE} = 7.38\%$) captures the smooth global power-law scaling but misses non-linear hardware bottlenecks.
 - **How it works & benefit:**
   - **Stage 1 (Level-0 Physics Log-Ridge Prior):** Fits an $L_2$-regularized linear model $\hat{\ell}_{\text{prior}}(x) = w_0 + w^\top \tilde{x}$ on standardized log-ratio features, capturing the global scaling laws of GPU throughput, resolution pixel load, and Steam recommended specs.
-  - **Stage 2 (Level-1 Monotonic `HistGradientBoostingRegressor` on Residuals):** Trained strictly on the log-residuals $r_i = \ln(y_i) - \hat{\ell}_{\text{prior}}(x_i)$ to capture complex non-linear effects: **VRAM exhaustion cliffs** (when `user_vram < min_vram` at 4K), **1080p CPU bottleneck plateaus** on high-end GPUs paired with budget CPUs, **60 FPS engine locks**, and **generational shader efficiency**. Combining both stages (`M4`) cuts Leave-Games-Out MAPE from **`7.38%` (`M2`) $\rightarrow$ `4.57%` (`M4`)** while preserving smooth extrapolation to future GPU tiers.
+  - **Stage 2 (Level-1 Monotonic `HistGradientBoostingRegressor` on Residuals):** Trained strictly on the log-residuals $r_i = \ln(y_i) - \hat{\ell}_{\text{prior}}(x_i)$ to capture complex non-linear effects: **VRAM exhaustion cliffs** (when `user_vram < min_vram` at 4K), **1080p CPU bottleneck plateaus** on high-end GPUs paired with budget CPUs, **60 FPS engine locks**, and **generational shader efficiency**. Combining both stages (`M4`) cuts Leave-Games-Out MAPE from **`7.24%` (`M2`) $\rightarrow$ `4.48%` (`M4`)** while preserving smooth extrapolation to future GPU tiers.
 
 #### **3. Directional Monotonic Constraints (`monotonic_cst`)**
 - **Why it was used:** Unconstrained gradient-boosted trees (`M3`) split greedily on noisy local correlations, resulting in **`0.73%` physical monotonicity violations** on unseen GPUs (and **`11.17%` in legacy v8.0**)—meaning a user with an `RTX 4070 Ti` could occasionally be predicted to get *lower* FPS than an `RTX 4070` in the exact same game and resolution.
@@ -438,7 +455,7 @@ Every statistical and machine-learning technique in the v9.0 pipeline was select
 
 #### **5. Entity-Free, Leak-Free Continuous Domain Feature Engineering (18 Features)**
 - **Why it was used:** Feeding categorical or target-encoded `game_name`, `steam_app_id`, or `gpu_model` identifiers into the regressor (as in legacy v8.0) causes the model to memorize specific titles and fail completely on newly released Steam games ($R^2 = 0.0932$).
-- **Benefit:** By representing every game exclusively through **continuous physical ratios** between the user's PC and the game's parsed Steam Store requirements (`gpu_headroom_rec = log(user_gpu_pm / rec_gpu_pm)`, `spec_demand_index`, `vram_cliff_penalty`), the model generalizes zero-shot to **any brand-new or upcoming game on Steam** the moment its store requirements page is published ($R^2 = 0.9539$, `4.57%` MAPE on Leave-Games-Out CV).
+- **Benefit:** By representing every game exclusively through **continuous physical ratios** between the user's PC and the game's parsed Steam Store requirements (`gpu_headroom_rec = log(user_gpu_pm / rec_gpu_pm)`, `spec_demand_index`, `vram_cliff_penalty`), the model generalizes zero-shot to **any brand-new or upcoming game on Steam** the moment its store requirements page is published ($R^2 = 0.9589$, `4.48%` MAPE on Leave-Games-Out CV in the training suite; 18.9% median error on independent TechPowerUp data).
 
 #### **6. Dual `GroupKFold` Cross-Validation (Leave-Games-Out & Leave-GPUs-Out)**
 - **Why it was used:** In panel data (`Game × GPU × Resolution × CPU`), standard random $k$-fold splits place 80% of a game's GPU rows in the training set and 20% of the *same game's* rows in the test set. That leaks the game's baseline frame rate across folds and produced legacy v8.0's misleading `0.9866` $R^2$.
@@ -462,7 +479,7 @@ Every statistical and machine-learning technique in the v9.0 pipeline was select
 - **Why JSON beats `.pkl`/`joblib`, `.onnx`, and `.safetensors` for G-Assist:**
   - **Zero Binary Runtime Dependencies:** Shipping `.pkl`/`joblib` requires bundling `scikit-learn`, `scipy`, and `numpy` (~150+ MB) into the G-Assist plugin `libs/` folder and breaks across Python minor versions. Shipping `.onnx` requires `onnxruntime` (~45 MB native C++ DLLs). By compiling the `StandardScaler`, `Ridge` weights, and `HistGradientBoostingRegressor` decision trees into `data/ml_fps_model_unified.json`, `canrun_model_loader.py` executes inference using **only Python's built-in `json` and `math` modules**.
   - **Security & Auditability (mod.io / NVIDIA G-Assist Compliance):** Python `pickle`/`.joblib` files can execute arbitrary code on load (`__reduce__`) and are flagged by security scanners. JSON is 100% declarative, human-inspectable, and safe.
-  - **Sub-Millisecond Inference & Tiny Zip Footprint:** The 220 GBDT trees + Ridge weights take only **`~790 KB`** in JSON (and the entire `127,245`-entry lookup table + trees compress to **`~650 KB`** inside `dist/canrun-12.0.0.zip`). Tree traversal takes **`< 0.15 ms`** per prediction with verified numerical parity ($\max |\Delta \text{FPS}| = 1.72 \times 10^{-6}\text{ FPS}$ across 500 test rows).
+  - **Sub-Millisecond Inference & Tiny Zip Footprint:** The 100 GBDT trees + Ridge weights take about **`920 KB`** in JSON (and with the `127,245`-entry lookup table the model file compresses to **`~660 KB`** inside `dist/canrun-12.1.0.zip`). A prediction takes about **`0.06 ms`**, and the published `inference.py` gives the same features and predictions as the plugin runtime.
 
 ### **Head-to-Head Model Performance Comparison (Old v8.0 vs. New v9.0 / v1.0)**
 
@@ -489,6 +506,41 @@ Evaluated across all **636,225 records** (`1,697` games, `25` GPUs, `5` CPUs) us
 | **`M2`: Level-0 Physics Log-Ridge Prior Only** | `0.9064` | `7.24%` | `3.79%` | `7.27 FPS` | `17.00 FPS` | `0.00%` |
 | **`M3`: Single-Stage Unconstrained GBDT** | `0.9650` | `6.05%` | `3.18%` | `5.09 FPS` | `10.39 FPS` | `0.77%` |
 | **`M4`: New v9.0 Two-Stage Log-Ridge + Monotonic GBDT + EB** | **`0.9987`** | **`1.08%`** | **`0.55%`** | **`0.90 FPS`** | **`1.97 FPS`** | **`0.00%`** |
+
+### **Real-World Accuracy on Independent Benchmarks**
+
+The tables above are cross-validation inside CanRun's own benchmark suite. To measure real-world error, the model and the full plugin were tested against outside measurements that were never used for training, with nothing tuned to them. All values are median absolute percentage error.
+
+| Test set | Points | Model alone | Full CanRun app | Naive spec heuristic |
+| :--- | :---: | :---: | :---: | :---: |
+| [TechPowerUp RTX 5070 review](https://www.techpowerup.com/review/nvidia-geforce-rtx-5070-founders-edition/) (Mar 2025), full app end to end: 24 games typed by name, 11 NVIDIA cards, 1080p and 1440p, live Steam requirements | 308 | n/a | **15.2%** | n/a |
+| TechPowerUp, the 7 games without a measured curve (store-spec path only) | 266 | **18.9%** | 20.8% | 19.8% |
+| TechSpot reviews (2025–2026): Forza Horizon 6, Crimson Desert, Battlefield 6, DOOM: The Dark Ages | 98 | 36.7% | **32.9%** (NVIDIA only: 28.6%) | 37.5% |
+| [OpenML 42737 "fps-in-video-games"](https://www.openml.org/d/42737) (user reports, 2019–2020 hardware, 14 games) | 12,032 | 39.4% | **30.7%** | n/a |
+
+- **What a user sees:** In the end-to-end test, the app put the game on the right side of 30 FPS 99.4% of the time and of 60 FPS 93.8% of the time. 31.2% of predictions were within 10%, and the measured value was inside the shown range 57.1% of the time.
+- **Where it misses:** The newest games are predicted about 30% too low (Forza Horizon 6 at High 56% low). Old, CPU-limited PCs are predicted about 22% too high on OpenML. AMD and Intel cards are less accurate than NVIDIA (38.7% vs 28.6% on TechSpot), because the training suite is mostly NVIDIA.
+- **Noise floor:** In OpenML, a single user report differs from the median of identical hardware by 12.5%, so no predictor can get much below that on this set.
+- **Not scored:** God of War Ragnarök and Ratchet & Clank: Rift Apart (39 cases) were not found from the typed title. AMD cards are rejected by the G-Assist plugin by design.
+
+**How the app raises the score above the model alone**
+1. **Benchmark curves first.** When a game is in the benchmark table, the app reads the user's GPU off that game's own curve. On OpenML that lowers the error from 39.4% to 30.7%. In the end-to-end test the curve path scored 15.6% on 154 points.
+2. **The model for everything else.** Games without a curve use the model with the live Steam store specs: 18.5% on 132 end-to-end points. Games whose store page lists only a minimum spec scored 7.6% on 22 points.
+3. **Matching the right game.** The whole-word title matcher took the end-to-end error from 35.1% to 15.2% without any model change.
+4. **Real hardware scores.** PassMark G3D averages for current NVIDIA, AMD and Intel cards.
+
+The app does not always win: on F1 24 its store-spec path is 54% off while the model alone is 29% off, because the app passes the model fewer inputs (no VRAM, release year or genre).
+
+**Compared with other FPS estimators:** FPS calculator sites that publish accuracy on independent data report a median error of 26% ([FPSGauge](https://fpsgauge.com/methodology), 1,990 results) and 41.6% ([FPSHQ](https://fpshq.com/en/methodology/), 1,341 review results). CanRun's 15–30% is in line with or better than those, while running fully on the user's PC. Each tool was tested on different data, so this is a comparison of size, not a head-to-head.
+
+Reproduce with the scripts in `scripts/ds_pipeline/`:
+
+```bash
+py -3 scripts/ds_pipeline/evaluate_demo_end_to_end.py      # live Steam, paced to stay under Steam's rate limit
+py -3 scripts/ds_pipeline/evaluate_external_benchmarks.py  # TechPowerUp, model alone vs app path
+py -3 scripts/ds_pipeline/evaluate_techspot_benchmarks.py
+py -3 scripts/ds_pipeline/evaluate_openml_benchmarks.py    # needs the OpenML 42737 ARFF file
+```
 
 ### **21 Leak-Free Domain Features (`scripts/ds_pipeline/features.py`)**
 No game title strings, game IDs, or GPU model names are ever fed into the regressor. Instead, the model learns from **21 continuous physical & hardware-ratio features** with enforced monotonic constraints (`+1` on user GPU/CPU PassMark, VRAM, and headroom ratios; `-1` on resolution pixels, 60 FPS engine locks, and heavier genres):
@@ -597,7 +649,7 @@ Why the steps are in this order:
 
 4. **Busiest unlabeled bucket.** Steam sometimes returns a count with no GPU name. That bucket is treated as an RTX 5070 and scaled the same way, with the same ±30% range and mixed-settings label.
 
-5. **Store requirements.** Used only when all of the above miss and this GPU has a PassMark score. A recommended GPU is taken as 60 FPS at 1080p, a minimum GPU as 30, and an unnamed spec as a GTX 1050 Ti at 60. That anchor is blended with the v9 two-stage model, then capped at 240. The range is ±20% at 1080p, ±22% at 1440p, and ±25% at 4K. The model's own 80% band on unseen games is about ±5–6%, and Steam's live player floor is ±8%. The shown band stays wider than both, because driver, settings, and scene noise are not in the training loss. It is tighter than the old ±35/40/50 heuristic-only floor.
+5. **Store requirements.** Used only when all of the above miss and this GPU has a PassMark score. When the store page names a GPU, the estimate is the v9 two-stage model's prediction alone, capped at 240. If the model is not loaded, or the page names no GPU, a recommended GPU is taken as 60 FPS at 1080p, a minimum GPU as 30, and an unnamed spec as a GTX 1050 Ti at 60. The range is ±20% at 1080p, ±22% at 1440p, and ±25% at 4K. On 182 measured TechPowerUp results for games outside the training data (`scripts/ds_pipeline/evaluate_external_benchmarks.py`), the model's median error was 15.2% against 18.6% for the spec heuristic and 22.4% for the old blend of the two, and about 60% of results fell inside the shown range.
 
 6. **Unknown.** Shown when this PC's GPU has no PassMark score, so none of the later scales can run.
 
@@ -623,4 +675,13 @@ The side note runs only after a native estimate (the table curve or the store sp
 **Ready to see if your system can run any game? CanRun delivers A-tier performance analysis with official G-Assist protocol support!**
 
 For technical support, feature requests, or contributions, visit [GitHub repository](https://github.com/leksval/canrun).
+
+### Steam Web API & Trademark Disclaimer
+
+CanRun is an independent project and is **not** endorsed by, affiliated with, or sponsored by Valve Corporation. In accordance with the [Steam Web API Terms of Use](https://steamcommunity.com/dev/apiterms) (Sections 2, 5, 7, 8, and 9):
+- No raw Steam database dumps, nonpublic end-user Steam data, or Steam Web API keys are redistributed in this repository or in the [Hugging Face model (`grasant/canrun-fps-predictor`)](https://huggingface.co/grasant/canrun-fps-predictor).
+- All hardware detection and FPS inference run locally on the user's PC; only the numeric Steam App ID is queried against the public Steam Store API when requested by the user.
+- Any Steam Data retrieved at runtime is provided **"AS IS," "WITH ALL FAULTS," AND "AS AVAILABLE,"** without warranty of any kind. Valve Corporation, Steam game publishers/developers, and the authors of CanRun disclaim all warranties and liability arising from use of the Steam Web API or Steam Data.
+- Valve and Steam are registered trademarks of Valve Corporation. NVIDIA, GeForce RTX, DLSS, and G-Assist are trademarks of NVIDIA Corporation.
+
 #AIonRTXHackathon
