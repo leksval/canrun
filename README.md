@@ -46,7 +46,7 @@ AVAILABLE on official Nvidia g-assist mod marketplace:  [mod.io/canrun](https://
 - **⭐ S-A-B-C-D-F Tier System**: Advanced performance classification with weighted scoring
 - 
 - **🧠 AI-Powered Analysis**: G-Assist routes natural language to the plugin. The S-A-B-C-D-F tier still comes from local hardware scoring
-- **📈 Frame Rates**: A Steam player sample is used when it has at least 10 reports. Otherwise a similar-PC estimate is used for games in the benchmark table, and the ML model estimates every other game from its Steam store specs. The range is wide enough that it is not presented as an exact FPS. On independent benchmarks the median error is 15–30% (see [Real-World Accuracy](#real-world-accuracy-on-independent-benchmarks)). The S-A-B-C-D-F tier still comes from local hardware scoring, not from that FPS number.
+- **📈 Frame Rates**: The number you see is an estimate built in steps. A Steam player sample is used when it has at least 10 reports, then that game's benchmark curve, then a scaled sample from a similar GPU. The ML model runs only when those miss. That full estimate beats the model alone on independent benchmarks (see [Real-World Accuracy](#real-world-accuracy-on-independent-benchmarks)). The S-A-B-C-D-F tier still comes from local hardware scoring, not from that FPS number.
 - **🔒 Local Matching**: GPU and CPU names stay on this PC. The frame-rate request sends only the Steam app id
 - **🎯 Steam-First Data**: Game requirements come from the Steam Store API
 - **🎯 Intelligent Game Matching**: Names are matched against Windows games from the last 30 days and the current 100 bestsellers, then the Steam store. A close or split title still lands on the published game.
@@ -60,7 +60,7 @@ AVAILABLE on official Nvidia g-assist mod marketplace:  [mod.io/canrun](https://
 
 ## Recent changes
 
-**12.1.0** is the current release. Release notes live with the [G-Assist Hub release](https://mod.io/g/g-assist/m/canrun2#description). In short: titles match on whole words, more GeForce cards are recognized, and the same FPS model was checked on independent benchmarks (15.2% median error end to end).
+**12.1.0** is the current release. Release notes live with the [G-Assist Hub release](https://mod.io/g/g-assist/m/canrun2#description). In short: titles match on whole words, more GeForce cards are recognized, and the full estimate (not the model alone) is 15.2% off end to end on independent benchmarks.
 
 The model card is [grasant/canrun-fps-predictor](https://huggingface.co/grasant/canrun-fps-predictor) v1.0.
 
@@ -491,13 +491,17 @@ The tables above are cross-validation inside CanRun's own benchmark suite. To me
 - **Noise floor:** In OpenML, a single user report differs from the median of identical hardware by 12.5%, so no predictor can get much below that on this set.
 - **Not scored:** God of War Ragnarök and Ratchet & Clank: Rift Apart (39 cases) were not found from the typed title. AMD cards are rejected by the G-Assist plugin by design.
 
-**How the app raises the score above the model alone**
-1. **Benchmark curves first.** When a game is in the benchmark table, the app reads the user's GPU off that game's own curve. On OpenML that lowers the error from 39.4% to 30.7%. In the end-to-end test the curve path scored 15.6% on 154 points.
-2. **The model for everything else.** Games without a curve use the model with the live Steam store specs: 18.5% on 132 end-to-end points. Games whose store page lists only a minimum spec scored 7.6% on 22 points.
-3. **Matching the right game.** The whole-word title matcher took the end-to-end error from 35.1% to 15.2% without any model change.
-4. **Real hardware scores.** PassMark G3D averages for current NVIDIA, AMD and Intel cards.
+**The estimate beats the model alone.** The model card is the last step. Each earlier step uses a measurement, and the first one that has data is the number shown. On OpenML that drops median error from 39.4% (model alone) to 30.7%. On TechSpot it drops from 36.7% to 32.9%, and from 33.6% to 28.6% on NVIDIA cards. The 15.2% end-to-end figure is this full estimate.
 
-The app does not always win: on F1 24 its store-spec path is 54% off while the model alone is 29% off, because the app passes the model fewer inputs (no VRAM, release year or genre).
+1. **Match the whole title.** A typed name matches a benchmark curve on whole words only, and a sequel never falls back to the original. This took end-to-end error from 35.1% to 15.2% with no model change. A saved list of recent Windows games and current bestsellers is checked before the store search, so "Dawn Walker" still lands on "The Blood of Dawnwalker".
+2. **Steam players.** When a hardware cluster has at least 10 reports, the estimate is their measured average. The range is their spread, and never tighter than ±8%.
+3. **That game's curve.** If the game is in the benchmark table, the estimate is read off that game's own curve at the user's PassMark score. On OpenML this is the largest gain. In the end-to-end test this path scored 15.6% on 154 points.
+4. **A similar GPU in the same Steam survey.** A card between 0.5× and 1.5× this GPU's PassMark is scaled by `(your PassMark / theirs) ^ 0.85`, then reduced if the CPU is weak. The range is ±30%.
+5. **The busiest unlabeled Steam bucket.** When Steam gives a count and no GPU name, that bucket is treated as an RTX 5070 and scaled the same way.
+6. **The model, only if the steps above miss.** Live Steam store minimum and recommended specs go into the model, capped at 240 FPS. This path scored 18.5% on 132 end-to-end points, and 7.6% on 22 points whose store page lists only a minimum GPU.
+7. **The card's PassMark score.** Current GeForce G3D averages, including RTX 50 and 40 Super. A name with a memory size, such as "RTX 5060 Ti 16GB", falls back to the base card.
+
+The model can still be closer on a single title. On F1 24 the store-spec path is 54% off and the model alone is 29% off, because that path passes fewer inputs (no VRAM, release year, or genre).
 
 **Compared with other FPS estimators:** FPS calculator sites that publish accuracy on independent data report a median error of 26% ([FPSGauge](https://fpsgauge.com/methodology), 1,990 results) and 41.6% ([FPSHQ](https://fpshq.com/en/methodology/), 1,341 review results). CanRun's 15–30% is in line with or better than those, while running fully on the user's PC. Each tool was tested on different data, so this is a comparison of size, not a head-to-head.
 
@@ -529,40 +533,23 @@ py -3 scripts/ds_pipeline/train_and_evaluate.py
 
 ---
 
-## 🚀 **GPU-Accelerated Training**
+## Training hardware
 
-For developers wanting to retrain the ML model with CUDA acceleration:
+The shipped model was trained on the CPU. `scripts/ds_pipeline/train_and_evaluate.py` fits a scikit-learn `Ridge` model and a `HistGradientBoostingRegressor`. That script does not use CUDA, PyTorch, or XGBoost.
 
-### **CUDA Setup (Recommended for RTX/GTX users)**
+### Why ridge regression
 
-```bash
-# Step 1: Install CUDA-enabled PyTorch (for RTX with CUDA 13.0)
-cd canrun
-uv run pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118
+Ridge regression is a straight-line fit with a penalty that keeps the line from getting too steep when the inputs overlap.
 
-# Step 2: Install XGBoost with GPU support
-uv add xgboost
+Frame rate follows a power law. A faster GPU raises FPS by a multiplier, and more pixels lower it by a multiplier. In log space that curve becomes a straight line:
 
-# Step 3: Optional - Install cuML for maximum GPU acceleration
-# conda install -c rapidsai -c conda-forge cuml
+`log(FPS) = intercept + weighted sum of the 21 hardware and store-spec features`
 
-# Step 4: Run GPU-accelerated training
-uv run python src/train_fps_predictor_ml_model.py
-```
+Those features repeat the same idea in different forms: GPU score, headroom over the recommended GPU, VRAM, and resolution. Ordinary linear regression treats them as independent and can assign wild weights. Ridge adds an L2 penalty (`alpha = 10`), which pulls the weights toward zero and keeps the slope stable.
 
+That matters for a card the training set never saw. A tree can only repeat the highest or lowest FPS it saw in training, so a new GPU faster than every training card gets a flat answer. The ridge line keeps rising. On CanRun's own suite, this stage alone already explained about 90% of the log-FPS variation and stayed physically monotonic: a faster GPU never predicted a lower FPS.
 
-### **XGBoost CUDA Configuration (Verified Working):**
-```python
-# Modern XGBoost syntax (recommended)
-XGBRegressor(device='cuda', tree_method='hist', n_estimators=500)
-
-# Console output confirms: "XGBoost is running on: cuda:0"
-```
-### **Expected GPU Benefits:**
-- **XGBoost GPU**: `device='cuda'` with `tree_method='hist'` - **3-5x faster** tree training
-- **cuML**: GPU-accelerated RandomForest - **10-50x faster** on RTX cards
-- **PyTorch CUDA**: Tensor operations on GPU for enhanced feature engineering
-- **Automatic Fallback**: CPU training if CUDA unavailable
+It is the first stage, not the whole model. A straight line misses 60 FPS locks, VRAM cliffs, and genre differences. One hundred small trees then fit what the line got wrong. The line sets the shape. The trees correct it.
 
 # Features
 
@@ -617,7 +604,7 @@ Why the steps are in this order:
 
 4. **Busiest unlabeled bucket.** Steam sometimes returns a count with no GPU name. That bucket is treated as an RTX 5070 and scaled the same way, with the same ±30% range and mixed-settings label.
 
-5. **Store requirements.** Used only when all of the above miss and this GPU has a PassMark score. When the store page names a GPU, the estimate is the v9 two-stage model's prediction alone, capped at 240. If the model is not loaded, or the page names no GPU, a recommended GPU is taken as 60 FPS at 1080p, a minimum GPU as 30, and an unnamed spec as a GTX 1050 Ti at 60. The range is ±20% at 1080p, ±22% at 1440p, and ±25% at 4K. On 182 measured TechPowerUp results for games outside the training data (`scripts/ds_pipeline/evaluate_external_benchmarks.py`), the model's median error was 15.2% against 18.6% for the spec heuristic and 22.4% for the old blend of the two, and about 60% of results fell inside the shown range.
+5. **Store requirements.** Used only when all of the above miss and this GPU has a PassMark score. The estimate is the v9 two-stage model's prediction from the live store specs, capped at 240. If the model is not loaded, or the page names no GPU, a recommended GPU is taken as 60 FPS at 1080p, a minimum GPU as 30, and an unnamed spec as a GTX 1050 Ti at 60. The range is ±20% at 1080p, ±22% at 1440p, and ±25% at 4K. This is the model-only path: 18.9% median error on the TechPowerUp games that have no CanRun curve, against 15.2% for the full estimate on the same review.
 
 6. **Unknown.** Shown when this PC's GPU has no PassMark score, so none of the later scales can run.
 
