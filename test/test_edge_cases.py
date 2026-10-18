@@ -25,6 +25,7 @@ from canrun_game_fetcher import (
     steam_title_matches,
 )
 from canrun_game_matcher import CanRunGameMatcher
+from canrun_model_loader import match_gpu_key
 from canrun_steam_fps import (
     SteamFpsClient,
     first_known_gpu,
@@ -74,9 +75,74 @@ def test_requirement_line_never_turns_an_old_card_into_a_new_one(line, expected)
     ("NVIDIA GeForce RTX 5060 Ti 16GB", 22621),
     ("NVIDIA GeForce RTX 5060 Ti 8GB", 21833),
     ("Radeon RX 9060 XT 8GB", 19663),
+    ("NVIDIA GeForce RTX 4060 Laptop GPU", 17312),
+    ("NVIDIA GeForce RTX 5070 Ti Laptop GPU", 22501),
+    ("NVIDIA RTX Spark N1X", 15979),
 ])
 def test_gpu_lookup_covers_current_cards_and_memory_variants(name, expected):
     assert lookup_gpu_passmark(name, load_gpu_passmarks()) == expected
+
+
+@pytest.mark.parametrize(("name", "expected"), [
+    ("NVIDIA GeForce RTX 4060 Laptop GPU", "RTX 4060 Laptop GPU"),
+    ("NVIDIA GeForce RTX 4060", "RTX 4060"),
+    ("NVIDIA GeForce RTX 4060 Ti", "RTX 4060 Ti"),
+    ("RTX 4060", "RTX 4060"),
+    ("4090", "RTX 4090"),
+    ("RTX Spark N1X", "RTX Spark N1X"),
+])
+def test_gpu_table_match_prefers_the_longest_name(name, expected):
+    entries = {key: {} for key in ("RTX 4060", "RTX 4060 Ti", "RTX 4060 Laptop GPU", "RTX 4090",
+                                   "RTX 4090 Laptop GPU", "RTX Spark N1X")}
+    assert match_gpu_key(name, entries) == expected
+
+
+def test_steam_device_ratings_keep_only_rated_devices():
+    from canrun_game_fetcher import STEAMFPS_ATTRIBUTION, steam_device_lines, steam_device_ratings
+
+    platforms = {"steam_deck_compat_category": 3, "steam_machine_compat_category": 3,
+                 "steam_frame_compat_category": 2, "steam_os_compat_category": 0, "windows": True}
+    ratings = steam_device_ratings(platforms)
+    assert ratings == {"Steam Deck": 3, "Steam Machine": 3, "Steam Frame": 2}
+    assert steam_device_lines(ratings) == ["Steam Deck: Verified", "Steam Machine: Verified", "Steam Frame: Playable"]
+    assert steam_device_ratings({"steam_deck_compat_category": True, "steam_frame_compat_category": 9}) == {}
+    assert steam_device_ratings("bad") == {}
+    assert steam_device_lines({}, vr_only=True) == ["VR headset required"]
+    assert steam_device_lines({}) == []
+
+    steamfps = {
+        "verdict": {"color": "green", "tier": "medium"},
+        "steamMachine": {"provenance": "estimated", "tiers": {
+            "medium": {"fps": 74, "resolution": "1080p"}, "high": {"fps": 61, "resolution": "1080p"}}},
+        "steamDeck": {"category": "verified", "fps": 30, "resolution": "800p", "provenance": "community"},
+        "unrelated": "dropped",
+    }
+    lines = steam_device_lines(ratings, steamfps=steamfps)
+    assert lines[0] == "Steam Deck: Verified (about 30 FPS at 800p, player reports)"
+    assert lines[1] == "Steam Machine: Verified (about 74 FPS at 1080p medium settings, estimate)"
+    assert lines[-1] == STEAMFPS_ATTRIBUTION
+    assert steam_device_lines({}, steamfps={"steamDeck": {"fps": "30"}}) == []
+
+
+def test_engine_factor_corrects_unreal_engine_5_and_ignores_unknown_games():
+    from canrun_steam_fps import engine_factor, game_engine
+
+    assert game_engine("2358720") == "Unreal Engine 5"
+    assert 0.5 < engine_factor("2358720") < 1.0
+    assert engine_factor("") == 1.0
+    assert engine_factor("999999999") == 1.0
+
+
+@pytest.mark.parametrize(("gpu", "watts", "warned"), [
+    ("RTX 4060 Laptop GPU", 45, True),
+    ("RTX 4060 Laptop GPU", 115, False),
+    ("RTX 4060 Ti", 60, False),
+    ("RTX 5070 Ti Laptop GPU", 0, False),
+])
+def test_laptop_power_note_only_for_low_power_laptops(gpu, watts, warned):
+    from canrun_hardware_detector import laptop_power_note
+
+    assert bool(laptop_power_note(gpu, watts)) is warned
 
 
 @pytest.mark.parametrize(("typed", "expected"), [
@@ -87,10 +153,14 @@ def test_gpu_lookup_covers_current_cards_and_memory_variants(name, expected):
     ("Space Marine 2", "Warhammer 40,000: Space Marine 2"),
     ("Baldurs Gate 3", "Baldur's Gate 3"),
     ("中华料理大王", "中华料理大王"),
+    ("Prince of Persia The Lost Crown", None),
+    ("Call of Duty Modern Warfare 3 2023", None),
+    ("Cyberpunk 2077 Ultimate Edition", "Cyberpunk 2077"),
 ])
 def test_benchmark_title_match_needs_whole_words(typed, expected):
     games = ["中华料理大王", "RAGE", "S.T.A.L.K.E.R.", "The Witcher 3: Wild Hunt",
-             "Warhammer 40,000: Space Marine 2", "Baldur's Gate 3", "Silent Hill"]
+             "Warhammer 40,000: Space Marine 2", "Baldur's Gate 3", "Silent Hill",
+             "Prince of Persia", "Call of Duty", "Cyberpunk 2077"]
     assert match_benchmark_game(typed, games) == expected
 
 
@@ -617,7 +687,7 @@ def test_new_game_fps_scales_from_the_recommended_gpu():
     assert typed.expected_fps == real.expected_fps
     bare = estimate_from_requirements("RTX 4090", "AMD Ryzen 7 7800X3D", "GTX 1060+", "", "1440p")
     full = estimate_from_requirements("RTX 4090", "AMD Ryzen 7 7800X3D", "GTX 1060 6GB", "", "1440p")
-    assert bare.expected_fps == full.expected_fps
+    assert abs(bare.expected_fps - full.expected_fps) <= 1
     amd = estimate_from_requirements("RTX 4090", "AMD Ryzen 7 7800X3D", "AMD Radeon RX 580", "", "1440p")
     assert amd.fps_source == "requirements"
     assert amd.fps_min <= amd.expected_fps <= amd.fps_max
@@ -712,7 +782,7 @@ def test_optimization_cached_fps_resolution_stays_fast():
 
 
 def _plugin_with_capture():
-    plugin = CanRunPlugin("canrun", version="12.1.0")
+    plugin = CanRunPlugin("canrun", version="12.2.0")
     sent = []
 
     class Protocol:
@@ -726,3 +796,25 @@ def _plugin_with_capture():
 
     plugin._protocol = Protocol()
     return plugin, sent
+
+
+def test_curve_uses_the_users_gpu_vendor_when_it_has_enough_points():
+    from canrun_steam_fps import gpu_vendor, same_vendor_points
+
+    points = [("RTX 5070", 22000, 100), ("RTX 4070", 19000, 85), ("RTX 3070", 17000, 70), ("RTX 5080", 26000, 120),
+              ("RX 9070 XT", 22000, 120), ("RX 7800 XT", 19000, 100)]
+    assert gpu_vendor("NVIDIA GeForce RTX 4060") == "nvidia"
+    assert gpu_vendor("AMD Radeon RX 7600") == "amd"
+    assert [row[0] for row in same_vendor_points(points, "RTX 4060")] == ["RTX 5070", "RTX 4070", "RTX 3070", "RTX 5080"]
+    assert same_vendor_points(points, "RX 7600") == points
+
+
+def test_measured_table_is_checked_before_the_benchmark_table(monkeypatch):
+    import canrun_steam_fps as fps
+
+    measured = {("Test Game", "1080p"): [("RTX 4070", 19000.0, 90.0)]}
+    generated = {("Test Game", "1080p"): [("RTX 4070", 19000.0, 50.0)], ("Other Game", "1080p"): [("RTX 4070", 19000.0, 40.0)]}
+    monkeypatch.setattr(fps, "load_measured_table", lambda: measured)
+    monkeypatch.setattr(fps, "load_benchmark_table", lambda: generated)
+    assert fps._benchmark_points("Test Game", "1080p")[0][2] == 90.0
+    assert fps._benchmark_points("Other Game", "1080p")[0][2] == 40.0

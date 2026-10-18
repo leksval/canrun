@@ -161,6 +161,10 @@ async def execute_canrun_command(
             "Try the exact Steam title again in a moment."
         )
 
+# create_safe_g_assist_response cuts at 1400 characters, which would drop the verdict,
+# and its bullet replacement adds a character per line.
+_DEVICE_BLOCK_BUDGET = 1340
+
 _ESTIMATE_NOTICE = (
     "Estimate only. CanRun does not guarantee that this game will run, "
     "or that you will see this frame rate."
@@ -213,7 +217,7 @@ def format_canrun_response(result):
             fps_line = f"**FPS:** {fps}"
         else:
             fps = "Unknown"
-            fps_line = "FPS: **Unknown**. Steam has no player sample for this PC, and this game is not in the measured table."
+            fps_line = "FPS: **Unknown**. This game is not in the benchmark table, and this GPU has no PassMark score."
 
         settings = getattr(result.performance_prediction, 'recommended_settings', 'Unknown')
         recommended_resolution = getattr(result.performance_prediction, 'recommended_resolution', 'Unknown')
@@ -240,10 +244,25 @@ def format_canrun_response(result):
             getattr(result, "detected_resolution_class", ""),
         )
 
+        from canrun_hardware_detector import laptop_power_note
+        power_note = laptop_power_note(
+            getattr(result.hardware_specs, "gpu_model", "") or "",
+            int(getattr(result.hardware_specs, "gpu_power_limit_w", 0) or 0),
+        )
+        power_line = f"\n• {power_note}" if power_note else ""
+
+        from canrun_game_fetcher import steam_device_lines
+        devices = steam_device_lines(
+            getattr(result.game_requirements, "steam_device_ratings", {}) or {},
+            bool(getattr(result.game_requirements, "vr_only", False)),
+            getattr(result.game_requirements, "steamfps", {}) or {},
+        )
+        device_block = "\n\n🕹️ **STEAM DEVICES**" + "".join(f"\n• {line}" for line in devices) if devices else ""
+
         message = f"""🎮 **Game:** {steam_api_name}
 
 💻 **YOUR SYSTEM**
-• **GPU:** {result.hardware_specs.gpu_model} ({result.hardware_specs.gpu_vram_gb}GB)
+• **GPU:** {result.hardware_specs.gpu_model} ({result.hardware_specs.gpu_vram_gb}GB){power_line}
 • **CPU:** {result.hardware_specs.cpu_model}
 • **RAM:** {result.hardware_specs.ram_total_gb}GB
 • **Display:** {actual_resolution} @ {result.hardware_specs.primary_monitor_refresh_hz}Hz{display_note}
@@ -286,7 +305,7 @@ def format_canrun_response(result):
 • {fps_line}{feature_block}
 • **Settings:** {settings}
 • **Resolution:** {recommended_resolution}
-• **Score:** {tier} Tier ({score}/100)
+• **Score:** {tier} Tier ({score}/100){device_block}
 
 🔧 **OPTIMIZE**"""
 
@@ -327,6 +346,8 @@ def format_canrun_response(result):
             message += "🎯 **VERDICT:** CANNOT RUN"
 
         message += f"\n\n{_ESTIMATE_NOTICE}"
+        if device_block and len(message) > _DEVICE_BLOCK_BUDGET:
+            message = message.replace(device_block, "", 1)
         return message.strip()
 
     except Exception as e:
@@ -558,7 +579,7 @@ def cli_mode():
 class CanRunPlugin(Plugin):
     """Protocol V2 plugin. Command work runs off the reader thread so pings still get answers."""
 
-    def __init__(self, name: str, version: str = "12.1.0", description: str = ""):
+    def __init__(self, name: str, version: str = "12.2.0", description: str = ""):
         import signal
         previous_int = signal.getsignal(signal.SIGINT)
         previous_term = signal.getsignal(signal.SIGTERM)
@@ -677,8 +698,8 @@ def _manifest_identity() -> tuple[str, str, str]:
     with open(path, encoding="utf-8") as handle:
         data = json.load(handle)
     return (
-        str(data.get("name") or "canrun-12.1.0"),
-        str(data.get("version") or "12.1.0"),
+        str(data.get("name") or "canrun-12.2.0"),
+        str(data.get("version") or "12.2.0"),
         str(data.get("description") or ""),
     )
 

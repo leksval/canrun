@@ -19,6 +19,8 @@ from typing import Any
 import cpuinfo  # py-cpuinfo package
 import psutil
 
+from canrun_model_loader import match_gpu_key
+
 # Platform detection
 IS_WINDOWS = platform.system() == "Windows"
 IS_LINUX = platform.system() == "Linux"
@@ -112,6 +114,7 @@ class HardwareSpecs:
     nvidia_driver_version: str = "Unknown"
     total_storage_gb: int = 0
     drives: list[dict[str, Any]] = None
+    gpu_power_limit_w: int = 0
 
     def __post_init__(self):
         """Validate hardware specs after initialization."""
@@ -170,8 +173,35 @@ class HardwareSpecs:
             'is_nvidia_gpu': self.is_nvidia_gpu,
             'supports_rtx': self.supports_rtx,
             'supports_dlss': self.supports_dlss,
-            'nvidia_driver_version': self.nvidia_driver_version
+            'nvidia_driver_version': self.nvidia_driver_version,
+            'gpu_power_limit_w': self.gpu_power_limit_w,
         }
+
+
+# Highest graphics power NVIDIA allows for each laptop GPU, without Dynamic Boost.
+LAPTOP_MAX_TGP_W = {
+    "rtx 5090 laptop": 150, "rtx 5080 laptop": 150, "rtx 5070 ti laptop": 115, "rtx 5070 laptop": 100,
+    "rtx 5060 laptop": 100, "rtx 5050 laptop": 100,
+    "rtx 4090 laptop": 150, "rtx 4080 laptop": 150, "rtx 4070 laptop": 115, "rtx 4060 laptop": 115,
+    "rtx 4050 laptop": 115,
+    "rtx 3080 ti laptop": 150, "rtx 3080 laptop": 150, "rtx 3070 ti laptop": 125, "rtx 3070 laptop": 125,
+    "rtx 3060 laptop": 115, "rtx 3050 ti laptop": 80, "rtx 3050 laptop": 80,
+}
+LOW_POWER_SHARE = 0.7
+
+
+def laptop_power_note(gpu_model: str, power_limit_w: int) -> str:
+    """Warning for a laptop GPU set well below the power its model can run at, else ""."""
+    if not power_limit_w or power_limit_w <= 0:
+        return ""
+    key = match_gpu_key(gpu_model, {name: {} for name in LAPTOP_MAX_TGP_W})
+    if key is None or "laptop" not in (gpu_model or "").lower():
+        return ""
+    max_w = LAPTOP_MAX_TGP_W[key]
+    if power_limit_w >= max_w * LOW_POWER_SHARE:
+        return ""
+    return (f"This laptop runs its GPU at up to {power_limit_w} W; the same GPU runs at up to {max_w} W "
+            "in other laptops, so FPS can be lower than shown.")
 
 
 class CanRunHardwareDetector:
@@ -333,11 +363,24 @@ class CanRunHardwareDetector:
             supports_dlss=gpu_info['supports_dlss'],
             nvidia_driver_version=gpu_info['driver_version'],
             total_storage_gb=storage_info.get('total_gb', 1000),
-            drives=storage_info.get('drives', [])
+            drives=storage_info.get('drives', []),
+            gpu_power_limit_w=int(gpu_info.get('power_limit_w') or 0),
         )
 
         self.logger.info('Hardware detected: %s, %s, %sGB RAM', specs.gpu_model, specs.cpu_model, specs.ram_total_gb)
         return specs
+
+    @staticmethod
+    def _nvml_power_limit_w(handle) -> int:
+        """Board power limit in watts from NVML; 0 when the driver does not report one."""
+        for getter in ("nvmlDeviceGetEnforcedPowerLimit", "nvmlDeviceGetPowerManagementLimit"):
+            try:
+                milliwatts = getattr(pynvml, getter)(handle)
+            except Exception:
+                continue
+            if isinstance(milliwatts, (int, float)) and 5_000 <= milliwatts <= 1_000_000:
+                return round(milliwatts / 1000)
+        return 0
 
     def _detect_nvidia_gpu(self) -> dict[str, Any]:
         """Detect NVIDIA GPU information."""
@@ -379,7 +422,8 @@ class CanRunHardwareDetector:
                         'is_nvidia': True,
                         'supports_rtx': 'RTX' in gpu_name.upper(),
                         'supports_dlss': 'RTX' in gpu_name.upper(),
-                        'driver_version': driver_version
+                        'driver_version': driver_version,
+                        'power_limit_w': self._nvml_power_limit_w(handle),
                     })
 
                     self.logger.info('NVIDIA GPU detected via pynvml: %s (%sGB -> %sGB VRAM)', gpu_info['name'], raw_vram_gb, rounded_vram_gb)
@@ -761,14 +805,13 @@ class CanRunHardwareDetector:
 
         # Search in loaded GPU database
         if self.gpu_database:
-            for gpu_key, gpu_info in self.gpu_database.items():
-                # Check main key and any aliases
-                if (gpu_key.lower() in gpu_lower or
-                    any(alias.lower() in gpu_lower for alias in gpu_info.get('aliases', []))):
-                    vram = gpu_info.get('vram_gb')
-                    if vram is not None:
-                        self.logger.debug('Found VRAM for %s: %sGB from database', gpu_name, vram)
-                        return vram
+            gpu_key = match_gpu_key(gpu_lower, self.gpu_database)
+            if gpu_key is not None:
+                gpu_info = self.gpu_database[gpu_key]
+                vram = gpu_info.get('vram_gb', gpu_info.get('memory'))
+                if vram is not None:
+                    self.logger.debug('Found VRAM for %s: %sGB from database', gpu_name, vram)
+                    return vram
 
         # If not found in database, cannot determine VRAM accurately
         self.logger.warning('VRAM data not found for GPU: %s', gpu_name)

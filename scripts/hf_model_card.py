@@ -210,35 +210,54 @@ tags:
 
 A small tabular model that estimates the native frame rate of a PC game at 1080p, 1440p or 4K from two things you can know before buying or installing: the PC's hardware scores and the game's Steam store requirements. It is the FPS engine of the [CanRun G-Assist plugin](https://mod.io/g/g-assist/m/canrun2#description) and runs with the Python standard library alone.
 
-**Real-world accuracy:** on independent benchmarks the model alone is a median 18.9% off on recent games and NVIDIA cards, and 37% to 39% off on other test sets. The full CanRun app, which adds benchmark curves and live Steam lookups, is 15.2% off end to end. Treat every prediction as a rough estimate, good for "will this run at 60 FPS?" and not for exact numbers.
+**Real-world accuracy:** on independent benchmarks the model alone is a median 18.9% off on recent games and NVIDIA cards, and 37% to 39% off on other test sets. The full CanRun app, which reads measured review curves first, is 9.3% off end to end, and about 10% off against a second reviewer on NVIDIA cards for games it has measurements for. Games without measurements still rely on this model, at 20% to 30%. No Steam player FPS data is used anywhere. Treat every prediction as a rough estimate, good for "will this run at 60 FPS?" and not for exact numbers.
 
 **Try it:** the [CanRun Space](https://huggingface.co/spaces/grasant/canrun) runs this model alone. Pick a GPU, CPU, RAM and resolution, type a game, and it reads the live Steam store specs.
+
+**Or just ask G-Assist.** In the [CanRun plugin](https://mod.io/g/g-assist/m/canrun2), press Alt+G and type "canrun cyberpunk 2077?". This is the full app's answer (review curves first, then this model), shortened, from a real run on an RTX 4090 with a 144 Hz screen:
+
+```text
+🎮 Game: Cyberpunk 2077
+⚡ FPS: 113-144 FPS on this 144 Hz screen (estimated from a similar PC, native, ray tracing off)
+- DLSS 4.5 frame gen: around 140 FPS more (2x)
+- Path tracing: around 70 to 95 FPS less
+🕹️ Steam Deck: Verified (about 30 FPS at 800p) | Steam Frame: Playable
+🎯 VERDICT: CAN RUN - EXCELLENT PERFORMANCE
+```
 
 ## Model details
 
 | | |
 | :--- | :--- |
-| Developer | Grasant ([CanRun](https://mod.io/g/g-assist/m/canrun2#description)) |
+| Developer | Bartosz Lenart ([CanRun](https://mod.io/g/g-assist/m/canrun2#description)) |
 | Version | 1.0, released 2026 |
 | Type | Ridge regression prior plus {n_trees} monotonic gradient-boosted trees, in log-FPS space |
 | Inputs | {n_features} numeric features from GPU and CPU PassMark scores, VRAM, resolution and Steam minimum and recommended specs |
 | Output | Native raster FPS (no upscaling, frame generation or ray tracing), clipped to 5 to 500 |
 | Files | `model.json` (weights, about 920 KB) and `inference.py` (features and tree traversal, standard library only) |
-| Speed | About 0.06 ms per prediction on a desktop CPU |
+| Speed | 0.06 ms median per prediction (0.12 ms p99), 6.5 ms to load `model.json`, measured on a Ryzen 7 7800X3D with Python 3.13. A full CanRun check takes 1 to 4 seconds, almost all of it Steam network requests |
 | License | Apache-2.0 |
 
 """
 
     external = """## Real-world accuracy
 
-These tests use outside measurements that were never used for training or tuning. All errors are median absolute percentage error. "Model alone" calls `inference.py` with the game's store specs. "CanRun app" is the full plugin pipeline described in the next section.
+In each test CanRun predicted the FPS for a game, a graphics card and a resolution, and the prediction was compared with the FPS a reviewer or player actually measured. "Model alone" is this model, called through `inference.py` with the game's store specs. "CanRun app" is the full plugin described in the next section.
 
-| Test set | Points | Model alone | CanRun app | App within 10% | Measured FPS inside the app's range |
+What the columns mean:
+
+- **Typical error** is the median miss: half the predictions were closer than this, half were further off. At 10%, a game predicted at 60 FPS typically ran within about 6 FPS of that.
+- **Within 10% of real FPS** is the share of predictions that landed that close. For a prediction of 60 FPS, that means the real result was between about 55 and 67 FPS.
+- **Real FPS inside the shown range.** The app shows a range, about 20% either side of its estimate. This column is how often the real result fell inside it.
+
+TechSpot and OpenML were never used to build or tune CanRun. The RTX 5070 test is TechPowerUp's 2025 review, and the app's measured curves come from TechPowerUp's 2026 results, so that row compares the same reviewer one year apart.
+
+| Test set | Points | Model alone: typical error | CanRun app: typical error | CanRun app: within 10% of real FPS | CanRun app: real FPS inside the shown range |
 | :--- | :-: | :-: | :-: | :-: | :-: |
-| TechPowerUp RTX 5070 review (March 2025), full app end to end: 24 games typed by name, 11 NVIDIA cards, 1080p and 1440p, live Steam requirements | 308 | n/a | **15.2%** | 31.2% | 57.1% |
-| TechPowerUp, the 7 of those games without a CanRun benchmark curve, 19 GPUs | 266 | **18.9%** | 20.8% | 30.5% | n/a |
-| TechSpot reviews (2025 to 2026): Forza Horizon 6, Crimson Desert, Battlefield 6, DOOM: The Dark Ages, on NVIDIA, AMD and Intel cards | 98 | 36.7% | **32.9%** | 18.4% | 27.6% |
-| [OpenML 42737 "fps-in-video-games"](https://www.openml.org/d/42737): UserBenchmark and FPS Benchmark user reports (2019 to 2020), 14 games, median per hardware group | 12,032 | 39.4% | **30.7%** | 17.0% | 34.8% |
+| TechPowerUp RTX 5070 review (March 2025), full app end to end: 24 games typed by name, 11 NVIDIA cards, 1080p and 1440p, live Steam requirements | 308 | n/a | **9.3%** | 53% | 71% |
+| TechPowerUp, the 7 of those games without a CanRun benchmark curve, 19 GPUs | 266 | 18.9% | **18.7%** | 31% | n/a |
+| TechSpot reviews (2025 to 2026): Forza Horizon 6, Crimson Desert, Battlefield 6, DOOM: The Dark Ages, on NVIDIA, AMD and Intel cards | 98 | 36.7% | **13.3%** (NVIDIA 10.0%) | 37% (NVIDIA 51%) | 69% (NVIDIA 82%) |
+| [OpenML 42737 "fps-in-video-games"](https://www.openml.org/d/42737): UserBenchmark and FPS Benchmark user reports (2019 to 2020), 14 games, median per hardware group | 11,842 | 38.8% | **30.0%** | 17% | 35% |
 
 How to read these numbers:
 
@@ -252,25 +271,42 @@ All four tests can be rerun with `evaluate_demo_end_to_end.py`, `evaluate_extern
 
 ### How the CanRun app improves on the model
 
-1. **Live Steam requirements.** The app looks up the typed title in the Steam store when the check runs and maps the minimum and recommended GPU, CPU and RAM to PassMark scores, so a game can be checked on release day.
-2. **Benchmark curves first.** For games in CanRun's local benchmark table, the app reads that game's curve at the user's GPU score instead of predicting. On OpenML this lowers the error from 39.4% to 30.7%, and on TechSpot NVIDIA cards from 33.6% to 28.6%. In the end-to-end test the curve path scored 15.6% on 154 points.
-3. **The model for everything else.** Games without a curve use this model: 18.5% on 132 end-to-end points.
-4. **Matching the right game.** Whole-word title matching cut the end-to-end error from 35.1% to 15.2% with no model change. The old matcher sent "Assassin's Creed Mirage" to "RAGE".
+This model is unchanged since v1.0. CanRun 12.2 wraps it with measured review curves, laptop GPU scores and an engine correction. On the same tests (median error, lower is better):
 
-The app can also be worse than the model. Its store-spec path passes fewer inputs (no VRAM, release year or genre), so on F1 24 it is 54% off while the model is 29% off.
+| Test | This model alone | Full CanRun 12.2 app |
+| :--- | :---: | :---: |
+| TechSpot desktops, NVIDIA cards (55 points) | 33.6% | **10.0%** |
+| TechSpot desktops, all cards (98) | 36.7% | **13.3%** |
+| TechSpot desktops, AMD and Intel cards (43) | 40.7% | **16.2%** |
+| OpenML user reports, older games (11,842) | 38.8% | **30.0%** |
+| Games without review data, each measured game held out (30 games, NVIDIA) | 25.0% | **23.1%** |
+| TechPowerUp 2025 games without a curve (266) | 18.9% | **18.7%** |
+
+Where the app has review data for a game, it is about three times closer than the model alone, and on TechSpot's NVIDIA results the real FPS fell inside the app's shown range (about ±20%) 82% of the time. On games without review data the app is close to the model, because the model makes that estimate; the engine correction adds about 2 points. The app was also scored on cases the model cannot take on its own: Notebookcheck laptops at 14.9% (12.1, which read laptop GPUs as desktop cards, was 23.0% and 39% too high), and TechPowerUp's RTX 5070 review end to end, games typed by name, at 9.3%.
+
+1. **Live Steam requirements.** The app looks up the typed title in the Steam store when the check runs and maps the minimum and recommended GPU, CPU and RAM to PassMark scores, so a game can be checked on release day.
+2. **Measured curves first.** For 32 games the app has review measurements from TechPowerUp (the June 2026 suite with 21 cards, and per-game reviews with 30 to 43 cards down to the RTX 3050), at three resolutions. They ship inside the CanRun 12.2 plugin and are not published in this repository. The app reads that game's curve at the user's GPU score, fitted on the user's GPU vendor. Scored against TechSpot's separate measurements of four of those games, this cut the app's error from 32.9% to 13.3%, and to 10.0% on NVIDIA cards. A card left out of its own curve is predicted within 6.0% (NVIDIA), 8.3% for NVIDIA cards below an RTX 3070, and 9.4% (AMD). On Notebookcheck's laptop results the app is 14.9% off, where 12.1 read laptop GPUs as desktop cards and was 39% too high. Other games fall back to CanRun's older benchmark table, where only 79 curves carry outside information; on OpenML that lowers the error from 38.8% to 30.0%. In the end-to-end test the curve path scored 6.9% on 176 points.
+3. **The model for everything else.** Games without a curve use this model: 18.5% on 132 end-to-end points. CanRun 12.2 multiplies its output by an engine factor for Unreal Engine 5 (×0.77) and RE Engine (×1.11), with engines taken from Wikidata; holding out each of 30 measured games, that lowers the error from 25.0% to 23.1% on NVIDIA cards.
+4. **Matching the right game.** Whole-word title matching cut the end-to-end error from 35.1% to 15.2% with no model change, before the measured curves were added. The old matcher sent "Assassin's Creed Mirage" to "RAGE".
+
+The app's store-spec path passes the model both GPU scores, the user's VRAM, the recommended CPU and RAM from the store page, and Steam's release year and genres. When it passed only the two GPU scores, it scored 20.8% on those 7 games and was 54% off on F1 24. With the full specs it scores 18.7%, and F1 24 is 29% off.
+
+**How the store specs are used.** 8 of the 21 features come from the Minimum and Recommended specs: both GPU scores and the user's headroom over each, VRAM headroom and a VRAM cliff penalty, a demand index from the recommended GPU, CPU and RAM, and CPU headroom over the recommended CPU. A page with only one GPU gets the other at a 1.65× ratio. The same specs also generated most training targets (see Training data), so the model mostly learned how far a PC sits above the recommended GPU.
 
 ### Compared with other FPS estimators
 
 | Tool | Published accuracy | Test data |
 | :--- | :--- | :--- |
-| **CanRun** | 15.2% to 30.7% median error (app), 18.9% to 39.4% (model) | TechPowerUp, TechSpot and OpenML, above |
+| **CanRun 12.2** | 10.0% median error (NVIDIA desktops), 13.3% (all desktop cards), 14.9% (laptops), 9.3% (end to end), 30.0% (older games, user reports) | TechSpot, Notebookcheck and OpenML were never used to build it. TechPowerUp's 2026 results are its measured curves; the 9.3% test is TechPowerUp's 2025 RTX 5070 review |
+| **CanRun 12.2, game nobody has measured** | 18.7% to 23.1% median error | TechPowerUp games without a curve, and each measured game held out; store-spec model only |
+| [MyRigCheck](https://myrigcheck.games/accuracy), TechSavant | about 15% (claimed) | No public test set |
+| [PCBottleneck](https://www.pcbottleneck.com/methodology) | 21.6% mean error | Its own estimate path |
 | [FPSGauge](https://fpsgauge.com/methodology) | 26% median error | 1,990 independent results |
 | [FPSHQ](https://fpshq.com/en/methodology/) | 41.6% median error | 1,341 independent review results |
-| [PCBottleneck](https://www.pcbottleneck.com/methodology) | 21.6% mean error | Its own estimate path |
-| [MyRigCheck](https://myrigcheck.games/accuracy), TechSavant | about 15% (claimed) | No public test set |
-| Ramkumar et al. 2025 | R² 0.99 | OpenML 42737, in-sample |
+| [SteamFPS](https://steamfps.com/methodology) | None published | Measured FPS for 239 Steam Deck games; other figures are estimated or derived |
+| Ramkumar et al. 2025 | R² 0.99 | OpenML 42737, scored on its own training data |
 
-Each tool was tested on different data, so this compares the size of the error, not a head-to-head result.
+Each tool was tested on different data, so the table compares the size of each error. On the one shared test, 16 new 2025 and 2026 games at 1080p on an RTX 4060 (the class SteamFPS uses for the Steam Machine), CanRun was 8.0% off with measured curves and 10.7% from store specs alone; SteamFPS gives only a color rating for those games.
 
 """
 
@@ -361,6 +397,8 @@ The anchor and the exponent β, set per resolution, come from one of three sourc
 
 Special-case rules cover 60 FPS locked games and light indie games capped at 240 FPS. The {summary['primary_benchmark_curves']:,} curves are then expanded over {summary['unique_cpus']} CPU tiers (Ryzen 5 3600 to Ryzen 7 7800X3D) with a CPU-bottleneck factor, giving {summary['total_records']:,} rows. Store specs come from Steam's public store API, and game discovery uses Steam Web API chart endpoints with the developer's own key.
 
+**No Steam player FPS.** The pipeline also asks Steam's `IGamePerformanceStatsService/GetGameFrameRateStats` for player frame rates per hardware cluster. That endpoint is not in Valve's [Web API reference](https://partner.steamgames.com/doc/webapi) and returns HTTP 401 to outside keys, so the dataset contains 0 Steam FPS reports. The only measured frame rates behind training are the published benchmarks for 21 games.
+
 **What this means for the scores.** For about 95% of games the target is a fixed function of the same store-spec features the model receives, and for 990 of them those specs are placeholders too. The cross-validation below therefore mostly measures how well the model reproduces that rule. That is why it reports about 1% error while independent benchmarks show 15% to 40%. Use the real-world numbers above.
 
 Four automated checks run before training: removal of curves copied from a generic template (143 repaired), FPS that falls from 1080p to 1440p to 4K for every game and GPU, robust repair of single-card outliers per game and resolution (6 repaired), and full coverage of resolutions and CPU tiers.
@@ -383,7 +421,9 @@ Four automated checks run before training: removal of curves copied from a gener
 | :--- | :-: | :-: | :-: | :-: | :-: |
 {_cv_rows(cv_gpus)}
 
-The legacy v8.0 lookup model looked strong on a random split (R² 0.9866) and collapsed on unseen games (R² 0.0932), because it memorized 15 game names. This model gets no game or GPU identifiers, which is why it holds up when grouped.
+The legacy v8.0 model was a seven-model stacking ensemble trained on 179 rows from 15 games, with one column per game and no store requirements. It scored R² 0.984 on a random split, and its shipped lookup table scored R² 0.0932 on unseen games. This model gets no game or GPU identifiers, which is why it holds up when grouped.
+
+Running the v8.0 ensemble itself on the same independent benchmarks (`scripts/ds_pipeline/evaluate_legacy_v8.py`), the median error was 79.8% on TechPowerUp (this model: 18.9%), 75.1% on TechSpot (36.7%) and 39.8% on OpenML (38.8%). v8.0 overestimated new games by about +90% to +110%. On older popular games the two are roughly tied. The simple spec rule scored 19.8%, 37.5% and 36.7% on the same three tests, so on OpenML it beat both models on the median. This model still makes fewer large misses than the rule: on TechPowerUp its mean error is 18.8% against 23.1%, its average miss 26.5 FPS against 34.4 FPS, and R² 0.503 against 0.064. On OpenML its mean error is 43.1% against 47.7%. It does better because it also reads the minimum GPU, CPU, VRAM, RAM, release year and genre, which it learned to weigh from the 79 measured and hand-calibrated games (F1 24: 29.2% off against the rule's 54.4%). It also gives a range and stays monotonic.
 
 """
 
@@ -399,7 +439,7 @@ CanRun and this model are independent and not affiliated with or endorsed by Val
 
 ```bibtex
 @misc{{canrun_fps_model_v1_2026,
-  author       = {{Grasant}},
+  author       = {{Lenart, Bartosz}},
   title        = {{CanRun FPS Model v1.0: A Two-Stage Ridge and Monotonic GBDT Model for PC Game Frame-Rate Estimation}},
   year         = {{2026}},
   publisher    = {{Hugging Face}},

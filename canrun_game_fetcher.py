@@ -12,7 +12,7 @@ import re
 import sys
 import threading
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from html import unescape
 from pathlib import Path
@@ -779,6 +779,85 @@ class GameRequirements:
     last_updated: str = ""
     steam_api_name: str = ""  # Actual name returned by Steam API for reference
     steam_app_id: str = ""
+    release_year: int = 0
+    genre: str = ""
+    steam_device_ratings: dict[str, int] = field(default_factory=dict)
+    vr_only: bool = False
+    steamfps: dict[str, Any] = field(default_factory=dict)
+
+
+# Valve's per-device compatibility fields in IStoreBrowseService/GetItems, in display order.
+STEAM_DEVICES = {
+    "steam_deck_compat_category": "Steam Deck",
+    "steam_machine_compat_category": "Steam Machine",
+    "steam_frame_compat_category": "Steam Frame",
+    "steam_os_compat_category": "SteamOS",
+}
+STEAM_DEVICE_RATINGS = {1: "Unsupported", 2: "Playable", 3: "Verified"}
+STEAM_ITEMS_URL = "https://api.steampowered.com/IStoreBrowseService/GetItems/v1/"
+
+
+def steam_device_ratings(platforms: Any) -> dict[str, int]:
+    """Device name -> Valve rating (1 unsupported, 2 playable, 3 verified). Unrated devices are left out."""
+    if not isinstance(platforms, dict):
+        return {}
+    ratings = {}
+    for key, device in STEAM_DEVICES.items():
+        value = platforms.get(key, platforms.get(device))
+        if isinstance(value, int) and not isinstance(value, bool) and value in STEAM_DEVICE_RATINGS:
+            ratings[device] = value
+    return ratings
+
+
+STEAMFPS_SEARCH_URL = "https://steamfps.com/api/v1/search"
+STEAMFPS_ATTRIBUTION = "Device FPS from [SteamFPS](https://steamfps.com), CC BY 4.0"
+STEAMFPS_CACHE_SECONDS = 24 * 3600
+_STEAMFPS_KEYS = ("appid", "verdict", "steamMachine", "steamDeck", "steamFrame", "url")
+_STEAMFPS_SOURCES = {"measured": "measured", "community": "player reports", "estimated": "estimate"}
+_steamfps_cache: dict[str, tuple[float, dict]] = {}
+
+
+def steamfps_record(raw: Any) -> dict:
+    """The SteamFPS fields CanRun shows, copied from an API game record or a cached copy."""
+    if not isinstance(raw, dict):
+        return {}
+    return {key: raw[key] for key in _STEAMFPS_KEYS if key in raw}
+
+
+def _fps_text(fps: Any, resolution: Any, source: Any, settings: str = "") -> str:
+    if not isinstance(fps, (int, float)) or isinstance(fps, bool) or not 1 <= fps <= 1000:
+        return ""
+    where = " ".join(str(part) for part in (resolution, settings) if isinstance(part, str) and part and part != "n/a")
+    label = _STEAMFPS_SOURCES.get(str(source or ""), "")
+    text = f"about {int(fps)} FPS" + (f" at {where}" if where else "")
+    return text + (f", {label}" if label else "")
+
+
+def steam_device_lines(ratings: dict[str, int], vr_only: bool = False, steamfps: dict | None = None) -> list[str]:
+    """One line per Steam device: Valve's rating, plus SteamFPS's FPS figure when it has one."""
+    record = steamfps_record(steamfps)
+    machine = record.get("steamMachine") if isinstance(record.get("steamMachine"), dict) else {}
+    tiers = machine.get("tiers") if isinstance(machine.get("tiers"), dict) else {}
+    verdict = record.get("verdict") if isinstance(record.get("verdict"), dict) else {}
+    tier_name = verdict.get("tier") if verdict.get("tier") in tiers else "medium"
+    tier = tiers.get(tier_name) if isinstance(tiers.get(tier_name), dict) else {}
+    deck = record.get("steamDeck") if isinstance(record.get("steamDeck"), dict) else {}
+    fps_notes = {
+        "Steam Machine": _fps_text(tier.get("fps"), tier.get("resolution"), machine.get("provenance"),
+                                   f"{tier_name} settings" if tier else ""),
+        "Steam Deck": _fps_text(deck.get("fps"), deck.get("resolution"), deck.get("provenance")),
+    }
+    lines = []
+    for device in STEAM_DEVICES.values():
+        rating = STEAM_DEVICE_RATINGS.get(ratings.get(device, 0), "")
+        note = fps_notes.get(device, "")
+        if rating or note:
+            lines.append(f"{device}: {rating or 'Not rated by Valve'}" + (f" ({note})" if note else ""))
+    if vr_only:
+        lines.append("VR headset required")
+    if any(fps_notes.values()):
+        lines.append(STEAMFPS_ATTRIBUTION)
+    return lines
 
 
 class CanRunGameFetcher:
@@ -907,7 +986,9 @@ class CanRunGameFetcher:
 
     async def _requirements_for_known_app(self, steam_id: str, game_name: str) -> GameRequirements | None:
         """Accept an app id only when Steam's own name still matches the query."""
-        app_info = await self._get_app_info(steam_id)
+        app_info, platforms = await asyncio.gather(
+            self._get_app_info(steam_id), self._get_store_platforms(steam_id)
+        )
         if not app_info:
             self.logger.warning('No app info found for Steam ID %s', steam_id)
             return None
@@ -926,7 +1007,61 @@ class CanRunGameFetcher:
         requirements.steam_app_id = steam_id
         requirements.steam_api_name = official
         requirements.game_name = game_name
+        requirements.steam_device_ratings = steam_device_ratings(platforms)
+        vr = platforms.get("vr_support") if isinstance(platforms, dict) else None
+        requirements.vr_only = bool(isinstance(vr, dict) and vr.get("vrhmd_only"))
+        requirements.steamfps = await self._get_steamfps(steam_id, official or game_name)
         return requirements
+
+    async def _get_steamfps(self, steam_id: str, title: str) -> dict:
+        """SteamFPS record for this app id, found by title search; {} when it has none."""
+        cached = _steamfps_cache.get(steam_id)
+        if cached and time.time() - cached[0] < STEAMFPS_CACHE_SECONDS:
+            return cached[1]
+        record: dict = {}
+        try:
+            timeout = aiohttp.ClientTimeout(total=4)
+            # Some bundled aiohttp builds advertise Brotli without being able to decode it.
+            headers = {"User-Agent": "CanRun G-Assist plugin", "Accept-Encoding": "gzip, deflate"}
+            async with aiohttp.ClientSession(timeout=timeout, headers=headers) as session:
+                async with session.get(STEAMFPS_SEARCH_URL, params={"q": title[:100], "limit": "10"}) as response:
+                    if response.status != 200:
+                        return {}
+                    data = await response.json(content_type=None)
+        except Exception as e:
+            self.logger.debug("SteamFPS lookup failed for %s: %s", steam_id, e)
+            return {}
+        games = data.get("games") if isinstance(data, dict) else None
+        for game in games or []:
+            if isinstance(game, dict) and str(game.get("appid")) == steam_id:
+                record = steamfps_record(game)
+                break
+        _steamfps_cache[steam_id] = (time.time(), record)
+        return record
+
+    async def _get_store_platforms(self, steam_id: str) -> dict:
+        """Valve's device ratings and VR flags for one app; {} when the store does not answer."""
+        query = json.dumps({
+            "ids": [{"appid": int(steam_id)}],
+            "context": {"language": "english", "country_code": "US"},
+            "data_request": {"include_platforms": True},
+        })
+        try:
+            timeout = aiohttp.ClientTimeout(total=6)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.get(STEAM_ITEMS_URL, params={"input_json": query}) as response:
+                    if response.status != 200:
+                        return {}
+                    data = await response.json(content_type=None)
+        except Exception as e:
+            self.logger.debug("Steam device ratings unavailable for %s: %s", steam_id, redact_secrets(e))
+            return {}
+        items = (data.get("response") or {}).get("store_items") if isinstance(data, dict) else None
+        for item in items or []:
+            if isinstance(item, dict) and str(item.get("appid")) == steam_id:
+                platforms = item.get("platforms")
+                return platforms if isinstance(platforms, dict) else {}
+        return {}
 
     async def _search_game(self, game_name: str) -> str | None:
         """
@@ -1360,9 +1495,15 @@ class CanRunGameFetcher:
                 )
                 return None
 
+            year = re.search(r"\b(19|20)\d\d\b", str((app_info.get('release_date') or {}).get('date', '')))
+            genres = ", ".join(
+                str(g.get('description', '')) for g in (app_info.get('genres') or []) if isinstance(g, dict)
+            )
             return GameRequirements(
                 game_name=game_name,
                 steam_api_name=official,
+                release_year=int(year.group(0)) if year else 0,
+                genre=genres,
                 **self._dict_to_dataclass_fields(minimum, recommended),
                 source='Steam API',
                 last_updated=str(int(time.time()))

@@ -211,7 +211,8 @@ def main() -> int:
                 plugin = estimate_from_requirements(
                     gpu, TEST_CPU, recommended_gpu=rec_gpu_text, minimum_gpu=min_gpu_text,
                     resolution=resolution, gpu_passmarks=gpu_pms, cpu_patterns=cpu_patterns,
-                    game_name=store["name"],
+                    game_name=store["name"], user_vram_gb=float(VRAM_GB[gpu]), recommended_cpu=rec_cpu_text,
+                    recommended_ram_gb=float(rec_ram), release_year=store["release_year"], genre=store["genre"],
                 ).expected_fps
                 heur = heuristic_m0(float(gpu_pm), rec_pm, resolution)
                 if abs(math.log(pred) - math.log(true_fps)) <= bands[resolution]:

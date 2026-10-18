@@ -98,6 +98,14 @@ def requirements_from_cache(payload: Any) -> GameRequirements:
     picked = trusted_dataclass_kwargs(payload, GameRequirements)
     if "steam_app_id" in picked:
         picked["steam_app_id"] = valid_steam_app_id(str(picked["steam_app_id"]))
+    if "steam_device_ratings" in picked:
+        from canrun_game_fetcher import steam_device_ratings
+        picked["steam_device_ratings"] = steam_device_ratings(picked["steam_device_ratings"])
+    if "steamfps" in picked:
+        from canrun_game_fetcher import steamfps_record
+        picked["steamfps"] = steamfps_record(picked["steamfps"])
+    if "vr_only" in picked:
+        picked["vr_only"] = picked["vr_only"] is True
     return GameRequirements(**picked)
 
 
@@ -237,6 +245,8 @@ class CanRunEngine:
             "recommended_cpu": game_requirements.recommended_cpu,
             "minimum_ram_gb": game_requirements.minimum_ram_gb,
             "recommended_ram_gb": game_requirements.recommended_ram_gb,
+            "release_year": getattr(game_requirements, "release_year", 0),
+            "genre": getattr(game_requirements, "genre", ""),
             "steam_app_id": getattr(game_requirements, "steam_app_id", ""),
             "resolution": detected_resolution_class,
         }

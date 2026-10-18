@@ -43,7 +43,9 @@ PLUGIN_META = [
 # per-game FPS curve table, not the training corpus.
 DATA_JSON = [
     "cpu_benchmarks.json",
+    "game_engines.json",
     "gpu_hierarchy.json",
+    "measured_benchmarks.json",
     "ml_fps_model_unified.json",
     "steam_hardware_clusters.json",
     "training_benchmarks.json",
@@ -83,7 +85,7 @@ DROP_DIST_INFO = {
 
 def _plugin_version() -> str:
     manifest = json.loads((ROOT / "manifest.json").read_text(encoding="utf-8"))
-    return str(manifest.get("version") or "12.1.0")
+    return str(manifest.get("version") or "12.2.0")
 
 
 def _is_excluded_data(name: str) -> bool:

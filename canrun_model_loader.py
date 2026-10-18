@@ -27,6 +27,34 @@ RESOLUTION_PIXELS: dict[str, int] = {
 BASE_PIXELS_1080P = float(1920 * 1080)
 
 
+def _gpu_words(name: str) -> str:
+    return " ".join(re.sub(r"[^a-z0-9]+", " ", (name or "").lower()).split())
+
+
+def match_gpu_key(gpu_name: str, entries: dict[str, Any]) -> str | None:
+    """Key of the GPU table entry for a detected GPU name, or None.
+
+    The longest table name found as whole words wins, so "RTX 4060 Laptop GPU"
+    is not read as the desktop "RTX 4060", nor "RTX 4060 Ti" as "RTX 4060".
+    Entries may list "aliases". A name that is only part of a table name
+    (e.g. "4090") falls back to the shortest such entry.
+    """
+    text = f" {_gpu_words(gpu_name)} "
+    if not text.strip():
+        return None
+    best, best_len = None, 0
+    for key, info in entries.items():
+        aliases = info.get("aliases", []) if isinstance(info, dict) else []
+        for candidate in (key, *aliases):
+            words = _gpu_words(candidate)
+            if words and f" {words} " in text and len(words) > best_len:
+                best, best_len = key, len(words)
+    if best is not None:
+        return best
+    partial = [key for key in entries if f" {text.strip()} " in f" {_gpu_words(key)} "]
+    return min(partial, key=len) if partial else None
+
+
 class LightweightMLPredictor:
     """
     Pure-Python Two-Stage Log-Ridge + Monotonic Residual GBDT predictor +
@@ -488,9 +516,9 @@ class LightweightMLPredictor:
         if gpu_lower in self.gpu_hierarchy:
             return int(self.gpu_hierarchy[gpu_lower]["passmark"])
 
-        for gpu_key, gpu_data in self.gpu_hierarchy.items():
-            if gpu_key in gpu_lower or gpu_lower in gpu_key:
-                return int(gpu_data["passmark"])
+        key = match_gpu_key(gpu_lower, self.gpu_hierarchy)
+        if key is not None:
+            return int(self.gpu_hierarchy[key]["passmark"])
 
         gpu_numbers = "".join(filter(str.isdigit, gpu_lower))
         if gpu_numbers:
@@ -510,9 +538,9 @@ class LightweightMLPredictor:
         if gpu_lower in self.gpu_hierarchy:
             return int(self.gpu_hierarchy[gpu_lower]["vram"])
 
-        for gpu_key, gpu_data in self.gpu_hierarchy.items():
-            if gpu_key in gpu_lower or gpu_lower in gpu_key:
-                return int(gpu_data["vram"])
+        key = match_gpu_key(gpu_lower, self.gpu_hierarchy)
+        if key is not None:
+            return int(self.gpu_hierarchy[key]["vram"])
 
         return 8
 

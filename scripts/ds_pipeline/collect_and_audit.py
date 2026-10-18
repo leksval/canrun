@@ -3,7 +3,9 @@ Stage 1 & Stage 2: Multi-Source Steam API & Benchmark Data Ingestion, EDA & Phys
 
 1. Live Steam API Harvester (when .env STEAM_WEBAPI_KEY / network is available):
    - Queries ISteamChartsService/GetMostPlayedGames/v1/ for top played Steam AppIDs
-   - Queries IGamePerformanceStatsService/GetGameFrameRateStats/v1/ for Steam hardware cluster telemetry
+   - Queries IGamePerformanceStatsService/GetGameFrameRateStats/v1/ for Steam hardware cluster telemetry.
+     This endpoint is not in Valve's public Web API reference and returns HTTP 401 to outside keys,
+     so frame_rate_telemetry stays empty and no Steam FPS reaches the training set.
    - Queries store.steampowered.com/api/appdetails for official PC minimum/recommended specs
    - Queries FPSHQ public benchmark API when reachable
 2. Comprehensive 52-Game Audited Benchmark Catalog across 25 GPUs and 3 resolutions (1080p, 1440p, 4K),
@@ -14,7 +16,7 @@ Stage 1 & Stage 2: Multi-Source Steam API & Benchmark Data Ingestion, EDA & Phys
    - Gate 3: Within-Architecture PassMark Monotonicity & Studentized Huber Residual Outlier Repair
    - Gate 4: Sparse Game & Multi-Resolution Expansion
 4. Outputs (all under gitignored data/):
-   - `data/steam_api_harvest.json` (raw Steam API store specs & telemetry summary)
+   - `data/steam_api_harvest.json` (raw Steam API store specs, plus the frame-rate status counts)
    - `data/training_benchmarks.json` (audited 52-game, ~1,650-point multi-resolution benchmark table)
    - `data/game_requirements.json` (enriched Steam Store hardware requirements catalog)
    - `data/clean_training_dataset.json` (5,500+ leak-free training records for the Two-Stage ML Pipeline)
@@ -705,6 +707,7 @@ async def harvest_live_steam_api(api_key: str) -> dict[str, Any]:
     steamspy_games: dict[str, dict[str, Any]] = {}
     browse_items: dict[str, dict[str, Any]] = {}
     frame_rate_telemetry: dict[str, dict[str, Any]] = {}
+    frame_rate_status: dict[str, int] = {}
     store_appdetails: dict[str, dict[str, Any]] = {}
 
     # Reuse previously cached store_appdetails & browse_items so repeated runs accumulate more Steam API data
@@ -894,6 +897,8 @@ async def harvest_live_steam_api(api_key: str) -> dict[str, Any]:
             async with semaphore:
                 try:
                     async with session.get(url, params={"key": api_key, "appid": appid, "format": "json"}) as resp:
+                        status_key = str(resp.status)
+                        frame_rate_status[status_key] = frame_rate_status.get(status_key, 0) + 1
                         if resp.status == 200:
                             payload = await resp.json(content_type=None)
                             buckets = parse_frame_rate_payload(payload)
@@ -911,6 +916,7 @@ async def harvest_live_steam_api(api_key: str) -> dict[str, Any]:
                                     "min_bucket_fps": round(min(b.mean_fps for b in buckets), 2),
                                 }
                 except Exception:
+                    frame_rate_status["error"] = frame_rate_status.get("error", 0) + 1
                     return
 
         # 5. Query Steam Store appdetails for uncached priority AppIDs (up to 180 new per run to respect rate limit)
@@ -959,6 +965,9 @@ async def harvest_live_steam_api(api_key: str) -> dict[str, Any]:
         await asyncio.gather(*(fetch_fps_stats(aid) for aid in priority_appids[:150]))
         await asyncio.gather(*(fetch_store_details(aid) for aid in uncached_priority))
 
+    if frame_rate_status and not frame_rate_telemetry:
+        print(f"  GetGameFrameRateStats returned no data. HTTP status counts: {frame_rate_status}")
+
     return {
         "harvested_at": int(time.time()),
         "steam_api_key_used": bool(api_key),
@@ -976,6 +985,7 @@ async def harvest_live_steam_api(api_key: str) -> dict[str, Any]:
         "concurrent_appids": concurrent_appids,
         "frame_rate_telemetry_games": len(frame_rate_telemetry),
         "frame_rate_telemetry": frame_rate_telemetry,
+        "frame_rate_http_status": frame_rate_status,
         "store_appdetails_fetched": len(store_appdetails),
         "store_appdetails": store_appdetails,
         "browse_items": browse_items,
@@ -1419,6 +1429,14 @@ def audit_and_repair_benchmarks(
                 spec["4K"] = f1440
 
     raw_data["version"] = "4.0-audited"
+    raw_data["description"] = (
+        "Per-game FPS curves over 25 GPUs and 3 resolutions. 21 games are anchored to published "
+        "benchmarks, 58 are set by hand, and the rest are generated from Steam store specs."
+    )
+    raw_data["source"] = (
+        "Tom's Hardware GPU Hierarchy 2025, GamersNexus, TechPowerUp, Reddit and YouTube for the 21 measured games; "
+        "a power-law rule on store specs for the others. No Steam player FPS."
+    )
     raw_data["total_data_points"] = f"{sum(len(g.get('gpus', {})) * 3 for g in games.values())}+"
     raw_data["games"] = games
 

@@ -12,6 +12,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
+from canrun_model_loader import match_gpu_key
+
 # Try to import ML model loader
 try:
     from canrun_model_loader import LightweightMLPredictor
@@ -249,6 +251,12 @@ class CanRunMLPredictor:
                 str(requirements.get("minimum_gpu") or ""),
                 resolution,
                 game_name=str(requirements.get("game_name") or ""),
+                user_vram_gb=float(hardware.get("gpu", {}).get("vram") or 0),
+                recommended_cpu=str(requirements.get("recommended_cpu") or ""),
+                recommended_ram_gb=float(requirements.get("recommended_ram_gb") or 0),
+                release_year=int(requirements.get("release_year") or 0),
+                genre=str(requirements.get("genre") or ""),
+                steam_app_id=str(requirements.get("steam_app_id") or ""),
             )
             if estimate.fps_source == "unknown" or estimate.expected_fps <= 0:
                 return 0, 0, 0, 0, "Steam frame-rate data unavailable", "unknown"
@@ -312,12 +320,13 @@ class CanRunMLPredictor:
         gpu_model = gpu_info.get('model', '').lower()
 
         # Search in pre-loaded database (self.gpu_database loaded once in __init__)
-        for gpu_key, gpu_data in self.gpu_database.items():
-            if gpu_key.lower() in gpu_model or gpu_model in gpu_key.lower():
-                passmark = gpu_data.get('passmark_g3d', gpu_data.get('score', 500) * 45)
-                score = min(100, passmark / 400)
-                self.logger.debug("GPU '%s' found: PassMark %s, Score %s", gpu_model, passmark, score)
-                return int(score), int(passmark)
+        gpu_key = match_gpu_key(gpu_model, self.gpu_database)
+        if gpu_key is not None:
+            gpu_data = self.gpu_database[gpu_key]
+            passmark = gpu_data.get('passmark_g3d', gpu_data.get('score', 500) * 45)
+            score = min(100, passmark / 400)
+            self.logger.debug("GPU '%s' found: PassMark %s, Score %s", gpu_model, passmark, score)
+            return int(score), int(passmark)
 
         # If not found in database, log and use minimal fallback
         self.logger.warning('GPU data not found for: %s', gpu_model)

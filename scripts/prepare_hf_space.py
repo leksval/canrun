@@ -25,9 +25,10 @@ DATA_DIR = ROOT / "data"
 DEFAULT_STAGE = ROOT / "dist" / "hf_space"
 DEFAULT_REPO = "grasant/canrun"
 SPACE_FILES = ["app.py", "README.md", "logo.png", *PLUGIN_PY, *PLUGIN_META]
-PUBLIC_DATA = ["cpu_benchmarks.json", "gpu_hierarchy.json"]
+PUBLIC_DATA = ["cpu_benchmarks.json", "game_engines.json", "gpu_hierarchy.json"]
 FORBIDDEN = {
     "training_benchmarks.json",
+    "measured_benchmarks.json",
     "steam_hardware_clusters.json",
     "steam_api_harvest.json",
     "clean_training_dataset.json",
@@ -94,7 +95,7 @@ def _remote_files(repo_id: str) -> list[str]:
 
 def upload(stage_dir: Path, repo_id: str, files: list[str]) -> None:
     stale = [f for f in _remote_files(repo_id) if f not in files and f != ".gitattributes"]
-    cmd = ["hf", "upload", repo_id, ".", ".", "--type", "space", "--commit-message", "CanRun v12.1.0 demo"]
+    cmd = ["hf", "upload", repo_id, ".", ".", "--type", "space", "--commit-message", "CanRun v12.2.0 demo"]
     for path in stale:
         cmd += ["--delete", path]
     # Run from the stage dir: on Windows the hf CLI expands glob arguments against the cwd.

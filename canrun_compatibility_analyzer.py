@@ -9,6 +9,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
+from canrun_model_loader import match_gpu_key
+
 
 class CompatibilityLevel(Enum):
     """Compatibility levels for RTX/GTX gaming systems."""
@@ -183,14 +185,15 @@ class CanRunCompatibilityAnalyzer:
         gpu_model_lower = gpu_model.lower()
 
         # Search in GPU database
-        for gpu_key, gpu_data in self.gpu_database.items():
-            if gpu_key.lower() in gpu_model_lower or gpu_model_lower in gpu_key.lower():
-                # RTX 4090 should get score=1000 from hierarchy -> ~95+ points
-                raw_score = gpu_data.get('score', 500)
-                # Convert to 0-100 scale similar to ML predictor
-                normalized_score = min(100, raw_score / 10)  # 1000 -> 100, 500 -> 50
-                self.logger.debug("GPU '%s' found: raw_score %s, normalized %s", gpu_model, raw_score, normalized_score)
-                return int(normalized_score)
+        gpu_key = match_gpu_key(gpu_model_lower, self.gpu_database)
+        if gpu_key is not None:
+            gpu_data = self.gpu_database[gpu_key]
+            # RTX 4090 should get score=1000 from hierarchy -> ~95+ points
+            raw_score = gpu_data.get('score', 500)
+            # Convert to 0-100 scale similar to ML predictor
+            normalized_score = min(100, raw_score / 10)  # 1000 -> 100, 500 -> 50
+            self.logger.debug("GPU '%s' found: raw_score %s, normalized %s", gpu_model, raw_score, normalized_score)
+            return int(normalized_score)
 
         # If not found in database, log and use minimal fallback
         self.logger.warning('GPU data not found for: %s', gpu_model)

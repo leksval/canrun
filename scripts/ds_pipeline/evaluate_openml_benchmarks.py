@@ -151,6 +151,7 @@ def main() -> int:
         game_info[game] = {
             "name": entry["name"], "mismatch": mismatch, "rec_text": rec_text, "min_text": min_text,
             "rec_pm": rec_pm, "min_pm": min_pm,
+            "rec_cpu_text": _extract_field_from_raw_req(entry.get("recommended_raw", ""), "Processor"),
             "rec_cpu_pm": float(lookup_cpu_passmark(
                 _extract_field_from_raw_req(entry.get("recommended_raw", ""), "Processor"), cpu_patterns) or 16000),
             "rec_ram": _extract_ram_gb(entry.get("recommended_raw", ""), 16),
@@ -190,7 +191,9 @@ def main() -> int:
         if shown.fps_source == "unknown" or shown.expected_fps <= 0:
             shown = estimate_from_requirements(gpu, cpu, info["rec_text"], info["min_text"], res,
                                                gpu_passmarks=gpu_pms, cpu_patterns=cpu_patterns,
-                                               game_name=info["name"])
+                                               game_name=info["name"], user_vram_gb=vram_gb.get(gpu_raw, 4.0),
+                                               recommended_cpu=info["rec_cpu_text"],
+                                               recommended_ram_gb=float(info["rec_ram"]), release_year=info["year"])
         results.append({
             "part": part, "game": game, "gpu": gpu, "cpu": cpu, "cpu_pm": cpu_pm, "res": res, "setting": setting,
             "n": len(values), "true": true_fps, "model": min(model_fps, FPS_CAP), "plugin": float(shown.expected_fps),

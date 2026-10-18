@@ -1,8 +1,10 @@
 """
 Steam frame-rate lookup for CanRun.
 
-The public read API is IGamePerformanceStatsService/GetGameFrameRateStats.
-An unauthenticated call returns HTTP 401, so a Steam Web API key is required.
+The read API is IGamePerformanceStatsService/GetGameFrameRateStats. It is not in
+Valve's public Web API reference, and it returns HTTP 401 to a valid outside key,
+a fake key and no key alike (October 2026). Until Valve opens it, every Steam
+player path below falls through to the benchmark curve or the store-spec model.
 The published protobuf (June 2026) returns one bucket per hardware cluster:
 
     clusterid, report_count, report_days, mean_frame_rate,
@@ -443,12 +445,19 @@ def estimate_from_requirements(
     gpu_passmarks: dict[str, int] | None = None,
     cpu_patterns: list[tuple] | None = None,
     game_name: str = "",
+    user_vram_gb: float = 0.0,
+    recommended_cpu: str = "",
+    recommended_ram_gb: float = 0.0,
+    release_year: int = 0,
+    genre: str = "",
+    steam_app_id: str = "",
 ) -> FpsEstimate:
     """FPS for a game with no player sample, scaled from its published GPU spec.
 
     Uses the Two-Stage Log-Ridge + Monotonic GBDT model when it is loaded and the
-    page names a GPU. Otherwise falls back to the power-law prior (recommended
-    card = 60 FPS at 1080p, minimum card = 30 FPS).
+    page names a GPU, times the engine factor for the game's engine. Otherwise
+    falls back to the power-law prior (recommended card = 60 FPS at 1080p,
+    minimum card = 30 FPS). Missing store fields get the defaults training used.
     """
     if gpu_passmarks is None:
         gpu_passmarks = load_gpu_passmarks()
@@ -486,18 +495,28 @@ def estimate_from_requirements(
     if predictor is not None and source in {SOURCE_REQUIREMENTS, SOURCE_REQUIREMENTS_MINIMUM}:
         rec_pm = float(spec[1]) if source == SOURCE_REQUIREMENTS else float(spec[1]) * 1.65
         min_pm = float(min_spec[1]) if min_spec else (rec_pm / 1.65)
+        min_vram = 4 if min_pm < 10000 else (6 if min_pm < 17000 else 8)
+        rec_vram = max(min_vram, 6 if rec_pm < 14500 else 8)
+        rec_cpu_pm = lookup_cpu_passmark(recommended_cpu, cpu_patterns) if recommended_cpu else None
         x_vec = predictor.extract_feature_vector(
             gpu_passmark=float(user_passmark),
             cpu_passmark=float(cpu_pm or 28000),
+            gpu_vram_gb=float(user_vram_gb or 8.0),
             gpu_name=normalize_gpu(user_gpu),
             resolution=resolution_key,
             rec_gpu_passmark=rec_pm,
             min_gpu_passmark=min_pm,
+            rec_cpu_passmark=float(rec_cpu_pm or 16000),
+            rec_vram_gb=float(rec_vram),
+            rec_ram_gb=float(recommended_ram_gb or 16),
+            release_year=int(release_year or 2023),
+            genre=str(genre or ""),
             game_name=str(game_name or ""),
         )
         tree_fps = predictor.predict_two_stage_from_features(x_vec)
         if tree_fps is not None and tree_fps > 0:
-            estimate = _spread_band(float(tree_fps), float(tree_fps) * spread)
+            tree_fps = float(tree_fps) * engine_factor(steam_app_id)
+            estimate = _spread_band(tree_fps, tree_fps * spread)
 
     if estimate.expected_fps > _REQUIREMENTS_FPS_CAP:
         estimate = _spread_band(_REQUIREMENTS_FPS_CAP, _REQUIREMENTS_FPS_CAP * spread)
@@ -689,13 +708,66 @@ def fit_log_fps_curve(points: list[tuple]) -> tuple | None:
 
 
 def load_benchmark_table() -> dict[tuple, list[tuple]]:
-    """Measured FPS rows keyed by (game, resolution)."""
-    path = _data_file("training_benchmarks.json")
+    """Benchmark-table FPS rows keyed by (game, resolution)."""
+    return _table_from_file(_data_file("training_benchmarks.json"))
+
+
+def load_measured_table() -> dict[tuple, list[tuple]]:
+    """Review measurements keyed by (game, resolution). Checked before the benchmark table."""
+    return _table_from_file(_data_file("measured_benchmarks.json"))
+
+
+def game_engine(steam_app_id: str) -> str:
+    """Engine family of a Steam game, or "" when unknown."""
+    return _engine_data(*_file_stamp(_data_file("game_engines.json")))[1].get(str(steam_app_id or ""), "")
+
+
+def engine_factor(steam_app_id: str) -> float:
+    """Measured-vs-model FPS ratio for the game's engine; 1.0 for unknown or uncorrected engines."""
+    factors, apps = _engine_data(*_file_stamp(_data_file("game_engines.json")))
+    factor = factors.get(apps.get(str(steam_app_id or ""), ""), 1.0)
+    return factor if 0.5 <= factor <= 2.0 else 1.0
+
+
+def _file_stamp(path: Path) -> tuple[str, int]:
+    try:
+        return str(path), path.stat().st_mtime_ns
+    except OSError:
+        return str(path), 0
+
+
+@lru_cache(maxsize=2)
+def _engine_data(path_text: str, _stamp: int) -> tuple[dict[str, float], dict[str, str]]:
+    try:
+        data = json.loads(Path(path_text).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}, {}
+    factors = data.get("factors") if isinstance(data, dict) else None
+    apps = data.get("apps") if isinstance(data, dict) else None
+    if not isinstance(factors, dict) or not isinstance(apps, dict):
+        return {}, {}
+    return (
+        {str(k): float(v) for k, v in factors.items() if isinstance(v, (int, float))},
+        {str(k): str(v) for k, v in apps.items() if isinstance(v, str)},
+    )
+
+
+def _table_from_file(path: Path) -> dict[tuple, list[tuple]]:
+    try:
+        stamp = path.stat().st_mtime_ns
+    except OSError:
+        return {}
+    return _parse_table_file(str(path), stamp)
+
+
+@lru_cache(maxsize=4)
+def _parse_table_file(path_text: str, _stamp: int) -> dict[tuple, list[tuple]]:
+    path = Path(path_text)
     table: dict[tuple, list[tuple]] = {}
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
-        logger.warning("Could not read training benchmarks: %s", exc)
+        logger.warning("Could not read %s: %s", path.name, exc)
         return table
     games = data.get("games", {})
     if not isinstance(games, dict):
@@ -884,6 +956,25 @@ def _contains_title(longer: list[str], shorter: list[str]) -> bool:
     return False
 
 
+_EDITION_WORDS = frozenset({
+    "edition", "remastered", "remaster", "definitive", "complete", "goty", "game", "of", "the", "year",
+    "directors", "cut", "enhanced", "deluxe", "ultimate", "anniversary", "standard", "gold", "premium",
+})
+
+
+def _only_edition_words(longer: list[str], shorter: list[str]) -> bool:
+    """A typed name longer than the table title may only add edition words.
+
+    "Prince of Persia The Lost Crown" is a different game from "Prince of Persia";
+    "Cyberpunk 2077 Ultimate Edition" is the same game as "Cyberpunk 2077".
+    """
+    extra = list(longer)
+    for token in shorter:
+        if token in extra:
+            extra.remove(token)
+    return all(token in _EDITION_WORDS for token in extra)
+
+
 def match_benchmark_game(game_name: str | None, games: list[str]) -> str | None:
     if game_name in games:
         return game_name
@@ -900,7 +991,8 @@ def match_benchmark_game(game_name: str | None, games: list[str]) -> str | None:
     hits = [
         game for tokens, game in keyed
         if len("".join(tokens)) >= 4
-        and (_contains_title(tokens, query_tokens) or _contains_title(query_tokens, tokens))
+        and (_contains_title(tokens, query_tokens)
+             or (_contains_title(query_tokens, tokens) and _only_edition_words(query_tokens, tokens)))
     ]
     if len(hits) == 1:
         return hits[0]
@@ -912,6 +1004,9 @@ def _benchmark_points(game_name: str | None, resolution: str | None, table: dict
     if not game_name or not resolved:
         return []
     if table is None:
+        measured = _benchmark_points(game_name, resolution, load_measured_table())
+        if measured:
+            return measured
         table = load_benchmark_table()
     games = sorted({game for game, _ in table})
     matched = match_benchmark_game(game_name, games)
@@ -940,6 +1035,27 @@ def leave_one_out_fps(game_name: str, resolution: str, gpu_model: str) -> float 
     return _cap_at_tied_leaders(prediction, points)
 
 
+def gpu_vendor(gpu_name: str) -> str:
+    text = (gpu_name or "").lower()
+    if re.search(r"\b(rtx|gtx|geforce|quadro|titan)\b", text):
+        return "nvidia"
+    if re.search(r"\b(rx|radeon)\b", text):
+        return "amd"
+    if re.search(r"\barc\b", text):
+        return "intel"
+    return ""
+
+
+MIN_VENDOR_POINTS = 4
+
+
+def same_vendor_points(points: list[tuple], gpu_model: str) -> list[tuple]:
+    """Keep the user's vendor when it has enough points. AMD cards get more FPS per PassMark point."""
+    vendor = gpu_vendor(gpu_model)
+    kept = [row for row in points if gpu_vendor(row[0]) == vendor] if vendor else []
+    return kept if len(kept) >= MIN_VENDOR_POINTS else points
+
+
 def _cap_at_tied_leaders(prediction: float, points: list[tuple]) -> float:
     """Keep a tied top score, such as Elden Ring's 60 FPS cap, from being extrapolated."""
     ranked = sorted(points, key=lambda row: row[1], reverse=True)
@@ -966,7 +1082,7 @@ def calibrated_similar_fps(
     exclude_gpu: str | None = None,
 ) -> FpsEstimate | None:
     """Shipped similar-PC estimate. exclude_gpu drops that card from the fit."""
-    points = _benchmark_points(game_name, resolution)
+    points = same_vendor_points(_benchmark_points(game_name, resolution), gpu_model)
     if not points:
         return None
     training = []

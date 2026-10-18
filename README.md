@@ -17,7 +17,7 @@ tags:
 ---
 <table> <tr> <td width="110" valign="middle"> <img width="100" height="100" alt="canrun_logo" src="https://github.com/user-attachments/assets/239082bd-d5ca-427b-b235-5326299f3104" /> </td> <td valign="middle"> <h1 style="display:inline-block; vertical-align:middle; margin:0; padding:0;">  CanRun - System Spec Game Compatibility Checker </h1> </td> </tr> </table>
   
-  [![Version](https://img.shields.io/badge/version-12.1.0-blue.svg)](https://github.com/canrun/canrun)
+  [![Version](https://img.shields.io/badge/version-12.2.0-blue.svg)](https://github.com/canrun/canrun)
   [![Python](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/downloads/)
   [![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
   [![G-Assist](https://img.shields.io/badge/G--Assist-Official%20Protocol%20Verified-brightgreen.svg)](https://www.nvidia.com/en-us/geforce/technologies/g-assist/)
@@ -30,9 +30,38 @@ tags:
 
 **CanRun** is an RTX/GTX-exclusive G-Assist plugin that instantly tells you if your PC can run any game with an advanced **S-A-B-C-D-F tier system** and enhanced Steam integration.
 
-AVAILABLE on official Nvidia g-assist mod marketplace:  [mod.io/canrun](https://mod.io/g/g-assist/m/canrun2#description). CanRun is trending and top rated on the [G-Assist hub](https://mod.io/g/g-assist). The next marketplace upload is **version 12.1.0**.
+AVAILABLE on official Nvidia g-assist mod marketplace:  [mod.io/canrun](https://mod.io/g/g-assist/m/canrun2#description). CanRun is trending and top rated on the [G-Assist hub](https://mod.io/g/g-assist). The next marketplace upload is **version 12.2.0**.
 
 [![CanRun trending on the NVIDIA G-Assist hub](docs/g-assist-trending.jpg)](https://mod.io/g/g-assist/m/canrun2#description)
+
+## Just ask
+
+Press **Alt+G** in the NVIDIA App overlay and type **"canrun cyberpunk 2077?"**. A real 12.2 answer on an RTX 4090 with a 144 Hz screen, shortened:
+
+```text
+🎮 Game: Cyberpunk 2077
+
+💻 YOUR SYSTEM
+- GPU: RTX 4090 (24GB)
+- CPU: AMD Ryzen 7 7800X3D 8-Core Processor
+- Display: 3072x1728 @ 144Hz (FPS estimate uses 1440p)
+
+⚡ PERFORMANCE
+- FPS: 113-144 FPS on this 144 Hz screen (estimated from a similar PC, native, ray tracing off). On a faster monitor, about 113-170.
+- DLSS 4.5 frame gen: around 140 FPS more (2x).
+- Path tracing: around 70 to 95 FPS less (typically about 2x to 3x heavier).
+- Score: S Tier (97/100)
+
+🕹️ STEAM DEVICES
+- Steam Deck: Verified (about 30 FPS at 800p, player reports)
+- Steam Machine: Verified (about 74 FPS at 1080p medium settings, estimate)
+- Steam Frame: Playable
+- Device FPS from SteamFPS (steamfps.com), CC BY 4.0
+
+🎯 VERDICT: CAN RUN - EXCELLENT PERFORMANCE
+```
+
+The range is about 20% either side of CanRun's estimate. On desktop GeForce cards, in games with review data, the real FPS landed inside it about 4 times out of 5 (see [Real-World Accuracy](#real-world-accuracy-on-independent-benchmarks)).
 
 ## Demo
 
@@ -46,7 +75,7 @@ AVAILABLE on official Nvidia g-assist mod marketplace:  [mod.io/canrun](https://
 - **⭐ S-A-B-C-D-F Tier System**: Advanced performance classification with weighted scoring
 - 
 - **🧠 AI-Powered Analysis**: G-Assist routes natural language to the plugin. The S-A-B-C-D-F tier still comes from local hardware scoring
-- **📈 Frame Rates**: The number you see is an estimate built in steps. A Steam player sample is used when it has at least 10 reports, then that game's benchmark curve, then a scaled sample from a similar GPU. The ML model runs only when those miss. That full estimate beats the model alone on independent benchmarks (see [Real-World Accuracy](#real-world-accuracy-on-independent-benchmarks)). The S-A-B-C-D-F tier still comes from local hardware scoring, not from that FPS number.
+- **📈 Frame Rates**: The number you see is an estimate built in steps. If the game is in CanRun's local benchmark table, the estimate is read off that game's curve. Otherwise the ML model predicts it from the live Steam store specs. That full estimate beats the model alone on independent benchmarks (see [Real-World Accuracy](#real-world-accuracy-on-independent-benchmarks)). No Steam player FPS data is used: Steam's frame-rate endpoint rejects outside Web API keys. The S-A-B-C-D-F tier still comes from local hardware scoring, not from that FPS number.
 - **🔒 Local Matching**: GPU and CPU names stay on this PC. The frame-rate request sends only the Steam app id
 - **🎯 Steam-First Data**: Game requirements come from the Steam Store API
 - **🎯 Intelligent Game Matching**: Names are matched against Windows games from the last 30 days and the current 100 bestsellers, then the Steam store. A close or split title still lands on the published game.
@@ -60,7 +89,33 @@ AVAILABLE on official Nvidia g-assist mod marketplace:  [mod.io/canrun](https://
 
 ## Recent changes
 
-**12.1.0** is the current release. Release notes live with the [G-Assist Hub release](https://mod.io/g/g-assist/m/canrun2#description). In short: titles match on whole words, more GeForce cards are recognized, and the full estimate (not the model alone) is 15.2% off end to end on independent benchmarks.
+**12.2.0** is the current release. Release notes live with the [G-Assist Hub release](https://mod.io/g/g-assist/m/canrun2#description). In short:
+
+- The model now gets the game's full store specs (recommended CPU and RAM, release year, genre) and your GPU's VRAM, not only the recommended GPU. On the TechPowerUp store-spec test this moved the error from 20.8% to 18.7%.
+- Benchmark curves are fitted on your GPU vendor's cards when the game has at least 4 of them. Mixed AMD and NVIDIA curves read about 8% high for NVIDIA.
+- A measured review table (`data/measured_benchmarks.json`, 32 games from TechPowerUp reviews) is checked before the older benchmark table, and the 12.2.0 zip ships it.
+- Laptop GPUs (RTX 3050 to 5090 Laptop) and the RTX Spark N1X are recognized with their own PassMark scores. 12.1 read a laptop GPU as the faster desktop card and was 39% too high on average on Notebookcheck's laptop results (23.0% median error); without the measured table 12.2 is 22.0% off with a −2% bias, and 14.9% with it. Every GPU lookup now prefers the longest matching name, so "RTX 4060 Ti" is never read as "RTX 4060".
+- Games without a measured curve get an engine correction. `data/game_engines.json` maps 7,916 Steam games to their engine (from Wikidata, CC0), and engines with at least 3 measured games get a factor: Unreal Engine 5 ×0.77, RE Engine ×1.11. Holding out each of 30 measured games, the store-spec error drops from 25.0% to 23.1% median (33.2% to 28.3% average). Rebuild with `real_benchmarks.py fetch-engines` and `engine-factors`.
+- Each answer lists Valve's own compatibility rating for the Steam Deck, Steam Machine, Steam Frame and SteamOS (Verified, Playable or Unsupported), read live from the Steam store without an API key, and says when a game needs a VR headset. Devices Valve has not rated are left out. When [SteamFPS](https://steamfps.com/api) has the game, the Steam Deck and Steam Machine lines add its FPS figure, labeled as an estimate, player reports or measured as SteamFPS marks it, with the attribution its CC BY 4.0 licence asks for. SteamFPS lookups are cached for a day, and the section is dropped when the answer would be cut off.
+- On NVIDIA laptops the GPU power limit is read through NVML. When a laptop runs its GPU below 70% of the most power NVIDIA allows for that model, the answer says FPS can be lower than shown. The FPS number itself is not changed, because there is no test data yet that pairs laptop power limits with measured FPS.
+- A longer typed title only matches a shorter benchmark title when the extra words are edition words, so "Prince of Persia The Lost Crown" no longer uses the "Prince of Persia" curve.
+- Benchmark tables are cached until the file changes, and the "FPS Unknown" message names the real cause.
+
+**12.1.0:** titles match on whole words, more GeForce cards are recognized, and the full estimate (not the model alone) is 15.2% off end to end on independent benchmarks.
+
+**12.2.0 against earlier versions** (median error on outside benchmarks, lower is better):
+
+| Test | v8 | 12.1 | 12.2 |
+| :--- | :---: | :---: | :---: |
+| TechSpot desktops, all cards (98 points) | 75.1% | 32.9% | **13.3%** |
+| TechSpot desktops, NVIDIA (55) | 63.8% | 28.6% | **10.0%** |
+| Notebookcheck laptops (about 1,100 to 1,300) | not run | 23.0% (+39% bias) | **14.9%** |
+| TechPowerUp RTX 5070 review, end to end (308) | n/a | 15.2% | **9.3%** |
+| TechPowerUp 2025, games without a curve (266) | 79.8% | 20.8% | **18.7%** |
+| OpenML user reports, older games (11,842) | 39.8% | 30.7% | **30.0%** |
+| Unmeasured games, each held out (30 games, NVIDIA) | n/a | not run | **23.1%** (25.0% without the engine correction) |
+
+The 12.2 end-to-end row was scored with the earlier 25-game table.
 
 The model card is [grasant/canrun-fps-predictor](https://huggingface.co/grasant/canrun-fps-predictor) v1.0.
 
@@ -75,7 +130,7 @@ cd canrun
 pack_g_assist_zip.bat
 ```
 
-The zip is `dist/canrun-<version>.zip` (currently `dist/canrun-12.1.0.zip`). Upload that file to mod.io.
+The zip is `dist/canrun-<version>.zip` (currently `dist/canrun-12.2.0.zip`). Upload that file to mod.io.
 
 To build the standalone `dist/g-assist-plugin-canrun.exe` instead, use the project venv, which has the GPU detection packages:
 
@@ -166,7 +221,7 @@ If the plugin is not detected by G-Assist:
 4. **Check Logs**: Review `%USERPROFILE%\canrun_plugin.log` and `gassist_sdk.log` in the plugin directory
 5. **Test CLI Mode**: Run `python plugin.py canrun "cyberpunk 2077" --json` from the plugin directory
 
-A Steam-backed FPS line looks like `93-139 FPS (Steam players)` or `93-139 FPS (estimated from a similar PC, native, ray tracing off)`. A heavier monitor adds `FPS estimate uses 1440p` on the display line. When neither Steam nor the benchmark table has the game, the ML model estimates FPS from the store specs, for example `53-83 FPS (estimated from the recommended GPU for this resolution, ray tracing off)`.
+A benchmark-curve FPS line looks like `93-139 FPS (estimated from a similar PC, native, ray tracing off)`. A heavier monitor adds `FPS estimate uses 1440p` on the display line. When the benchmark table does not have the game, the ML model estimates FPS from the store specs, for example `53-83 FPS (estimated from the recommended GPU for this resolution, ray tracing off)`.
 
 ### Keyless Runtime & Developer `.env` Setup
 
@@ -281,9 +336,69 @@ python app.py
 
 ## 🧠 ML Pipeline
 
-CanRun v12.1 ships the **v9.0 Two-Stage Log-Space Physics Ridge Prior + Monotonic Residual GBDT + Empirical Bayes Shrinkage** architecture (`data/ml_fps_model_unified.json`). At runtime, the compiled model is evaluated in **100% pure Python** (`canrun_model_loader.py` and `canrun_steam_fps.py`) with zero `scikit-learn`, `xgboost`, or `pickle` runtime dependencies.
+CanRun v12.2 ships the **v9.0 Two-Stage Log-Space Physics Ridge Prior + Monotonic Residual GBDT + Empirical Bayes Shrinkage** architecture (`data/ml_fps_model_unified.json`). At runtime, the compiled model is evaluated in **100% pure Python** (`canrun_model_loader.py` and `canrun_steam_fps.py`) with zero `scikit-learn`, `xgboost`, or `pickle` runtime dependencies.
 
 ### **Why We Changed the Model (Legacy v8.0 vs. New v9.0 / v1.0 Production Release) & By How Much It Improved**
+
+#### **The first model (v8.0): what it was and why it was built that way**
+
+v8.0 (`Unified_Stacking_Ensemble_2025`, version `8.0_2025_Edition`) was a real machine-learning model. Its pickles are still in `data/`: `unified_stacking_model.pkl`, `unified_scaler.pkl` and `unified_calibrator.pkl`.
+
+- **Architecture:** a scikit-learn `StackingRegressor` with seven base models: XGBoost (trained on CUDA), LightGBM, CatBoost, random forest, gradient boosting (300 trees, depth 12), extra trees (300 trees) and ridge regression. A Bayesian ridge meta-learner combined them. An isotonic calibrator and a fixed ×0.88 correction came after it.
+- **Inputs:** 75 features after a `RobustScaler`. These were GPU PassMark, VRAM, GPU generation and architecture flags, resolution, 15 one-hot `game_*` columns (one per training game), engine one-hots, and a complexity and ray-tracing score taken from keywords in the game description. It never used the Steam minimum or recommended requirements.
+- **Data:** 179 rows from 15 games, split randomly into 143 for training and 36 for testing. The saved test scores were R² 0.984 for the stack, 0.994 after calibration and 0.956 after the ×0.88 correction.
+- **Shipping:** the plugin read a 675-entry lookup table (15 GPUs × 15 games × 3 resolutions) of FPS values that the ensemble had produced. For other games it fell back to the "General Gaming" entries, then to a heuristic.
+
+**Why it was built that way.** The only trustworthy data at the time was about 180 measured points across 15 popular games. With that little data, a stacking ensemble of strong tabular learners is the standard way to squeeze out the most accuracy, and a game one-hot lets each game have its own baseline. Precomputing a lookup table kept the plugin fast and avoided loading the pickles in G-Assist.
+
+**Pros of v8.0**
+- A strong, well-known ensemble that fit its 15 games closely.
+- It needed no store requirements, so a game whose Steam page lists outdated specs did not mislead it.
+- The lookup table made the shipped plugin instant.
+
+**Cons of v8.0**
+- It could not tell new games apart. Any game outside the 15 got all-zero game columns and a description-keyword guess, so the model only knew it was "some game".
+- It overestimated badly on new games (+90% to +110% bias on the independent tests below). An RTX 5090 in Cyberpunk 2077 at 1080p came out at 369.6 FPS.
+- 179 rows is very little data for 75 features and seven models, and a random split put rows from the same game in both training and test, so the 0.984 score mostly measured memorization of those 15 games.
+- About 20–30 ms per prediction when the ensemble runs, with pickles plus scikit-learn, XGBoost, LightGBM and CatBoost as dependencies, and Python version risk on load.
+- Bugs in the feature code: `vram_usage_encoded` was always 2, CPU cores and base clock were filled with the defaults 3000 and 1500 in training, and the architecture-efficiency feature divides by zero for GPUs released in 2014.
+
+#### **v8.0 and v1.0 on the same independent benchmarks**
+
+To compare the two models directly, `scripts/ds_pipeline/evaluate_legacy_v8.py` loads v8.0's own pickles, rebuilds its 75 features with its training-time code and data files (from git revision `5a61ba3^`), and runs the ensemble itself, not the lookup table. The rebuild reproduces 635 of v8's 675 saved FPS values within 0.1 FPS, and the rest within 4.7 FPS. It then runs the three independent benchmark scripts with v8 in place of the current model. This compares the model alone. The full app adds the benchmark-table step on top of either model.
+
+| Test (median error, model alone) | v8.0 ensemble | v1.0 model | Simple spec rule |
+|---|---|---|---|
+| TechPowerUp, 266 points, new games | 79.8% (bias +108.5%, 4.5% within 10%) | **18.9%** (bias −13.9%, 31.2% within 10%) | 19.8% |
+| TechSpot, 98 points | 75.1% (bias +91%) | **36.7%** (bias −34.6%) | 37.5% |
+| TechSpot, NVIDIA cards only (55 points) | 63.8% | **33.6%** | 35.8% |
+| TechSpot, AMD and Intel cards | 89.0% | 40.7% | **39.1%** |
+| OpenML user reports, 11,842 points, older popular games | 39.8% (bias +14.4%, 14.4% within 10%) | 38.8% (bias −7.0%, 10.0% within 10%) | **36.7%** (bias +5.2%, 11.1% within 10%) |
+
+On new games, v1.0 cuts the median error by about three quarters, from 75–80% to 19–37%. v8 missed Silent Hill 2 by +235%, Star Wars Outlaws by +192% and Dragon Age by +145%. On OpenML's older games the two are roughly tied. v8 wins on Dota 2 (39.8% vs 52.2%), GTA V (44.5% vs 66.7%) and Rust (44.7% vs 52.1%). v1.0 wins on Apex Legends (28.2% vs 39.5%) and PUBG (26.1% vs 34.7%). v8 also does better on CS:GO and Overwatch (32.6% vs 56.6%), where OpenML measured an older version than the one Steam lists now. Since v8 ignores store specs, outdated specs can't mislead it.
+
+**Why v1.0 is better**
+- **It reads the game's Steam requirements.** The minimum and recommended GPUs tell it how demanding a game is, so a new game is not just "some game". This is the main reason for the gap on TechPowerUp and TechSpot.
+- **No game identifiers.** The model has no per-game columns, so it can't memorize titles and has nothing missing for new ones.
+- **Monotonic.** A faster GPU never gets fewer FPS for the same game and resolution, and a higher resolution never gets more.
+- **Much more training data**, though most of it is generated. See [Training Data Description](#training-data-description-636225-records-across-1697-steam-games).
+- **About 400× faster** (0.06 ms vs 20–30 ms) and stored as plain JSON, with no pickles or ML libraries at runtime.
+
+#### **v1.0 model vs the simple spec rule**
+
+The simple rule is `60 × (your GPU PassMark ÷ recommended GPU PassMark)^0.85`, multiplied by 0.75 at 1440p. Most of v1.0's training curves were generated from rules like this one (only 79 of the 1,697 games carry outside measurements), so on the median the two are close. The model is better in these specific ways:
+
+- **It reads more of the store page.** The rule sees only the recommended GPU and the resolution. In the benchmark tests the model also gets the minimum GPU, the recommended CPU against your CPU, recommended VRAM against your card's VRAM, recommended RAM, the release year and the genre. It learned from the 79 measured and hand-calibrated games how much each of these matters. F1 24 shows the difference: the model is 29.2% off and the rule 54.4% off.
+- **Fewer large misses.** The median hides this; the mean and the FPS error show it. On TechPowerUp the mean error is 18.8% against 23.1%, the average miss 26.5 FPS against 34.4 FPS, and R² 0.503 against 0.064, so the rule barely tracks which card-and-game pairs run faster. On OpenML the rule has the better median, but the model has the lower mean error (43.1% vs 47.7%), the lower average miss (40.5 vs 42.5 FPS) and a higher R² (−0.67 vs −0.94). The rule's worst game there is GTA V at 101.2% off; the model is 66.7% off.
+- **More results close to the measured FPS.** On TechPowerUp, 31.2% of the model's predictions are within 10% (rule: 25.2%) and 59.0% within 22% (rule: 55.3%). Its bias is smaller, −13.9% against −19.0%.
+- **Better on NVIDIA cards and on games where the curve shape matters.** TechSpot NVIDIA cards: 33.6% against 35.8%. Silent Hill 2: 8.3% against 11.1%. Star Wars Outlaws: 8.2% against 11.3%.
+- **It gives a range and stays monotonic.** The rule gives one number. The model also gives an uncertainty band, and its constraints guarantee more FPS for a faster GPU, fewer at a higher resolution, and more VRAM headroom never hurting.
+
+The app passes all of these to the model: your GPU's VRAM, the recommended CPU and RAM parsed from the store page, and Steam's release year and genres. Before that change it passed only the two GPU scores, and its store-spec path scored 20.8% median error on the 7 TechPowerUp games (33.8 FPS average miss, R² 0.08). With the full specs it scores 18.7% (26.5 FPS, R² 0.50), the same as the model given everything.
+
+**Where it is not better.** v1.0 only slightly beats the simple spec rule it was built on (18.9% vs 19.8% on TechPowerUp, 36.7% vs 37.5% on TechSpot). The rule beats it on AMD and Intel cards (39.1% vs 40.7%) and on OpenML (36.7% vs 38.8%). It is no better than v8 on older popular games, and outdated store specs hurt it. Most of the accuracy users see comes from the benchmark table, which works the same with either model.
+
+The `M1`/"Old v8.0" scores in the cross-validation tables below were computed differently. They simulate the v8 plugin's lookup table with its "General Gaming" and heuristic fallbacks on CanRun's own benchmark suite. The ensemble itself is not run there.
 
 #### **Can We Hit +98% Without Hurting Generalization?**
 **Yes on the scores that matter for a shipped plugin. No on raw-FPS Leave-Games-Out $R^2$, unless we cheat.**
@@ -292,11 +407,11 @@ All scores in this table are cross-validation on CanRun's own benchmark suite, w
 
 | What “+98%” usually means | New v9.0 score | Already ≥ 98%? | Safe to push higher? |
 | :--- | :---: | :---: | :--- |
-| **Unseen-GPU $R^2$** (known game, new graphics card) | **`0.9987` (`99.87%`)** | **Yes** | Already there. Empirical Bayes on the measured curve does this. |
+| **Unseen-GPU $R^2$** (known game, new graphics card) | **`0.9987` (`99.87%`)** | **Yes** | Already there. Empirical Bayes on the game's curve does this. |
 | **Median accuracy** (`100 − MdAPE`) on unseen games | **`98.81%`** (`1.19%` MdAPE) | **Yes** | This is the typical-title score a user actually feels. |
 | **Log-space $R^2$** on unseen games (the loss we train on) | **`0.9692` (`96.92%`)** | Almost | Leak-free regime features (`is_capped_60`, `genre_demand`, `cpu_headroom_rec`) can still inch this toward `0.98`. |
-| **Raw-FPS $R^2$** on unseen games | **`0.9589` (`95.89%`)** | No | The remaining `~4%` is high-FPS esports tails + engine-lock outliers. Forcing `0.98` here means adding `game_name` / AppID features or using random $k$-fold — the exact leak that made old v8.0 look like $R^2 = 0.9866$ in-sample and then collapse to **`0.0932`** on unseen games. |
-| **Mean accuracy** (`100 − MAPE`) on unseen games | **`95.52%`** (`4.48%` MAPE) | No | A `2%` MAPE (`98%` mean accuracy) is below Steam player noise (`±8%` minimum spread). Claiming it would overfit our synthesizer, not real hardware. |
+| **Raw-FPS $R^2$** on unseen games | **`0.9589` (`95.89%`)** | No | The remaining `~4%` is high-FPS esports tails + engine-lock outliers. Forcing `0.98` here means adding `game_name` / AppID features or using random $k$-fold — the leak that let v8.0 score $R^2 = 0.984$ on a random split of its 15 games, while its shipped lookup table scored **`0.0932`** on unseen games. |
+| **Mean accuracy** (`100 − MAPE`) on unseen games | **`95.52%`** (`4.48%` MAPE) | No | A `2%` MAPE (`98%` mean accuracy) is far below the 12.5% spread between user reports on identical hardware in OpenML. Claiming it would overfit our synthesizer, not real hardware. |
 
 **What we refuse to do to fake 98% raw $R^2$:** one-hot / target-encoded `game_name`, `steam_app_id`, or `gpu_model`; random (non-grouped) $k$-fold; reporting in-sample $R^2$ instead of Leave-Games-Out.
 
@@ -321,7 +436,7 @@ Evaluated across **`636,225` hardware-game-resolution records** (`1,697` Steam g
 
 #### **4 Core Architectural Reasons Why the New Model Wins**
 1. **Eliminated Target Leakage & Game-ID Memorization:**
-   - **Problem in Old v8.0:** The legacy v8.0 model encoded `game_name` and `gpu_model` identifiers directly and relied on a 675-entry static lookup table across only 15 games. While random train/test splits on those 15 memorized games reported an inflated $R^2$ (`0.9866`), rigorous **5-Fold `GroupKFold` by `game_name` (Leave-Games-Out)** proved it failed on unseen games ($R^2 = 0.0932$, $\text{MAPE} = 30.38\%$, $\text{MAE} = 30.85\text{ FPS}$).
+   - **Problem in Old v8.0:** The legacy v8.0 ensemble had one-hot `game_*` columns for its 15 training games, and the plugin shipped a 675-entry lookup table built from it. A random train/test split on those 15 games reported $R^2 = 0.984$. **5-Fold `GroupKFold` by `game_name` (Leave-Games-Out)** on the lookup table and its fallbacks gave $R^2 = 0.0932$, $\text{MAPE} = 30.38\%$, $\text{MAE} = 30.85\text{ FPS}$ on unseen games.
    - **Benefit in New v9.0:** Zero game names, AppIDs, or GPU strings are fed into the regressor. Instead, v9.0 learns from **21 continuous physical & hardware-headroom ratios** (user GPU/CPU PassMark vs. official Steam minimum/recommended specs, pixel count ratio, VRAM/RAM headroom, and GPU architecture tier), achieving **$R^2 = 0.9589$** and **`4.48%` MAPE** on unseen games in the training suite.
 2. **Enforced Physical Monotonicity Invariants:**
    - **Problem in Old v8.0:** Unconstrained trees and corrupted benchmark rows caused **`11.17%` monotonicity violations**, occasionally predicting lower FPS for a faster GPU on the same game and resolution.
@@ -339,7 +454,7 @@ The training dataset (`data/clean_training_dataset.json`, kept local via `.gitig
 **Most of it is generated, not measured.** Every game gets a curve `FPS = anchor_4090 × (PassMark / 38,192)^β` over 25 GPUs and 3 resolutions. The anchor and exponent come from published benchmarks for 21 games, are set by hand for 58, and follow a fixed rule on the store's recommended GPU for the other 1,618, of which 990 use placeholder specs picked by release year. The curves are then expanded over 5 CPU tiers. Because the targets for about 95% of games are a function of the model's own inputs, the cross-validation scores in this section mostly show that the model learned that rule. Real-world error is 15–40% (see [Real-World Accuracy](#real-world-accuracy-on-independent-benchmarks)).
 
 #### **1. Multi-Endpoint Steam API & Benchmark Data Sources (10 Sources)**
-Using the developer `.env` `STEAM_WEBAPI_KEY` alongside public Steam Store and SteamSpy APIs, `scripts/ds_pipeline/collect_and_audit.py` ingests and cross-validates **10 distinct sources**:
+Using the developer `.env` `STEAM_WEBAPI_KEY` alongside public Steam Store and SteamSpy APIs, `scripts/ds_pipeline/collect_and_audit.py` queries **10 endpoints**. Nine return data. These endpoints supply game discovery, metadata and store specs, not frame rates:
 
 | Data Source / Endpoint | Auth Required | Harvested Data & Role in Pipeline |
 | :--- | :---: | :--- |
@@ -348,7 +463,7 @@ Using the developer `.env` `STEAM_WEBAPI_KEY` alongside public Steam Store and S
 | **`ISteamChartsService/GetTopReleasesPages/v1/`** | `.env` `STEAM_WEBAPI_KEY` | **88** top monthly Steam game releases |
 | **`IStoreService/GetAppList/v1/`** | `.env` `STEAM_WEBAPI_KEY` | **1,000** active Windows PC game AppIDs from the Steam catalog |
 | **`IStoreBrowseService/GetItems/v1/`** | `.env` `STEAM_WEBAPI_KEY` | **798+** bulk store metadata records (release timestamps, Steam Deck / Steam Machine / SteamOS hardware compatibility categories, VR support flags, store tags) |
-| **`IGamePerformanceStatsService/GetGameFrameRateStats/v1/`** | `.env` `STEAM_WEBAPI_KEY` | Hardware cluster frame-rate telemetry (`mean_frame_rate`, `mean_frame_rate_stddev`, `report_count`) across priority AppIDs |
+| **`IGamePerformanceStatsService/GetGameFrameRateStats/v1/`** | Not available | **Returns nothing.** Player frame rates per hardware cluster. It is not in Valve's [Web API reference](https://partner.steamgames.com/doc/webapi) and returns HTTP 401 with a valid key, a fake key or no key (checked October 2026). The training set holds `0` Steam FPS reports. |
 | **`store.steampowered.com/api/appdetails`** | Public Steam Store API | **700** full HTML PC requirement blocks (`pc_requirements.minimum` & `pc_requirements.recommended`) parsed into structured GPU, CPU, RAM, and VRAM specs |
 | **`store.steampowered.com/api/featuredcategories`** | Public Steam Store API | Featured `top_sellers`, `new_releases`, `specials`, and `coming_soon` PC titles |
 | **`store.steampowered.com/search/results/`** | Public Steam Store API | **500** paginated global top-seller PC game AppIDs (`category1=998`) |
@@ -426,7 +541,7 @@ Every statistical and machine-learning technique in the v9.0 pipeline was select
 - **Benefit:** By representing every game exclusively through **continuous physical ratios** between the user's PC and the game's parsed Steam Store requirements (`gpu_headroom_rec = log(user_gpu_pm / rec_gpu_pm)`, `spec_demand_index`, `vram_cliff_penalty`), the model generalizes zero-shot to **any brand-new or upcoming game on Steam** the moment its store requirements page is published ($R^2 = 0.9589$, `4.48%` MAPE on Leave-Games-Out CV in the training suite; 18.9% median error on independent TechPowerUp data).
 
 #### **6. Dual `GroupKFold` Cross-Validation (Leave-Games-Out & Leave-GPUs-Out)**
-- **Why it was used:** In panel data (`Game × GPU × Resolution × CPU`), standard random $k$-fold splits place 80% of a game's GPU rows in the training set and 20% of the *same game's* rows in the test set. That leaks the game's baseline frame rate across folds and produced legacy v8.0's misleading `0.9866` $R^2$.
+- **Why it was used:** In panel data (`Game × GPU × Resolution × CPU`), standard random $k$-fold splits place 80% of a game's GPU rows in the training set and 20% of the *same game's* rows in the test set. That leaks the game's baseline frame rate across folds and produced legacy v8.0's misleading `0.984` $R^2$.
 - **Benefit:** We evaluate all models under two strict **5-Fold `GroupKFold`** schemes:
   1. **`GroupKFold(groups=game_name)` (Leave-Games-Out):** All 375 rows ($25\text{ GPUs} \times 3\text{ resolutions} \times 5\text{ CPUs}$) of every validation game are held out together, measuring true cold-start accuracy on unseen games.
   2. **`GroupKFold(groups=gpu_model)` (Leave-GPUs-Out):** Every row belonging to held-out GPU models is excluded from training, measuring hardware interpolation/extrapolation to unseen graphics cards.
@@ -436,7 +551,7 @@ Every statistical and machine-learning technique in the v9.0 pipeline was select
 - **Benefit:** Using out-of-fold log-residuals $e_i = |\ln(y_i) - \hat{\ell}_i^{\text{OOF}}|$ from `GroupKFold`, we compute resolution-specific empirical quantiles $q_{1-\alpha, r}$ ($80\%$ coverage target) for both unseen-game spec predictions and known-game curves, yielding calibrated multiplicative intervals $[\hat{y} \cdot \exp(-q_r),\; \hat{y} \cdot \exp(+q_r)]$.
 
 #### **8. Automated 4-Gate Physical Invariant & Huber Residual Auditing (`Stage 2`)**
-- **Why it was used:** Raw benchmark tables and scraped community telemetry frequently contain copy-paste errors (e.g., identical FPS curves pasted across different games), resolution inversions ($\text{FPS}_{4\text{K}} > \text{FPS}_{1440\text{p}}$), or single-card measurement outliers.
+- **Why it was used:** Raw benchmark tables frequently contain copy-paste errors (e.g., identical FPS curves pasted across different games), resolution inversions ($\text{FPS}_{4\text{K}} > \text{FPS}_{1440\text{p}}$), or single-card measurement outliers.
 - **Benefit:** Before training, `scripts/ds_pipeline/collect_and_audit.py` automatically runs 4 deterministic quality gates:
   1. **Gate 1 (Cross-Game Duplicate Detection):** Detects and recalibrates any game whose FPS vector matches `General Gaming` or another title (`143` duplicates repaired).
   2. **Gate 2 (Strict Resolution Monotonicity):** Enforces $\text{FPS}_{1080\text{p}} \ge \text{FPS}_{1440\text{p}} \ge \text{FPS}_{4\text{K}}$ for every `(game, GPU)` pair (`0` violations remaining).
@@ -447,7 +562,9 @@ Every statistical and machine-learning technique in the v9.0 pipeline was select
 - **Why JSON beats `.pkl`/`joblib`, `.onnx`, and `.safetensors` for G-Assist:**
   - **Zero Binary Runtime Dependencies:** Shipping `.pkl`/`joblib` requires bundling `scikit-learn`, `scipy`, and `numpy` (~150+ MB) into the G-Assist plugin `libs/` folder and breaks across Python minor versions. Shipping `.onnx` requires `onnxruntime` (~45 MB native C++ DLLs). By compiling the `StandardScaler`, `Ridge` weights, and `HistGradientBoostingRegressor` decision trees into `data/ml_fps_model_unified.json`, `canrun_model_loader.py` executes inference using **only Python's built-in `json` and `math` modules**.
   - **Security & Auditability (mod.io / NVIDIA G-Assist Compliance):** Python `pickle`/`.joblib` files can execute arbitrary code on load (`__reduce__`) and are flagged by security scanners. JSON is 100% declarative, human-inspectable, and safe.
-  - **Sub-Millisecond Inference & Tiny Zip Footprint:** The 100 GBDT trees + Ridge weights take about **`920 KB`** in JSON (and with the `127,245`-entry lookup table the model file compresses to **`~660 KB`** inside `dist/canrun-12.1.0.zip`). A prediction takes about **`0.06 ms`**, and the published `inference.py` gives the same features and predictions as the plugin runtime.
+  - **Sub-Millisecond Inference & Tiny Zip Footprint:** The 100 GBDT trees + Ridge weights take about **`920 KB`** in JSON (and with the `127,245`-entry lookup table the model file compresses to **`~660 KB`** inside `dist/canrun-12.2.0.zip`). A prediction takes about **`0.06 ms`**, and the published `inference.py` gives the same features and predictions as the plugin runtime.
+  - **Measured time per step** (Ryzen 7 7800X3D, Python 3.13, October 2026): the model call is 0.06 ms median (0.12 ms p99), and loading `model.json` takes 6.5 ms. The app's store-spec step takes 0.11 ms warm. The benchmark-curve step takes about 88 ms, because it reloads the 8 MB `training_benchmarks.json` on every call. A full check is 2.6 s for the first game in a process and about 1 s after that, of which about 0.9 s is waiting on 19 Steam requests. From the command line (`plugin.py canrun "<game>" --json`) it takes 3.2 to 4.0 s including Python start-up. The model is under 0.01% of the wait.
+  - **Known slow spots, not fixed yet:** `load_benchmark_table()` in `canrun_steam_fps.py` has no cache, so the curve step re-reads the table on every call. Caching it like the model would bring that step under 1 ms. A repeat check of a cached game still makes about 19 Steam requests, most from `page()` in `canrun_game_fetcher.py`. Caching those would bring a repeat check to roughly 0.2 s and lower the chance of a G-Assist plugin timeout.
 
 ### **Head-to-Head Model Performance Comparison (Old v8.0 vs. New v9.0 / v1.0)**
 
@@ -481,35 +598,67 @@ The tables above are cross-validation inside CanRun's own benchmark suite. To me
 
 | Test set | Points | Model alone | Full CanRun app | Naive spec heuristic |
 | :--- | :---: | :---: | :---: | :---: |
-| [TechPowerUp RTX 5070 review](https://www.techpowerup.com/review/nvidia-geforce-rtx-5070-founders-edition/) (Mar 2025), full app end to end: 24 games typed by name, 11 NVIDIA cards, 1080p and 1440p, live Steam requirements | 308 | n/a | **15.2%** | n/a |
-| TechPowerUp, the 7 games without a measured curve (store-spec path only) | 266 | **18.9%** | 20.8% | 19.8% |
-| TechSpot reviews (2025–2026): Forza Horizon 6, Crimson Desert, Battlefield 6, DOOM: The Dark Ages | 98 | 36.7% | **32.9%** (NVIDIA only: 28.6%) | 37.5% |
-| [OpenML 42737 "fps-in-video-games"](https://www.openml.org/d/42737) (user reports, 2019–2020 hardware, 14 games) | 12,032 | 39.4% | **30.7%** | n/a |
+| TechSpot reviews (2025–2026): Forza Horizon 6, Crimson Desert, Battlefield 6, DOOM: The Dark Ages. Curves come from TechPowerUp, so this is a second reviewer measuring the same games | 98 | 36.7% | **13.3%** (NVIDIA only: 10.0%, highest preset: 10.7%) | 37.5% |
+| [Notebookcheck](https://www.notebookcheck.net/) laptop results: RTX 4060, 4070, 4090, 5060, 5070, 5070 Ti and 5080 Laptop GPUs in review laptops, ultra preset at 1080p, QHD and 4K, 42 games with a curve. F1 25, Forza Horizon 6 and Resident Evil Requiem are left out because their "ultra" includes ray or path tracing | 1,304 | n/a | **14.9%** (games with measured curves: 13.2%). Without the measured table: 22.0% (bias −2.0%, 1,102 points); 12.1, which read laptops as the desktop card: 23.0% (bias +39.3%) | n/a |
+| TechPowerUp measured curves, each card predicted from the same game's other cards (leave one card out) | 2,675 | n/a | **7.2%** (NVIDIA: 6.0%, NVIDIA below an RTX 3070: 8.3%, AMD: 9.4%) | n/a |
+| TechPowerUp per-game reviews, NVIDIA cards below an RTX 3070 (RTX 3050 to 5060), predicted before those cards were added | 138 | n/a | **16.1%** (bias +26.6%; 11.6% where the game had a curve) | n/a |
+| TechPowerUp 2026 suite, store-spec model only (as for a game with no measurements), NVIDIA cards | 600 | **28.2%** | n/a | 32.2% (all vendors) |
+| [TechPowerUp RTX 5070 review](https://www.techpowerup.com/review/nvidia-geforce-rtx-5070-founders-edition/) (Mar 2025), full app end to end: 24 games typed by name, 11 NVIDIA cards, 1080p and 1440p, live Steam requirements. Same reviewer as the 2026 curves, one year and one test system earlier | 308 | n/a | **9.3%** (was 15.2%) | n/a |
+| TechPowerUp 2025, the 7 games without a benchmark curve (store-spec path only) | 266 | 18.9% | **18.7%** | 19.8% |
+| [OpenML 42737 "fps-in-video-games"](https://www.openml.org/d/42737) (user reports, 2019–2020 hardware, 14 games) | 11,842 | 38.8% | **30.0%** | 36.7% |
 
-- **What a user sees:** In the end-to-end test, the app put the game on the right side of 30 FPS 99.4% of the time and of 60 FPS 93.8% of the time. 31.2% of predictions were within 10%, and the measured value was inside the shown range 57.1% of the time.
-- **Where it misses:** The newest games are predicted about 30% too low (Forza Horizon 6 at High 56% low). Old, CPU-limited PCs are predicted about 22% too high on OpenML. AMD and Intel cards are less accurate than NVIDIA (38.7% vs 28.6% on TechSpot), because the training suite is mostly NVIDIA.
+- **Measured curves (`data/measured_benchmarks.json`):** 32 games from TechPowerUp, all at the highest preset, native resolution and ray tracing off, at 1080p, 1440p and 4K. 25 come from the June 2026 review suite (Ryzen 7 9800X3D, 21 cards each). 17 have their own per-game performance review with 30 to 43 cards, down to the RTX 3050, 3060, 4060 and 5060. Those 17 use the per-game review, because one curve should not mix two test scenes; 7 of them (DOOM: The Dark Ages, Silent Hill f, Mafia: The Old Country, Dying Light: The Beast, The Outer Worlds 2, 007 First Light, Pragmata) are new. The end-to-end and OpenML rows were scored with the earlier 25-game table. The numbers were transcribed from the review charts. The 12.2.0 mod.io zip ships this table; the public Space and the git repository do not. The curve step checks this table before the generated benchmark table, and fits each curve on the user's GPU vendor only when that vendor has at least 4 points, because AMD cards get more FPS per PassMark point. `scripts/ds_pipeline/real_benchmarks.py` builds the table and runs the leave-one-card-out, extrapolation and calibration checks.
+- **What a user sees:** CanRun shows a range, about 20% either side of its estimate (20% at 1080p, 22 to 25% at 1440p and 4K). For a game with a measured curve, an NVIDIA card and the game's highest preset, the typical miss against a second reviewer is about 10%: half the estimates are within 10% and 84% within 22%. On a laptop it is about 15%, because the same GPU varies with each laptop's power limit.
+- **How often the real FPS is inside the shown range:**
+
+  | Test | Inside the range |
+  | :--- | :---: |
+  | TechSpot, NVIDIA cards, games with a measured curve (55 points) | **82%** |
+  | TechSpot, all cards (98) | 69% |
+  | TechPowerUp RTX 5070 review, end to end (308, earlier 25-game table) | 71% |
+  | OpenML user reports, older PCs (11,842) | 35% |
+
+  The range is fitted for the highest preset on a fast CPU, so older, CPU-limited PCs and lower presets often land outside it.
+- **Where it misses:** A game without measurements still goes through the store-spec model, at 20–30% median error. Its error is mostly a per-game offset that the Steam requirements don't predict (F1 25 −58%, Black Myth: Wukong +99%), and a calibration fitted on the other 19 games and scored on the held-out one did not reduce it (28.2% to 26.6% at best). Settings below the highest preset run faster than the curve (Forza Horizon 6 at High: 34% low). Low-end cards were predicted about 27% too high while the curves stopped at an RTX 3070; with RTX 3050 to 5060 measurements in 17 games the leave-one-card-out error for them is 8.3% with no bias, but games without a per-game review still extrapolate below an RTX 3070. Laptop GPUs use PassMark's laptop scores (for example RTX 4060 Laptop 17,312 against 19,542 for the desktop card); a laptop with a low power limit runs slower than that average. GTX 16 and RTX 20 laptops report the desktop card's name, so they are scored as desktop cards. The RTX Spark N1X (PassMark 15,979) matched Micro Center's Cyberpunk 2077 Ultra result at 1080p (72.0 vs 71.9 FPS) and was 9% low at 1440p; that is one game, and many games do not run natively on its Arm CPU. Old, CPU-limited PCs are predicted about 24% too high on OpenML.
 - **Noise floor:** In OpenML, a single user report differs from the median of identical hardware by 12.5%, so no predictor can get much below that on this set.
 - **Not scored:** God of War Ragnarök and Ratchet & Clank: Rift Apart (39 cases) were not found from the typed title. AMD cards are rejected by the G-Assist plugin by design.
 
-**The estimate beats the model alone.** The model card is the last step. Each earlier step uses a measurement, and the first one that has data is the number shown. On OpenML that drops median error from 39.4% (model alone) to 30.7%. On TechSpot it drops from 36.7% to 32.9%, and from 33.6% to 28.6% on NVIDIA cards. The 15.2% end-to-end figure is this full estimate.
+**The estimate beats the model alone.** The model is the last step. The first step that has data gives the number shown. On OpenML that drops median error from 38.8% (model alone) to 30.0%. On TechSpot the measured curves drop it from 36.7% to 13.3%, and from 33.6% to 10.0% on NVIDIA cards. The 9.3% end-to-end figure is this full estimate. None of these scores use Steam player FPS data, because Steam's frame-rate endpoint returns HTTP 401 to outside keys.
 
 1. **Match the whole title.** A typed name matches a benchmark curve on whole words only, and a sequel never falls back to the original. This took end-to-end error from 35.1% to 15.2% with no model change. A saved list of recent Windows games and current bestsellers is checked before the store search, so "Dawn Walker" still lands on "The Blood of Dawnwalker".
-2. **Steam players.** When a hardware cluster has at least 10 reports, the estimate is their measured average. The range is their spread, and never tighter than ±8%.
-3. **That game's curve.** If the game is in the benchmark table, the estimate is read off that game's own curve at the user's PassMark score. On OpenML this is the largest gain. In the end-to-end test this path scored 15.6% on 154 points.
-4. **A similar GPU in the same Steam survey.** A card between 0.5× and 1.5× this GPU's PassMark is scaled by `(your PassMark / theirs) ^ 0.85`, then reduced if the CPU is weak. The range is ±30%.
-5. **The busiest unlabeled Steam bucket.** When Steam gives a count and no GPU name, that bucket is treated as an RTX 5070 and scaled the same way.
-6. **The model, only if the steps above miss.** Live Steam store minimum and recommended specs go into the model, capped at 240 FPS. This path scored 18.5% on 132 end-to-end points, and 7.6% on 22 points whose store page lists only a minimum GPU.
-7. **The card's PassMark score.** Current GeForce G3D averages, including RTX 50 and 40 Super. A name with a memory size, such as "RTX 5060 Ti 16GB", falls back to the base card.
+2. **That game's curve.** If the game has review measurements, the estimate is read off the measured curve at the user's PassMark score, fitted on the user's GPU vendor. In the end-to-end test this path scored 6.9% on 176 points. Otherwise the benchmark table is used. Of its 1,697 curves, 21 are anchored to published benchmarks and 58 are set by hand. The other 1,618 follow the same store-spec rule as the training targets, so they add little over the model. Most OpenML games (Counter-Strike 2, GTA V, PUBG, Apex Legends, Dota 2, Rust, Rainbow Six Siege) are among those 79 curves, which is why this step gives the largest gain there.
+3. **The model, if the game has no curve.** Live Steam store minimum and recommended specs go into the model, capped at 240 FPS. This path scored 20.3% on 110 end-to-end points, and 8.2% on 22 points whose store page lists only a minimum GPU.
+4. **The card's PassMark score.** Current GeForce G3D averages, including RTX 50 and 40 Super. A name with a memory size, such as "RTX 5060 Ti 16GB", falls back to the base card.
 
-The model can still be closer on a single title. On F1 24 the store-spec path is 54% off and the model alone is 29% off, because that path passes fewer inputs (no VRAM, release year, or genre).
+The code also has Steam player steps ahead of the curve. They never run today (see [Frame-Rate Prediction](#features)).
 
-**Compared with other FPS estimators:** FPS calculator sites that publish accuracy on independent data report a median error of 26% ([FPSGauge](https://fpsgauge.com/methodology), 1,990 results) and 41.6% ([FPSHQ](https://fpshq.com/en/methodology/), 1,341 review results). CanRun's 15–30% is in line with or better than those, while running fully on the user's PC. Each tool was tested on different data, so this is a comparison of size, not a head-to-head.
+The store-spec path passes the model the same inputs as the model-alone test. On F1 24 both are 29% off; the simple spec rule is 54% off.
+
+**How the store specs are used.** 8 of the model's 21 features come from the Minimum and Recommended specs: both GPU scores and this GPU's headroom over each, VRAM headroom and the VRAM cliff penalty, a demand index from the recommended GPU, CPU and RAM, and CPU headroom over the recommended CPU. The same specs also generated the training targets for 1,618 of the 1,697 games (about 68 FPS at 1080p on the recommended GPU), so the model mostly learned how far a PC sits above the recommended GPU. In the app, `estimate_from_requirements` passes both GPU scores, your GPU's VRAM, the recommended CPU and RAM from the store page, and Steam's release year and genres. Missing fields get the defaults training used: recommended CPU 16,000 PassMark, RAM 16 GB, release year 2023. Recommended VRAM is derived from the recommended GPU score, as in training. A page with only a minimum GPU gets a recommended GPU 1.65× stronger. Passing these fields took the store-spec path on the 7 TechPowerUp games from 20.8% to 18.7% median error and from 33.8 to 26.5 FPS average miss. There is no ablation yet that measures how much each field helps.
+
+**Compared with other FPS estimators:**
+
+| Tool | Published accuracy | Test data |
+| :--- | :--- | :--- |
+| **CanRun 12.2** | 10.0% median error (NVIDIA desktops), 13.3% (all desktop cards), 14.9% (laptops), 9.3% (end to end), 30.0% (older games, user reports) | TechSpot, Notebookcheck and OpenML were never used to build it. TechPowerUp's 2026 results are its measured curves; the 9.3% test is TechPowerUp's 2025 RTX 5070 review |
+| **CanRun 12.2, game nobody has measured** | 18.7% to 23.1% median error | TechPowerUp games without a curve, and each measured game held out; store-spec model only |
+| [MyRigCheck](https://myrigcheck.games/accuracy), TechSavant | about 15% (claimed) | No public test set |
+| [PCBottleneck](https://www.pcbottleneck.com/methodology) | 21.6% mean error | Its own estimate path |
+| [FPSGauge](https://fpsgauge.com/methodology) | 26% median error | 1,990 independent results |
+| [FPSHQ](https://fpshq.com/en/methodology/) | 41.6% median error | 1,341 independent review results |
+| [SteamFPS](https://steamfps.com/methodology) | None published | Measured FPS for 239 Steam Deck games; other figures are estimated or derived |
+| Ramkumar et al. 2025 | R² 0.99 | OpenML 42737, scored on its own training data |
+
+Each tool was tested on different data, so the table compares the size of each error. On the one shared test, 16 new 2025 and 2026 games at 1080p on an RTX 4060 (the class SteamFPS uses for the Steam Machine), CanRun was 8.0% off with measured curves and 10.7% from store specs alone; SteamFPS gives only a color rating for those games. Rerun it with `real_benchmarks.py steamfps-compare`.
 
 Reproduce with the scripts in `scripts/ds_pipeline/`:
 
 ```bash
 py -3 scripts/ds_pipeline/evaluate_demo_end_to_end.py      # live Steam, paced to stay under Steam's rate limit
 py -3 scripts/ds_pipeline/evaluate_external_benchmarks.py  # TechPowerUp, model alone vs app path
+py -3 scripts/ds_pipeline/real_benchmarks.py build-table    # measured curves from data/real_benchmarks/
+py -3 scripts/ds_pipeline/real_benchmarks.py loo            # each card predicted from the game's other cards
+py -3 scripts/ds_pipeline/real_benchmarks.py calibrate      # leave-one-game-out store-spec calibration
 py -3 scripts/ds_pipeline/evaluate_techspot_benchmarks.py
 py -3 scripts/ds_pipeline/evaluate_openml_benchmarks.py    # needs the OpenML 42737 ARFF file
 ```
@@ -523,7 +672,7 @@ No game title strings, game IDs, or GPU model names are ever fed into the regres
 
 ### **Running the Data Science Pipeline**
 ```bash
-# Stage 1 & 2: Harvest Steam API specs/telemetry & run 4 physical invariant audit gates
+# Stage 1 & 2: Harvest Steam store specs & run 4 physical invariant audit gates
 py -3 scripts/ds_pipeline/collect_and_audit.py
 
 # Stage 4–7: Run 5-fold GroupKFold CV ablations & compile pure-JSON production model
@@ -574,15 +723,9 @@ The first match wins. Later steps run only when the earlier one has nothing to u
 
 ```mermaid
 flowchart TD
-    start["Game check"] --> exact{"Steam bucket for this GPU and CPU, or this PC's cluster, with 10+ reports?"}
-    exact -->|yes| steamFps["Player average<br/>range: their spread, at least ±8%<br/>label: Steam players<br/>no side note"]
-    exact -->|"no, or no Steam data"| curve{"Game and resolution in the benchmark table?"}
+    start["Game check"] --> curve{"Game and resolution in the benchmark table?"}
     curve -->|yes| similar["log fps = a + b × log PassMark<br/>range: ±20%, ±25% at 4K<br/>label: similar PC, native, ray tracing off<br/>DLSS note on RTX"]
-    curve -->|no| near{"Steam bucket on a GPU within 0.5× to 1.5× of this one?"}
-    near -->|yes| scaled["Scale by PassMark^0.85 and CPU factor<br/>range: ±30%<br/>label: scaled from Steam players on a similar GPU, mixed settings<br/>no side note"]
-    near -->|no| leader{"Unlabeled bucket with 10+ reports?"}
-    leader -->|yes| survey["Treat the busiest one as an RTX 5070 and scale<br/>range: ±30%, same label<br/>no side note"]
-    leader -->|no| known{"This PC's GPU has a PassMark score?"}
+    curve -->|no| known{"This PC's GPU has a PassMark score?"}
     known -->|no| unknown["FPS: Unknown<br/>no side note"]
     known -->|yes| req{"What GPU does the store page name?"}
     req -->|recommended| rec["That GPU = 60 FPS at 1080p"]
@@ -596,21 +739,17 @@ flowchart TD
 
 Why the steps are in this order:
 
-1. **Steam players, at least 10 reports.** Live sample for this GPU and CPU, or this PC's hardware cluster. It is what people with the same hardware are getting on the current version of the game, so it wins. The range is the measured spread, never tighter than ±8%. No DLSS or ray-tracing note, because those players are already on a mix of settings.
+1. **Benchmark table.** `training_benchmarks.json`, one curve per game and resolution: `log(fps) = a + b × log(passmark)`. This is the native, ray-tracing-off number. 21 games are anchored to published benchmarks and 58 are set by hand. The other 1,618 curves come from the store-spec rule, so for those games this step is close to what the model would say. Leave-one-out on that table covered about 90% of held-out rows at ±20% (±25% at 4K).
 
-2. **Measured table.** `training_benchmarks.json`, one curve per game and resolution: `log(fps) = a + b × log(passmark)`. This is the native, ray-tracing-off number. It sits ahead of a nearby Steam bucket because the curve is split by resolution and the Steam number is not. Leave-one-out on that table covered about 90% of held-out rows at ±20% (±25% at 4K). Scaling from a nearby GPU needed ±27–34% even on the same clean rows.
+2. **Store requirements.** Used when the game has no curve and this GPU has a PassMark score. The estimate is the v9 two-stage model's prediction from the live store specs, capped at 240. If the model is not loaded, or the page names no GPU, a recommended GPU is taken as 60 FPS at 1080p, a minimum GPU as 30, and an unnamed spec as a GTX 1050 Ti at 60. The range is ±20% at 1080p, ±22% at 1440p, and ±25% at 4K. This is the model-only path: 18.9% median error on the TechPowerUp games that have no CanRun curve, against 15.2% for the full estimate on the same review.
 
-3. **Nearby Steam bucket.** A different card in the same survey, between half and 1.5 times this GPU's PassMark. Same vendor is preferred. Scale is `(your PassMark / theirs) ^ 0.85`, then ×0.9 or ×0.8 if the CPU is weak. The range is ±30%. Labeled mixed settings, with no DLSS note, because those players may already be using DLSS.
+3. **Unknown.** Shown when this PC's GPU has no PassMark score, so none of the later scales can run.
 
-4. **Busiest unlabeled bucket.** Steam sometimes returns a count with no GPU name. That bucket is treated as an RTX 5070 and scaled the same way, with the same ±30% range and mixed-settings label.
-
-5. **Store requirements.** Used only when all of the above miss and this GPU has a PassMark score. The estimate is the v9 two-stage model's prediction from the live store specs, capped at 240. If the model is not loaded, or the page names no GPU, a recommended GPU is taken as 60 FPS at 1080p, a minimum GPU as 30, and an unnamed spec as a GTX 1050 Ti at 60. The range is ±20% at 1080p, ±22% at 1440p, and ±25% at 4K. This is the model-only path: 18.9% median error on the TechPowerUp games that have no CanRun curve, against 15.2% for the full estimate on the same review.
-
-6. **Unknown.** Shown when this PC's GPU has no PassMark score, so none of the later scales can run.
+**Steam player steps (inactive).** `canrun_steam_fps.py` can rank a Steam player sample ahead of the curve: an exact hardware cluster with at least 10 reports (range: their spread, at least ±8%), then a card within 0.5× to 1.5× of this GPU scaled by `(your PassMark / theirs) ^ 0.85` (±30%), then the busiest unlabeled bucket scaled as an RTX 5070. All three need `IGamePerformanceStatsService/GetGameFrameRateStats`, which returns HTTP 401 to every outside Web API key, so they never run and no shipped number comes from Steam players.
 
 Each range is the width that held about 90% of held-out rows in `data/training_benchmarks.json`. The display line names the resolution class when the monitor is heavier than that class. The S-A-B-C-D-F tier stays the local weighted hardware score and does not come from this FPS number.
 
-The side note runs only after a native estimate (the table curve or the store spec), and only on an RTX card. Frame generation is NVIDIA's 2×, one extra frame per rendered frame. Multi frame generation on an RTX 50 card is 4× to 6×, and Dynamic mode aims at this screen's refresh. A Steam player line and a scaled Steam line get no note. There is no DLSS line when an estimate is already at the 240 FPS cap.
+The side note runs only after a native estimate (the table curve or the store spec), and only on an RTX card. Frame generation is NVIDIA's 2×, one extra frame per rendered frame. Multi frame generation on an RTX 50 card is 4× to 6×, and Dynamic mode aims at this screen's refresh. There is no DLSS line when an estimate is already at the 240 FPS cap.
 
 **4. MCP Server Implementation**
 # Model Context Protocol (MCP) server integration
