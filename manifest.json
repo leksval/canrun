@@ -9,12 +9,12 @@
   "functions": [
     {
       "name": "check_compatibility",
-      "description": "Check one Steam game against this PC. The returned text is the full answer. Show that text to the user unchanged.",
-      "tags": ["canrun", "can run", "can i run", "will run", "game", "compatibility", "diablo", "cyberpunk", "elden ring", "baldurs gate", "dawnwalker", "blood of dawnwalker", "performance", "tier", "score"],
+      "description": "Check one Steam game against this PC and give its expected FPS range. When the user asks about a Steam Deck, Steam Machine, Steam Frame or SteamOS, keep that in game_name, for example 'Elden Ring on Steam Deck', and the answer adds the Steam device ratings. Use it for questions such as 'canrun Cyberpunk 2077?', 'Can I run ARC Raiders?', 'Can I run Elden Ring?', 'How will Starfield run on my PC?' or 'What FPS will I get in Hades II?'. Call it for every game name, including new releases you do not recognize: CanRun looks the title up on Steam itself. Pass only the game name, exactly as the user wrote it. The returned text is the full answer. Show that text to the user unchanged.",
+      "tags": ["canrun", "can run", "can i run", "will run", "run on my pc", "how will", "fps", "frame rate", "game", "compatibility", "steam", "steam deck", "steam machine", "steam frame", "new release", "diablo", "cyberpunk", "elden ring", "baldurs gate", "arc raiders", "dawnwalker", "blood of dawnwalker", "performance", "tier", "score"],
       "properties": {
         "game_name": {
           "type": "string",
-          "description": "The name of the game to check compatibility for"
+          "description": "The game name exactly as the user wrote it, letter for letter, even if you do not know the game"
         }
       },
       "required": ["game_name"]
@@ -28,7 +28,7 @@
     },
     {
       "name": "auto_detect",
-      "description": "Read a question such as 'Can I run Diablo IV?' and answer with the check. Show the returned text unchanged.",
+      "description": "Read a whole question such as 'canrun Cyberpunk 2077?', 'Can I run ARC Raiders?', 'Can I run Diablo IV?' or 'How will Starfield run on my PC?' and answer with the check, for any game title. Show the returned text unchanged.",
       "tags": ["auto", "detect", "natural", "language", "query", "parse", "dawnwalker", "blood of dawnwalker"],
       "properties": {
         "user_input": {

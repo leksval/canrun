@@ -97,6 +97,62 @@ def test_gpu_table_match_prefers_the_longest_name(name, expected):
     assert match_gpu_key(name, entries) == expected
 
 
+PCGW_PAGE = """{{Infobox game
+{{Infobox game/row/date|Windows|December 10, 2020}}
+{{Infobox game/row/taxonomy/genres      | Action, RPG }}
+|steam appid  = 1091500
+|steam appid side  = 1495710
+}}
+==System requirements==
+{{System requirements
+|OSfamily = Windows
+|minOS    = 10 64-bit
+|minCPU   = Intel Core i7-6700
+|minCPU2  = AMD Ryzen 5 1600
+|minRAM   = 12 GB
+|minGPU   = [[Nvidia]] GeForce GTX 1060<ref>note</ref>
+|minGPU2  = AMD Radeon RX 580
+|minVRAM  = 6 GB
+|recCPU   = Intel Core i7-12700
+|recRAM   = 16 GB
+|recGPU   = Nvidia GeForce RTX 2060 Super
+}}
+"""
+
+
+def test_pcgamingwiki_page_becomes_steam_shaped_requirements():
+    from canrun_game_fetcher import CanRunGameFetcher, pcgamingwiki_app_info
+
+    assert pcgamingwiki_app_info(PCGW_PAGE, "Cyberpunk 2077", "999") is None
+    info = pcgamingwiki_app_info(PCGW_PAGE, "Cyberpunk 2077", "1091500")
+    assert info["release_date"]["date"] == "December 10, 2020"
+    assert [g["description"] for g in info["genres"]] == ["Action", "RPG"]
+    requirements = CanRunGameFetcher()._parse_requirements(info, "Cyberpunk 2077")
+    assert requirements.source == "PCGamingWiki"
+    assert requirements.release_year == 2020
+    assert requirements.minimum_gpu == "Nvidia GeForce GTX 1060 or AMD Radeon RX 580, 6 GB VRAM"
+    assert requirements.minimum_ram_gb == 12
+    assert "RTX 2060 Super" in requirements.recommended_gpu
+
+
+def test_blocked_steam_store_is_not_reported_as_missing_game():
+    import plugin
+
+    class Engine:
+        game_fetcher = type("Fetcher", (), {"recent_suggestions": [], "steam_store_status": 403})()
+
+    saved = plugin.canrun_engine
+    plugin.canrun_engine = Engine()
+    try:
+        reply = plugin._missing_game_reply("cyberpunk 2077")
+        Engine.game_fetcher.steam_store_status = 0
+        missing = plugin._missing_game_reply("cyberpunk 2077")
+    finally:
+        plugin.canrun_engine = saved
+    assert "HTTP 403" in reply and "could not find" not in reply
+    assert "could not find" in missing
+
+
 def test_steam_device_ratings_keep_only_rated_devices():
     from canrun_game_fetcher import STEAMFPS_ATTRIBUTION, steam_device_lines, steam_device_ratings
 
@@ -626,7 +682,7 @@ def test_security_protocol_probe_requires_explicit_env(monkeypatch):
 
 def test_edge_extract_game_name():
     assert extract_game_name("canrun?") == ""
-    assert extract_game_name("CANRUN   Hades") == "hades"
+    assert extract_game_name("CANRUN   Hades") == "Hades"
     assert extract_game_name("Elden Ring?") == "Elden Ring"
     assert extract_game_name("Can I run Diablo IV") == "Diablo IV"
     assert extract_game_name("Can I run Diablo IV?") == "Diablo IV"
@@ -636,6 +692,17 @@ def test_edge_extract_game_name():
     assert extract_game_name("cyberpunk?") == "Cyberpunk 2077"
     assert extract_game_name("Cyberpunk 2077") == "Cyberpunk 2077"
     assert extract_game_name("cyberpunk phantom liberty") == "cyberpunk phantom liberty"
+    assert extract_game_name("Can I run Elden Ring on Steam Deck?") == "Elden Ring"
+    assert extract_game_name("hades ii on my steamdeck oled") == "hades ii"
+
+
+def test_steam_device_block_only_when_asked():
+    from plugin import asks_about_steam_device
+
+    assert asks_about_steam_device("Can I run Elden Ring on Steam Deck?")
+    assert asks_about_steam_device("ARC Raiders steam machine")
+    assert not asks_about_steam_device("Can I run Elden Ring on my PC?")
+    assert not asks_about_steam_device("Death Stranding")
 
 
 def test_edge_fps_ranges_are_clamped_and_ordered():

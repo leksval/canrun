@@ -17,7 +17,7 @@ from datetime import datetime, timedelta
 from html import unescape
 from pathlib import Path
 from typing import Any
-from urllib.parse import quote_plus
+from urllib.parse import quote, quote_plus
 
 import aiohttp
 
@@ -860,6 +860,67 @@ def steam_device_lines(ratings: dict[str, int], vr_only: bool = False, steamfps:
     return lines
 
 
+PCGAMINGWIKI_API_URL = "https://www.pcgamingwiki.com/w/api.php"
+PCGAMINGWIKI_HEADERS = {"User-Agent": "CanRun G-Assist plugin", "Accept-Encoding": "gzip, deflate"}
+_PCGW_FIELDS = (
+    ("OS", ("OS",)),
+    ("Processor", ("CPU", "CPU2")),
+    ("Memory", ("RAM",)),
+    ("Graphics", ("GPU", "GPU2", "GPU3")),
+    ("DirectX", ("DX",)),
+    ("Storage", ("HD",)),
+)
+
+
+def _wiki_plain(value: str) -> str:
+    """Wiki markup reduced to the visible text."""
+    text = re.sub(r"<ref[^>]*/>|<ref[^>]*>.*?</ref>", "", value or "", flags=re.DOTALL)
+    text = re.sub(r"\{\{[^{}]*\}\}", "", text)
+    text = re.sub(r"\[\[(?:[^|\]]*\|)?([^\]]*)\]\]", r"\1", text)
+    text = re.sub(r"<[^>]+>", " ", text)
+    return " ".join(unescape(text).split())
+
+
+def _pcgw_requirement_html(fields: dict[str, str], tier: str) -> str:
+    rows = []
+    for label, keys in _PCGW_FIELDS:
+        values = [fields[f"{tier}{key}"] for key in keys if fields.get(f"{tier}{key}")]
+        if label == "Memory" and values and not re.search(r"\bRAM\b", values[0], re.IGNORECASE):
+            values[0] += " RAM"
+        if label == "Graphics" and values and fields.get(f"{tier}VRAM"):
+            values[-1] += f", {fields[f'{tier}VRAM']} VRAM"
+        if values:
+            rows.append(f"<strong>{label}:</strong> {' or '.join(values)}<br>")
+    return "".join(rows)
+
+
+def pcgamingwiki_app_info(wikitext: str, title: str, steam_id: str) -> dict | None:
+    """Steam-shaped app info from a PCGamingWiki page whose Steam app id matches."""
+    ids = re.search(r"^\|\s*steam appid\s*=\s*([^\n]*)$", wikitext or "", re.MULTILINE)
+    if not ids or str(steam_id) not in re.findall(r"\d+", ids.group(1)):
+        return None
+    blocks = (wikitext or "").split("{{System requirements")[1:]
+    windows = [b for b in blocks if re.search(r"\|\s*OSfamily\s*=\s*Windows", b)]
+    if not windows:
+        return None
+    fields = {
+        key: _wiki_plain(value)
+        for key, value in re.findall(r"^\|\s*((?:min|rec)\w+)\s*=\s*([^\n]*)$", windows[0].split("\n}}")[0], re.MULTILINE)
+    }
+    minimum = _pcgw_requirement_html(fields, "min")
+    if "Graphics:" not in minimum:
+        return None
+    released = re.search(r"Infobox game/row/date\|\s*Windows\s*\|\s*([^|}\n]+)", wikitext)
+    genres = re.search(r"Infobox game/row/taxonomy/genres\s*\|\s*([^}\n]+)", wikitext)
+    return {
+        "name": title,
+        "pc_requirements": {"minimum": minimum, "recommended": _pcgw_requirement_html(fields, "rec")},
+        "release_date": {"date": released.group(1).strip() if released else ""},
+        "genres": [{"description": g.strip()} for g in (genres.group(1).split(",") if genres else []) if g.strip()],
+        "requirements_source": "PCGamingWiki",
+    }
+
+
 class CanRunGameFetcher:
     """
     Main game requirements fetcher using Steam API exclusively.
@@ -873,6 +934,8 @@ class CanRunGameFetcher:
         # Load static data once in constructor (following user's efficiency pattern)
         self._load_static_data()
         self.recent_suggestions = []
+        self.steam_store_status = 0
+        self._community_names: dict[str, str] = {}
         self._recent_lock = asyncio.Lock()
         self._recent_memory: tuple[float, list[tuple[str, str]]] | None = None
         self._catalog_refresh_started = False
@@ -917,6 +980,7 @@ class CanRunGameFetcher:
         Always returns fresh data - no caching involved.
         """
         game_name = prefer_default_title(game_name)
+        self.steam_store_status = 0
         try:
             # Direct Steam API call with timeout for G-Assist compatibility
             steam_requirements = await asyncio.wait_for(
@@ -991,7 +1055,9 @@ class CanRunGameFetcher:
         )
         if not app_info:
             self.logger.warning('No app info found for Steam ID %s', steam_id)
-            return None
+            app_info = await self._get_pcgamingwiki_info(steam_id, game_name)
+            if not app_info:
+                return None
         official = official_steam_title(app_info)
         if official and not steam_title_matches(game_name, official):
             self.logger.info(
@@ -1103,6 +1169,7 @@ class CanRunGameFetcher:
         try:
             params = {"term": term, "l": "english", "cc": "US"}
             async with session.get(_STORE_SEARCH_URL, params=params, headers=STEAM_HEADERS) as response:
+                self.steam_store_status = response.status
                 if response.status != 200:
                     return []
                 return _search_items(json.loads(await response.text()))
@@ -1376,10 +1443,16 @@ class CanRunGameFetcher:
                     'max_results': 10
                 }
 
-                async with session.get(self.search_url, params=params, headers=STEAM_HEADERS) as response:
+                # SearchApps reads the term from the path; a ?text= query always returns [].
+                url = f"{self.search_url}/{quote(game_name[:100], safe='')}"
+                async with session.get(url, headers=STEAM_HEADERS) as response:
                     if response.status == 200:
-                        app_id = _app_id_from_search_body(game_name, await response.text())
+                        body = await response.text()
+                        app_id = _app_id_from_search_body(game_name, body)
                         if app_id:
+                            for item in _search_items(json.loads(body)):
+                                if isinstance(item, dict) and str(item.get("appid")) == app_id:
+                                    self._community_names[app_id] = " ".join(str(item.get("name") or "").split())
                             return app_id
 
         except Exception as e:
@@ -1438,6 +1511,7 @@ class CanRunGameFetcher:
                     try:
                         self.logger.debug('Fetching Steam app info for ID %s, attempt %s', steam_id, attempt + 1)
                         async with session.get(url, params=params) as response:
+                            self.steam_store_status = response.status
                             if response.status == 200:
                                 data = await response.json()
                                 if steam_id in data and data[steam_id].get('success'):
@@ -1469,6 +1543,32 @@ class CanRunGameFetcher:
         except Exception as e:
             self.logger.error("Steam app info fetch failed: %s", redact_secrets(e))
 
+        return None
+
+    async def _get_pcgamingwiki_info(self, steam_id: str, game_name: str) -> dict | None:
+        """Requirements from PCGamingWiki when the Steam store will not answer."""
+        titles = [t for t in (self._community_names.get(steam_id), game_name) if t]
+        try:
+            timeout = aiohttp.ClientTimeout(total=10)
+            async with aiohttp.ClientSession(timeout=timeout, headers=PCGAMINGWIKI_HEADERS) as session:
+                async def api(params: dict) -> dict:
+                    async with session.get(PCGAMINGWIKI_API_URL, params={**params, "format": "json"}) as response:
+                        return await response.json(content_type=None) if response.status == 200 else {}
+
+                for query in titles:
+                    found = await api({"action": "query", "list": "search", "srsearch": query, "srlimit": "3"})
+                    pages = [query] + [hit.get("title", "") for hit in found.get("query", {}).get("search", [])]
+                    for page in dict.fromkeys(p for p in pages if p):
+                        data = await api({"action": "parse", "page": page, "prop": "wikitext", "redirects": "1"})
+                        parsed = data.get("parse") or {}
+                        info = pcgamingwiki_app_info(
+                            str((parsed.get("wikitext") or {}).get("*") or ""), parsed.get("title", page), steam_id
+                        )
+                        if info:
+                            self.logger.info("Steam store unavailable; using PCGamingWiki page %s", info["name"])
+                            return info
+        except Exception as e:
+            self.logger.warning("PCGamingWiki lookup failed for %s: %s", steam_id, e)
         return None
 
     def _parse_requirements(self, app_info: dict, game_name: str) -> GameRequirements | None:
@@ -1505,7 +1605,7 @@ class CanRunGameFetcher:
                 release_year=int(year.group(0)) if year else 0,
                 genre=genres,
                 **self._dict_to_dataclass_fields(minimum, recommended),
-                source='Steam API',
+                source=str(app_info.get('requirements_source') or 'Steam API'),
                 last_updated=str(int(time.time()))
             )
         except Exception as e:

@@ -133,9 +133,11 @@ async def execute_canrun_command(
     if not params:
         return generate_failure_response("Game name is required for CanRun analysis")
 
-    game_name = extract_game_name(params.get("game_name", ""))
+    raw_name = str(params.get("game_name", "") or "")
+    game_name = extract_game_name(raw_name)
     if not game_name:
         return generate_failure_response("Game name is required for CanRun analysis")
+    show_devices = bool(params.get("steam_devices")) or asks_about_steam_device(raw_name)
 
     force_refresh = params.get("force_refresh", False)
     if isinstance(force_refresh, str):
@@ -147,7 +149,7 @@ async def execute_canrun_command(
         result = await canrun_engine.check_game_compatibility(game_name, use_cache=not force_refresh)
 
         if result:
-            formatted_result = format_canrun_response(result)
+            formatted_result = format_canrun_response(result, show_devices=show_devices)
             return generate_success_response(formatted_result)
         return generate_success_response(_missing_game_reply(game_name))
 
@@ -171,7 +173,7 @@ _ESTIMATE_NOTICE = (
 )
 
 
-def format_canrun_response(result):
+def format_canrun_response(result, show_devices: bool = False):
     """Format CanRun result for G-Assist display with proper line breaks."""
     try:
         # Extract key information
@@ -256,7 +258,7 @@ def format_canrun_response(result):
             getattr(result.game_requirements, "steam_device_ratings", {}) or {},
             bool(getattr(result.game_requirements, "vr_only", False)),
             getattr(result.game_requirements, "steamfps", {}) or {},
-        )
+        ) if show_devices else []
         device_block = "\n\n🕹️ **STEAM DEVICES**" + "".join(f"\n• {line}" for line in devices) if devices else ""
 
         message = f"""🎮 **Game:** {steam_api_name}
@@ -476,33 +478,48 @@ def _heavier_display_note(resolution: str, resolution_class: str) -> str:
     return f" (FPS estimate uses {resolution_class})"
 
 
+_MY_PC = r"(?:\s+(?:on|with)\s+(?:my|this|the)\s+(?:pc|computer|laptop|rig|system|machine|setup))?"
+_QUERY_PATTERNS = [
+    re.compile(p, re.IGNORECASE) for p in (
+        r"^.*?\bcan\s?run\b[\s:,\-]*(?P<game>.+?)" + _MY_PC + r"$",
+        r"^(?:can|could|will|would)\s+(?:i|we|it|you|my\s+(?:pc|computer|laptop|rig|system)|this\s+(?:pc|computer|laptop))"
+        r"\s+(?:be\s+able\s+to\s+|even\s+)?(?:run|play|handle)\s+(?P<game>.+?)" + _MY_PC + r"$",
+        r"^(?:is\s+it\s+possible\s+to|check\s+if\s+i\s+can|let\s+me\s+know\s+if\s+i\s+can)\s+(?:run|play)\s+(?P<game>.+?)"
+        + _MY_PC + r"$",
+        r"^how\s+(?:well\s+)?(?:will|would|does|do|can)\s+(?P<game>.+?)\s+(?:run|perform|play)(?:\s+well)?" + _MY_PC + r"$",
+        r"^(?:will|would|does|can)\s+(?P<game>.+?)\s+run(?:\s+well|\s+smoothly)?" + _MY_PC + r"$",
+        r"^(?:how\s+many\s+fps|what\s+fps|fps|frame\s?rate|performance)(?:\s+(?:will|would|can|do)\s+i\s+get)?"
+        r"\s+(?:in|for|on)\s+(?P<game>.+?)" + _MY_PC + r"$",
+    )
+]
+
+
+_STEAM_DEVICE = r"steam\s?(?:deck|machine|frame|os)"
+_STEAM_DEVICE_SUFFIX = re.compile(
+    r"\s+(?:on|with|for|in)\s+(?:(?:my|the|a|this)\s+)?" + _STEAM_DEVICE + r"(?:\s+(?:oled|lcd))?$", re.IGNORECASE
+)
+
+
+def asks_about_steam_device(user_input: str) -> bool:
+    """True when the question names a Steam Deck, Steam Machine, Steam Frame or SteamOS."""
+    return bool(re.search(r"\b" + _STEAM_DEVICE + r"\b", user_input or "", re.IGNORECASE))
+
+
 def extract_game_name(user_input: str) -> str:
     """Pull a game name out of a natural-language canrun query."""
-    game_name = (user_input or "").strip()
-    lowered = game_name.lower()
-    if "canrun" in lowered:
-        remainder = lowered.split("canrun", 1)[1].strip()
-        game_name = remainder
-    else:
-        prefixes = (
-            "can my computer run",
-            "can this pc run",
-            "can my pc run",
-            "will i be able to run",
-            "is it possible to run",
-            "check if i can run",
-            "could i run",
-            "can i run",
-            "can it run",
-            "will it run",
-        )
-        for prefix in prefixes:
-            if lowered.startswith(prefix):
-                game_name = game_name[len(prefix):].strip()
-                break
+    text = " ".join((user_input or "").split()).strip(" ?!.,:;")
+    text = _STEAM_DEVICE_SUFFIX.sub("", text)
+    if re.fullmatch(r"can\s?run", text, re.IGNORECASE):
+        return ""
+    game_name = text
+    for pattern in _QUERY_PATTERNS:
+        match = pattern.match(text)
+        if match and match.group("game").strip():
+            game_name = match.group("game")
+            break
     from canrun_game_fetcher import prefer_default_title
 
-    return prefer_default_title(game_name.rstrip("?").strip(" ."))
+    return prefer_default_title(game_name.strip(" ?!.,:;\"'"))
 
 
 def execute_initialize_command() -> dict:
@@ -649,10 +666,24 @@ class CanRunPlugin(Plugin):
         threading.Thread(target=worker, name="canrun-execute", daemon=True).start()
 
 
+def steam_unavailable_message(game_name: str, status: int) -> str:
+    """The Steam store refused or failed the lookup, so the title itself may be fine."""
+    name = (game_name or "that game").strip()
+    return "\n".join([
+        f'CanRun could not look up "{name}" because the Steam store is not answering this PC (HTTP {status}).',
+        "Steam does this for a while after many requests or during maintenance.",
+        "Try again in a few minutes.",
+    ])
+
+
 def _missing_game_reply(game_name: str) -> str:
     suggestions = []
+    status = 0
     if canrun_engine is not None:
         suggestions = getattr(canrun_engine.game_fetcher, "recent_suggestions", [])
+        status = int(getattr(canrun_engine.game_fetcher, "steam_store_status", 0) or 0)
+    if status in (403, 429) or status >= 500:
+        return steam_unavailable_message(game_name, status)
     return missing_steam_game_message(game_name, suggestions)
 
 
@@ -667,7 +698,7 @@ def check_compatibility(game_name: str = "", force_refresh: bool = False) -> str
         return "CanRun could not start. Quit the NVIDIA App from the system tray, open it again, and ask once more."
     if not name:
         return "CanRun needs a game name. Try: Can I run Cyberpunk 2077?"
-    params = {"game_name": name, "force_refresh": force_refresh}
+    params = {"game_name": name, "force_refresh": force_refresh, "steam_devices": asks_about_steam_device(raw_name)}
     return _message_or_raise(_run_async(execute_canrun_command(params)))
 
 
@@ -679,10 +710,9 @@ def detect_hardware_command() -> str:
 def auto_detect(user_input: str = "") -> str:
     """Parse a natural-language compatibility question and run the check."""
     logging.info("Auto-detect received %d characters", len(user_input or ""))
-    game_name = extract_game_name(user_input)
-    if not game_name:
+    if not extract_game_name(user_input):
         return "CanRun needs a game name. Try: Can I run Cyberpunk 2077?"
-    return check_compatibility(game_name)
+    return check_compatibility(user_input)
 
 
 _plugin = None
