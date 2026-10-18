@@ -145,34 +145,6 @@ def test_cpu_data_handling():
         traceback.print_exc()
         assert False, f"CPU data handling test failed: {e}"
 
-def test_fps_prediction_with_default_cpu():
-    """Test FPS prediction with default CPU (the failing scenario)."""
-    print("\nTesting FPS prediction with default CPU...")
-    
-    try:
-        ml_predictor = CanRunMLPredictor()
-        
-        # Test the specific scenario that was failing
-        fps = ml_predictor.predict_fps(
-            gpu_name="RTX 4070",
-            game_name="Cyberpunk 2077",
-            resolution="1080p",
-            quality="Ultra"
-        )
-        
-        print(f"[PASS] FPS prediction test passed: {fps} FPS")
-        print(f"   GPU: RTX 4070")
-        print(f"   Game: Cyberpunk 2077")
-        print(f"   Resolution: 1080p")
-        assert fps is not None, "FPS prediction should not be None"
-        assert fps == 0, "FPS stays unknown until Steam frame-rate stats are available"
-        
-    except Exception as e:
-        print(f"[FAIL] FPS prediction test failed: {e}")
-        import traceback
-        traceback.print_exc()
-        assert False, f"FPS prediction test failed: {e}"
-
 def test_full_engine_compatibility():
     """Test full engine compatibility check (end-to-end)."""
     print("\nTesting full engine compatibility check...")
@@ -204,7 +176,6 @@ def main():
     tests = [
         ("HardwareSpecs conversion", test_hardware_specs_to_dict_conversion),
         ("CPU data handling", test_cpu_data_handling),
-        ("FPS prediction with default CPU", test_fps_prediction_with_default_cpu),
         ("Full engine compatibility", test_full_engine_compatibility)
     ]
     

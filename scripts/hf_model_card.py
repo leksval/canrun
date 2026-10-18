@@ -218,11 +218,13 @@ A small tabular model that estimates the native frame rate of a PC game at 1080p
 
 ```text
 🎮 Game: Cyberpunk 2077
-⚡ FPS: 113-144 FPS on this 144 Hz screen (estimated from a similar PC, native, ray tracing off)
-- DLSS 4.5 frame gen: around 140 FPS more (2x)
-- Path tracing: around 70 to 95 FPS less
-🕹️ Steam Deck: Verified (about 30 FPS at 800p) | Steam Frame: Playable
-🎯 VERDICT: CAN RUN - EXCELLENT PERFORMANCE
+⚡ FPS: 113-144 (similar PC, native, RT off)
+- Faster screen: about 113-170 FPS
+- DLSS 4.5: DLAA, Quality to Performance
+- Frame gen 2x: +115 FPS (usually 1.8x)
+- Path tracing: -70 to -95 FPS (2-3x heavier)
+🕹️ Steam Deck: Verified (30 FPS 800p) | Steam Frame: Playable
+🎯 VERDICT: ✅🏃 CAN RUN
 ```
 
 ## Model details

@@ -174,10 +174,28 @@ def test_steam_device_ratings_keep_only_rated_devices():
         "unrelated": "dropped",
     }
     lines = steam_device_lines(ratings, steamfps=steamfps)
-    assert lines[0] == "Steam Deck: Verified (about 30 FPS at 800p, player reports)"
-    assert lines[1] == "Steam Machine: Verified (about 74 FPS at 1080p medium settings, estimate)"
+    assert lines[0] == "Steam Deck: Verified (30 FPS 800p, players)"
+    assert lines[1] == "Steam Machine: Verified (74 FPS 1080p medium, estimate)"
     assert lines[-1] == STEAMFPS_ATTRIBUTION
     assert steam_device_lines({}, steamfps={"steamDeck": {"fps": "30"}}) == []
+
+
+def test_cached_enums_load_back():
+    import json
+
+    from canrun_compatibility_analyzer import ComponentType
+    from canrun_engine import _cache_json_value, _tier_from_cache
+    from canrun_ml_predictor import PerformanceTier
+
+    saved = json.loads(json.dumps(
+        {"tier": PerformanceTier.S, "component": ComponentType.STORAGE}, default=_cache_json_value
+    ))
+    assert saved == {"tier": "S", "component": "Storage"}
+    assert _tier_from_cache(saved["tier"]) is PerformanceTier.S
+    assert ComponentType(saved["component"]) is ComponentType.STORAGE
+    assert _tier_from_cache(list(PerformanceTier.A.value)) is PerformanceTier.A
+    with pytest.raises(ValueError):
+        _tier_from_cache("PerformanceTier.S")
 
 
 def test_engine_factor_corrects_unreal_engine_5_and_ignores_unknown_games():
@@ -849,7 +867,7 @@ def test_optimization_cached_fps_resolution_stays_fast():
 
 
 def _plugin_with_capture():
-    plugin = CanRunPlugin("canrun", version="12.2.0")
+    plugin = CanRunPlugin("canrun", version="12.3.0")
     sent = []
 
     class Protocol:

@@ -9,7 +9,7 @@ import subprocess
 import pytest
 
 pytestmark = pytest.mark.skip(
-    reason="Replaced by test_g_assist_communication.py, which speaks Protocol V2."
+    reason="Replaced by test_official_g_assist_protocol.py, which speaks Protocol V2."
 )
 from io import StringIO
 

@@ -12,6 +12,7 @@ import os
 import re
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
+from enum import Enum
 from typing import Any
 
 from canrun_compatibility_analyzer import (
@@ -26,7 +27,7 @@ from canrun_game_matcher import CanRunGameMatcher
 
 # Import local modules from canrun directory
 from canrun_hardware_detector import CanRunHardwareDetector, HardwareSpecs
-from canrun_ml_predictor import CanRunMLPredictor, PerformanceAssessment
+from canrun_ml_predictor import CanRunMLPredictor, PerformanceAssessment, PerformanceTier
 from canrun_steam_fps import SteamFpsClient
 
 MAX_GAME_NAME_LENGTH = 120
@@ -92,6 +93,25 @@ def trusted_dataclass_kwargs(payload: Any, cls) -> dict[str, Any]:
     return {key: payload[key] for key in payload if key in allowed}
 
 
+def _cache_json_value(value: Any) -> Any:
+    """Text enums by value, so the cache loader can rebuild them; PerformanceTier (a tuple value) by name."""
+    if isinstance(value, Enum):
+        return value.value if isinstance(value.value, str) else value.name
+    return str(value)
+
+
+def _tier_from_cache(raw: Any) -> PerformanceTier:
+    """A cached tier: its name ("S"), or the [low, high, text] list older caches wrote."""
+    if isinstance(raw, PerformanceTier):
+        return raw
+    if isinstance(raw, str) and raw in PerformanceTier.__members__:
+        return PerformanceTier[raw]
+    for tier in PerformanceTier:
+        if isinstance(raw, (list, tuple)) and list(raw) == list(tier.value):
+            return tier
+    raise ValueError("cache record has an unknown performance tier")
+
+
 def requirements_from_cache(payload: Any) -> GameRequirements:
     """Build requirements from a cache object, dropping unknown keys and bad app ids."""
     from canrun_steam_fps import valid_steam_app_id
@@ -106,6 +126,9 @@ def requirements_from_cache(payload: Any) -> GameRequirements:
         picked["steamfps"] = steamfps_record(picked["steamfps"])
     if "vr_only" in picked:
         picked["vr_only"] = picked["vr_only"] is True
+    if "rtx_features" in picked:
+        from canrun_game_fetcher import rtx_feature_record
+        picked["rtx_features"] = rtx_feature_record(picked["rtx_features"])
     return GameRequirements(**picked)
 
 
@@ -512,9 +535,10 @@ class CanRunEngine:
             recommendations=[str(item)[:300] for item in recommendations]
         )
 
-        performance_prediction = PerformanceAssessment(
-            **trusted_dataclass_kwargs(data.get("performance_prediction"), PerformanceAssessment)
-        )
+        performance_kwargs = trusted_dataclass_kwargs(data.get("performance_prediction"), PerformanceAssessment)
+        if "tier" in performance_kwargs:
+            performance_kwargs["tier"] = _tier_from_cache(performance_kwargs["tier"])
+        performance_prediction = PerformanceAssessment(**performance_kwargs)
 
         return CanRunResult(
             game_name=data['game_name'],
@@ -545,7 +569,7 @@ class CanRunEngine:
         try:
             result_dict = asdict(result)
             result_dict['game_name'] = normalized_name
-            payload = json.dumps(result_dict, indent=2, default=str)
+            payload = json.dumps(result_dict, indent=2, default=_cache_json_value)
             _write_private_cache(cache_file, payload)
 
             self.logger.debug("Cached result for '%s' as '%s'", game_name, normalized_name)

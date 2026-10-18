@@ -167,10 +167,38 @@ async def execute_canrun_command(
 # and its bullet replacement adds a character per line.
 _DEVICE_BLOCK_BUDGET = 1340
 
-_ESTIMATE_NOTICE = (
-    "Estimate only. CanRun does not guarantee that this game will run, "
-    "or that you will see this frame rate."
+_ESTIMATE_NOTICE = "Estimate only. Your FPS may vary."
+# G-Assist shows text only, so the verdict mark is emoji.
+_CAN_RUN_MARK = "✅🏃"
+# G-Assist renders Markdown, which merges blank lines and shows HTML entities as text,
+# and it drops answers with non-emoji Unicode. A Markdown rule is the ASCII section break.
+_SECTION_BREAK = "---"
+
+_VENDOR_WORDS = re.compile(
+    r"\b(?:nvidia|geforce|amd|radeon(?=\s+(?:rx|r\d|hd|vii|pro))|intel(?=\s+(?:core|arc))|core(?=\s+i\d)"
+    r"|processor|graphics card|equivalent)\b",
+    re.IGNORECASE,
 )
+_HARDWARE_FILLER = re.compile(r"\bor\s+(?:better|higher|newer|above|equivalent|similar)\b", re.IGNORECASE)
+_SHORT_HARDWARE_MAX = 36
+
+
+def short_hardware_names(text) -> str:
+    """Requirement hardware without brand words, "RTX 2070 / RX 5700 XT", so it fits on one line."""
+    raw = str(text or "").strip()
+    parts = []
+    for part in re.split(r"\s+or\s+|\s*/\s*|\s*\|\s*", _HARDWARE_FILLER.sub(" ", raw), flags=re.IGNORECASE):
+        part = " ".join(_VENDOR_WORDS.sub(" ", part).split()).strip(" ,;.()")
+        if part and part.lower() not in {p.lower() for p in parts}:
+            parts.append(part)
+    if not parts:
+        return raw
+    shown = parts[0]
+    for part in parts[1:]:
+        if len(shown) + 3 + len(part) > _SHORT_HARDWARE_MAX:
+            break
+        shown += " / " + part
+    return shown
 
 
 def format_canrun_response(result, show_devices: bool = False):
@@ -196,15 +224,15 @@ def format_canrun_response(result, show_devices: bool = False):
         if fps_source == 'steam':
             source_note = " (Steam players)"
         elif fps_source == 'steam_similar':
-            source_note = " (estimated from a similar PC, native, ray tracing off)"
+            source_note = " (similar PC, native, RT off)"
         elif fps_source == 'steam_scaled':
-            source_note = " (scaled from Steam players on a similar GPU, mixed settings)"
+            source_note = " (Steam players, similar GPU)"
         elif fps_source == 'requirements':
-            source_note = " (estimated from the recommended GPU for this resolution, ray tracing off)"
+            source_note = " (from recommended GPU, RT off)"
         elif fps_source == 'requirements_minimum':
-            source_note = " (estimated from the minimum GPU for this resolution, ray tracing off)"
+            source_note = " (from minimum GPU, RT off)"
         elif fps_source == 'requirements_unspecified':
-            source_note = " (estimated for this PC; the Steam page names no known graphics card, ray tracing off)"
+            source_note = " (no GPU on Steam page, RT off)"
         else:
             source_note = ""
 
@@ -213,13 +241,13 @@ def format_canrun_response(result, show_devices: bool = False):
         # The high end stops at this screen's refresh rate.
         if fps_min and fps_max and fps_min != fps_max:
             fps = _fps_range_text(int(fps_min), int(fps_max), refresh_hz, source_note)
-            fps_line = f"**FPS:** {fps}"
+            fps_line = f"FPS: {fps}"
         elif expected_fps and isinstance(expected_fps, (int, float)) and expected_fps > 0:
             fps = _fps_range_text(int(expected_fps), int(expected_fps), refresh_hz, source_note)
-            fps_line = f"**FPS:** {fps}"
+            fps_line = f"FPS: {fps}"
         else:
             fps = "Unknown"
-            fps_line = "FPS: **Unknown**. This game is not in the benchmark table, and this GPU has no PassMark score."
+            fps_line = "FPS: **Unknown** (no benchmark for this GPU)"
 
         settings = getattr(result.performance_prediction, 'recommended_settings', 'Unknown')
         recommended_resolution = getattr(result.performance_prediction, 'recommended_resolution', 'Unknown')
@@ -236,6 +264,7 @@ def format_canrun_response(result, show_devices: bool = False):
             bool(getattr(result.hardware_specs, "supports_rtx", False)),
             steam_api_name or result.game_name,
             refresh_hz,
+            getattr(result.game_requirements, "rtx_features", None),
         )
         feature_block = "".join(f"\n• {line}" for line in feature_lines)
 
@@ -269,45 +298,53 @@ def format_canrun_response(result, show_devices: bool = False):
 • **RAM:** {result.hardware_specs.ram_total_gb}GB
 • **Display:** {actual_resolution} @ {result.hardware_specs.primary_monitor_refresh_hz}Hz{display_note}
 
+{_SECTION_BREAK}
+
 🎯 **GAME REQUIREMENTS**"""
 
         if exceeds_recommended:
             # System exceeds recommended - only show recommended requirements
             message += f"""
 **Recommended** (Your system exceeds these)
-• **GPU:** {result.game_requirements.recommended_gpu}"""
+• **GPU:** {short_hardware_names(result.game_requirements.recommended_gpu)}"""
             if hasattr(result.game_requirements, 'recommended_cpu') and result.game_requirements.recommended_cpu:
                 message += f"""
-• **CPU:** {result.game_requirements.recommended_cpu}"""
+• **CPU:** {short_hardware_names(result.game_requirements.recommended_cpu)}"""
             message += f"""
 • **RAM:** {result.game_requirements.recommended_ram_gb}GB"""
         else:
             # System doesn't exceed recommended - show both minimal and recommended
             message += f"""
 **Minimum**
-• **GPU:** {result.game_requirements.minimum_gpu}"""
+• **GPU:** {short_hardware_names(result.game_requirements.minimum_gpu)}"""
             if hasattr(result.game_requirements, 'minimum_cpu') and result.game_requirements.minimum_cpu:
                 message += f"""
-• **CPU:** {result.game_requirements.minimum_cpu}"""
+• **CPU:** {short_hardware_names(result.game_requirements.minimum_cpu)}"""
             message += f"""
 • **RAM:** {result.game_requirements.minimum_ram_gb}GB
 
 **Recommended**
-• **GPU:** {result.game_requirements.recommended_gpu}"""
+• **GPU:** {short_hardware_names(result.game_requirements.recommended_gpu)}"""
             if hasattr(result.game_requirements, 'recommended_cpu') and result.game_requirements.recommended_cpu:
                 message += f"""
-• **CPU:** {result.game_requirements.recommended_cpu}"""
+• **CPU:** {short_hardware_names(result.game_requirements.recommended_cpu)}"""
             message += f"""
 • **RAM:** {result.game_requirements.recommended_ram_gb}GB"""
 
-        # 3. EXPECTED PERFORMANCE
+        verdict = f"{_CAN_RUN_MARK} CAN RUN" if can_run else "❌ CANNOT RUN"
         message += f"""
+
+{_SECTION_BREAK}
+
+🎯 **VERDICT:** {verdict}
 
 ⚡ **PERFORMANCE**
 • {fps_line}{feature_block}
 • **Settings:** {settings}
 • **Resolution:** {recommended_resolution}
 • **Score:** {tier} Tier ({score}/100){device_block}
+
+{_ESTIMATE_NOTICE}
 
 🔧 **OPTIMIZE**"""
 
@@ -319,16 +356,16 @@ def format_canrun_response(result, show_devices: bool = False):
             if can_run:
                 if not feature_lines and result.hardware_specs.supports_dlss:
                     message += """
-• Enable DLSS Quality mode for higher framerates"""
+• Turn on DLSS Quality for more FPS"""
                 if not feature_lines and result.hardware_specs.supports_rtx:
                     message += """
-• Enable RTX ray tracing for enhanced visual quality"""
+• Turn on ray tracing for better visuals"""
                 message += """
 • Update GPU drivers"""
             else:
                 message += """
-• Upgrade GPU to meet minimum requirements
-• Check RAM meets minimum requirements"""
+• Upgrade the GPU to the minimum
+• Check RAM meets the minimum"""
 
         # Add note if different game was found
         if steam_api_name.lower() != original_query.lower():
@@ -336,18 +373,6 @@ def format_canrun_response(result, show_devices: bool = False):
 
 📝 Note: Showing results for {steam_api_name}"""
 
-        # 5. VERDICT - At bottom for visibility when scrolling!
-        message += """
-
-"""
-        if can_run and exceeds_recommended:
-            message += "🎯 **VERDICT:** CAN RUN - EXCELLENT PERFORMANCE"
-        elif can_run:
-            message += "🎯 **VERDICT:** CAN RUN"
-        else:
-            message += "🎯 **VERDICT:** CANNOT RUN"
-
-        message += f"\n\n{_ESTIMATE_NOTICE}"
         if device_block and len(message) > _DEVICE_BLOCK_BUDGET:
             message = message.replace(device_block, "", 1)
         return message.strip()
@@ -450,15 +475,12 @@ def _fps_range_text(fps_min: int, fps_max: int, refresh_hz: int, source_note: st
     """Cap the shown maximum at this monitor. Say what a faster screen could show."""
     note = source_note or ""
     if refresh_hz > 0 and fps_max > refresh_hz:
-        if fps_min >= refresh_hz:
-            shown = f"{refresh_hz} FPS on this {refresh_hz} Hz screen{note}"
-        else:
-            shown = f"{fps_min}-{refresh_hz} FPS on this {refresh_hz} Hz screen{note}"
+        shown = str(refresh_hz) if fps_min >= refresh_hz else f"{fps_min}-{refresh_hz}"
         uncapped = f"{fps_min}-{fps_max}" if fps_min != fps_max else str(fps_max)
-        return f"{shown}. On a faster monitor, about {uncapped}."
+        return f"**{shown}**{note}\n• Faster screen: about {uncapped} FPS"
     if fps_min != fps_max:
-        return f"{fps_min}-{fps_max} FPS{note}"
-    return f"~{fps_min} FPS{note}"
+        return f"**{fps_min}-{fps_max}**{note}"
+    return f"**~{fps_min}**{note}"
 
 
 def _heavier_display_note(resolution: str, resolution_class: str) -> str:
@@ -475,7 +497,7 @@ def _heavier_display_note(resolution: str, resolution_class: str) -> str:
     pixels = int(match.group(1)) * int(match.group(2))
     if pixels <= class_pixels * 1.15:
         return ""
-    return f" (FPS estimate uses {resolution_class})"
+    return f" (FPS at {resolution_class})"
 
 
 _MY_PC = r"(?:\s+(?:on|with)\s+(?:my|this|the)\s+(?:pc|computer|laptop|rig|system|machine|setup))?"
@@ -596,7 +618,7 @@ def cli_mode():
 class CanRunPlugin(Plugin):
     """Protocol V2 plugin. Command work runs off the reader thread so pings still get answers."""
 
-    def __init__(self, name: str, version: str = "12.2.0", description: str = ""):
+    def __init__(self, name: str, version: str = "12.3.0", description: str = ""):
         import signal
         previous_int = signal.getsignal(signal.SIGINT)
         previous_term = signal.getsignal(signal.SIGTERM)
@@ -728,8 +750,8 @@ def _manifest_identity() -> tuple[str, str, str]:
     with open(path, encoding="utf-8") as handle:
         data = json.load(handle)
     return (
-        str(data.get("name") or "canrun-12.2.0"),
-        str(data.get("version") or "12.2.0"),
+        str(data.get("name") or "canrun-12.3.0"),
+        str(data.get("version") or "12.3.0"),
         str(data.get("description") or ""),
     )
 

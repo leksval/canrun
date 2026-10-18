@@ -2,8 +2,8 @@
 # Windows version resource for g-assist-plugin-canrun.exe
 VSVersionInfo(
   ffi=FixedFileInfo(
-    filevers=(12, 2, 0, 0),
-    prodvers=(12, 2, 0, 0),
+    filevers=(12, 3, 0, 0),
+    prodvers=(12, 3, 0, 0),
     mask=0x3F,
     flags=0x0,
     OS=0x40004,
@@ -19,12 +19,12 @@ VSVersionInfo(
           [
             StringStruct('CompanyName', 'leksval'),
             StringStruct('FileDescription', 'CanRun G-Assist Plugin'),
-            StringStruct('FileVersion', '12.2.0'),
+            StringStruct('FileVersion', '12.3.0'),
             StringStruct('InternalName', 'g-assist-plugin-canrun'),
             StringStruct('LegalCopyright', 'Apache-2.0'),
             StringStruct('OriginalFilename', 'g-assist-plugin-canrun.exe'),
             StringStruct('ProductName', 'CanRun'),
-            StringStruct('ProductVersion', '12.2.0')
+            StringStruct('ProductVersion', '12.3.0')
           ]
         )
       ]

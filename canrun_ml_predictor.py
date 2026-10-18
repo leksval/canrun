@@ -523,19 +523,19 @@ class CanRunMLPredictor:
         if tier in [PerformanceTier.S, PerformanceTier.A]:
             suggestions.append("System performing excellently")
             if scores['gpu'] < 90:
-                suggestions.append("Consider DLSS/RTX features for enhanced visuals")
+                suggestions.append("Try DLSS and ray tracing for better visuals")
         elif tier == PerformanceTier.B:
             if scores['gpu'] < 75:
-                suggestions.append("GPU upgrade recommended - Consider RTX 4060 Ti or RTX 4070")
+                suggestions.append("GPU upgrade: RTX 4060 Ti or RTX 4070")
             if scores['cpu'] < 75:
-                suggestions.append("CPU upgrade could improve performance")
+                suggestions.append("A faster CPU would raise FPS")
         elif tier in [PerformanceTier.C, PerformanceTier.D]:
-            suggestions.append("GPU upgrade needed - Consider RTX 4060 or newer")
+            suggestions.append("GPU upgrade needed: RTX 4060 or newer")
             if scores['ram'] < 65:
-                suggestions.append("Upgrade to 16GB+ RAM recommended")
+                suggestions.append("Upgrade to 16GB+ RAM")
         else:  # F tier
             suggestions.append("Major system upgrade required")
-            suggestions.append("Consider complete system rebuild for modern gaming")
+            suggestions.append("Consider a new PC for modern games")
 
         return suggestions
 

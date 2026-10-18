@@ -784,6 +784,7 @@ class GameRequirements:
     steam_device_ratings: dict[str, int] = field(default_factory=dict)
     vr_only: bool = False
     steamfps: dict[str, Any] = field(default_factory=dict)
+    rtx_features: dict[str, Any] | None = None
 
 
 # Valve's per-device compatibility fields in IStoreBrowseService/GetItems, in display order.
@@ -813,7 +814,7 @@ STEAMFPS_SEARCH_URL = "https://steamfps.com/api/v1/search"
 STEAMFPS_ATTRIBUTION = "Device FPS from [SteamFPS](https://steamfps.com), CC BY 4.0"
 STEAMFPS_CACHE_SECONDS = 24 * 3600
 _STEAMFPS_KEYS = ("appid", "verdict", "steamMachine", "steamDeck", "steamFrame", "url")
-_STEAMFPS_SOURCES = {"measured": "measured", "community": "player reports", "estimated": "estimate"}
+_STEAMFPS_SOURCES = {"measured": "measured", "community": "players", "estimated": "estimate"}
 _steamfps_cache: dict[str, tuple[float, dict]] = {}
 
 
@@ -829,8 +830,7 @@ def _fps_text(fps: Any, resolution: Any, source: Any, settings: str = "") -> str
         return ""
     where = " ".join(str(part) for part in (resolution, settings) if isinstance(part, str) and part and part != "n/a")
     label = _STEAMFPS_SOURCES.get(str(source or ""), "")
-    text = f"about {int(fps)} FPS" + (f" at {where}" if where else "")
-    return text + (f", {label}" if label else "")
+    return ", ".join(part for part in (f"{int(fps)} FPS {where}".strip(), label) if part)
 
 
 def steam_device_lines(ratings: dict[str, int], vr_only: bool = False, steamfps: dict | None = None) -> list[str]:
@@ -844,7 +844,7 @@ def steam_device_lines(ratings: dict[str, int], vr_only: bool = False, steamfps:
     deck = record.get("steamDeck") if isinstance(record.get("steamDeck"), dict) else {}
     fps_notes = {
         "Steam Machine": _fps_text(tier.get("fps"), tier.get("resolution"), machine.get("provenance"),
-                                   f"{tier_name} settings" if tier else ""),
+                                   tier_name if tier else ""),
         "Steam Deck": _fps_text(deck.get("fps"), deck.get("resolution"), deck.get("provenance")),
     }
     lines = []
@@ -858,6 +858,57 @@ def steam_device_lines(ratings: dict[str, int], vr_only: bool = False, steamfps:
     if any(fps_notes.values()):
         lines.append(STEAMFPS_ATTRIBUTION)
     return lines
+
+
+NVIDIA_RTX_GAMES_URL = (
+    "https://www.nvidia.com/content/dam/en-zz/Solutions/geforce/news/"
+    "nvidia-rtx-games-engines-apps/dlss-rt-games-apps-overrides.json"
+)
+NVIDIA_RTX_CACHE_SECONDS = 7 * 24 * 3600
+_NVIDIA_RTX_CACHE_FILE = "nvidia_rtx_games_v2.json"
+# NVIDIA's column names, then the names CanRun keeps.
+_RTX_COLUMNS = {
+    "dlss super resolution": "super_resolution",
+    "dlaa": "dlaa",
+    "dlss frame generation": "frame_generation",
+    "dlss multi frame generation": "multi_frame_generation",
+    "dlss ray reconstruction": "ray_reconstruction",
+    "ray tracing": "ray_tracing",
+}
+
+
+def rtx_feature_record(raw: Any) -> dict | None:
+    """One game's RTX features from an NVIDIA list row or a cached copy. Values stay as NVIDIA wrote them."""
+    if not isinstance(raw, dict):
+        return None
+    record: dict[str, Any] = {"listed": raw.get("listed", True) is True}
+    for column, key in _RTX_COLUMNS.items():
+        value = raw.get(key, raw.get(column, ""))
+        record[key] = " ".join(value.split())[:20] if isinstance(value, str) and record["listed"] else ""
+    return record
+
+
+def nvidia_rtx_table(payload: Any) -> dict[str, dict]:
+    """Title key -> features, for the games in NVIDIA's RTX games list."""
+    from canrun_steam_fps import _normalize_game_key
+
+    rows = payload.get("data") if isinstance(payload, dict) else payload
+    table: dict[str, dict] = {}
+    for row in rows if isinstance(rows, list) else []:
+        if not isinstance(row, dict) or str(row.get("type") or "Game") != "Game":
+            continue
+        key = _normalize_game_key(str(row.get("name") or ""))
+        record = rtx_feature_record(row)
+        if key and record:
+            table.setdefault(key, record)
+    return table
+
+
+def rtx_features_for(title: str, table: dict[str, dict]) -> dict:
+    """This game's features, or listed=False when NVIDIA's list does not have it."""
+    from canrun_steam_fps import _normalize_game_key
+
+    return table.get(_normalize_game_key(title)) or {"listed": False}
 
 
 PCGAMINGWIKI_API_URL = "https://www.pcgamingwiki.com/w/api.php"
@@ -936,6 +987,7 @@ class CanRunGameFetcher:
         self.recent_suggestions = []
         self.steam_store_status = 0
         self._community_names: dict[str, str] = {}
+        self._rtx_memory: tuple[float, dict[str, dict]] | None = None
         self._recent_lock = asyncio.Lock()
         self._recent_memory: tuple[float, list[tuple[str, str]]] | None = None
         self._catalog_refresh_started = False
@@ -1076,8 +1128,56 @@ class CanRunGameFetcher:
         requirements.steam_device_ratings = steam_device_ratings(platforms)
         vr = platforms.get("vr_support") if isinstance(platforms, dict) else None
         requirements.vr_only = bool(isinstance(vr, dict) and vr.get("vrhmd_only"))
-        requirements.steamfps = await self._get_steamfps(steam_id, official or game_name)
+        requirements.steamfps, requirements.rtx_features = await asyncio.gather(
+            self._get_steamfps(steam_id, official or game_name),
+            self._get_rtx_features(official or game_name),
+        )
         return requirements
+
+    async def _get_rtx_features(self, title: str) -> dict | None:
+        """This game's row in NVIDIA's RTX games list; None when the list cannot be read."""
+        table = await self._nvidia_rtx_table()
+        return rtx_features_for(title, table) if table else None
+
+    async def _nvidia_rtx_table(self) -> dict[str, dict]:
+        """NVIDIA's list, kept on disk for a week. A stale copy is used when the download fails."""
+        if self._rtx_memory and time.time() - self._rtx_memory[0] < NVIDIA_RTX_CACHE_SECONDS:
+            return self._rtx_memory[1]
+        path = Path(get_resource_path("cache")) / _NVIDIA_RTX_CACHE_FILE
+        stale: tuple[float, dict] | None = None
+        try:
+            cached = json.loads(path.read_text(encoding="utf-8"))
+            fetched_at = cached.get("fetched_at")
+            games = cached.get("games")
+            if isinstance(fetched_at, (int, float)) and isinstance(games, dict):
+                table = {str(k): r for k, v in games.items() if (r := rtx_feature_record(v))}
+                stale = (float(fetched_at), table)
+                if time.time() - fetched_at < NVIDIA_RTX_CACHE_SECONDS and table:
+                    self._rtx_memory = stale
+                    return table
+        except (OSError, json.JSONDecodeError, AttributeError):
+            pass
+        table: dict[str, dict] = {}
+        try:
+            timeout = aiohttp.ClientTimeout(total=6)
+            headers = {"User-Agent": "CanRun G-Assist plugin", "Accept-Encoding": "gzip, deflate"}
+            async with aiohttp.ClientSession(timeout=timeout, headers=headers) as session:
+                async with session.get(NVIDIA_RTX_GAMES_URL) as response:
+                    if response.status == 200:
+                        table = nvidia_rtx_table(await response.json(content_type=None))
+        except Exception as e:
+            self.logger.debug("NVIDIA RTX games list unavailable: %s", e)
+        if len(table) < 100:
+            if stale:
+                self._rtx_memory = (time.time(), stale[1])
+            return stale[1] if stale else {}
+        self._rtx_memory = (time.time(), table)
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps({"fetched_at": time.time(), "games": table}), encoding="utf-8")
+        except OSError as e:
+            self.logger.debug("Could not save the NVIDIA RTX games list: %s", e)
+        return table
 
     async def _get_steamfps(self, steam_id: str, title: str) -> dict:
         """SteamFPS record for this app id, found by title search; {} when it has none."""

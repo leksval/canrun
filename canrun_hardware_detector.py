@@ -200,8 +200,7 @@ def laptop_power_note(gpu_model: str, power_limit_w: int) -> str:
     max_w = LAPTOP_MAX_TGP_W[key]
     if power_limit_w >= max_w * LOW_POWER_SHARE:
         return ""
-    return (f"This laptop runs its GPU at up to {power_limit_w} W; the same GPU runs at up to {max_w} W "
-            "in other laptops, so FPS can be lower than shown.")
+    return f"Power limit {power_limit_w} W of {max_w} W: expect lower FPS"
 
 
 class CanRunHardwareDetector:

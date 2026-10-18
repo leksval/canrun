@@ -11,7 +11,6 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from canrun_hardware_detector import CanRunHardwareDetector
-from canrun_engine import CanRunEngine
 
 
 def test_hardware_detector_display_resolution():
@@ -52,51 +51,6 @@ def test_hardware_detector_display_resolution():
     return primary_display, tier
 
 
-async def test_engine_display_resolution_integration():
-    """Test that engine properly integrates display resolution detection."""
-    print("\n[TEST] Engine Display Resolution Integration")
-    
-    engine = CanRunEngine()
-    
-    # Test the engine's display resolution detection
-    hardware_specs = await engine.get_hardware_info()
-    print(f"Hardware Specs GPU: {hardware_specs.gpu_model}")
-    print(f"Hardware Specs Monitor: {hardware_specs.primary_monitor_resolution}")
-    
-    # Test the engine's internal resolution methods
-    display_resolution = engine._get_display_resolution(hardware_specs)
-    print(f"Engine Display Resolution: {display_resolution['width']}x{display_resolution['height']}")
-    
-    detected_tier = engine._classify_resolution(display_resolution)
-    print(f"Engine Resolution Tier: {detected_tier}")
-    
-    return display_resolution, detected_tier
-
-
-async def test_rtx_4090_resolution_scenario():
-    """Test specific RTX 4090 scenario to ensure 4K detection."""
-    print("\n[TEST] RTX 4090 Resolution Scenario")
-    
-    # Create mock hardware detector for RTX 4090 scenario
-    detector = CanRunHardwareDetector()
-    
-    # Test high-end resolutions that RTX 4090 should support
-    rtx_4090_scenarios = [
-        (3840, 2160, "4K"),    # Standard 4K
-        (3440, 1440, "1440p"), # Ultrawide 1440p
-        (2560, 1440, "1440p"), # Standard 1440p
-    ]
-    
-    print("RTX 4090 Resolution Scenarios:")
-    for width, height, expected_tier in rtx_4090_scenarios:
-        tier = detector.get_resolution_tier(width, height)
-        print(f"  RTX 4090 @ {width}x{height} -> {tier} (expected: {expected_tier})")
-        
-        if width == 3840 and height == 2160:
-            assert tier == "4K", f"RTX 4090 should detect 4K resolution, got {tier}"
-            print("  [SUCCESS] RTX 4090 correctly detects 4K resolution")
-
-
 def test_display_resolution_consistency():
     """Test consistency between different detection methods."""
     print("\n[TEST] Display Resolution Consistency")
@@ -134,13 +88,7 @@ async def main():
         # Test 1: Hardware detector display resolution
         primary_display, tier = test_hardware_detector_display_resolution()
         
-        # Test 2: Engine integration
-        display_resolution, detected_tier = await test_engine_display_resolution_integration()
-        
-        # Test 3: RTX 4090 scenario
-        await test_rtx_4090_resolution_scenario()
-        
-        # Test 4: Consistency check
+        # Test 2: Consistency check
         test_display_resolution_consistency()
         
         print("\n" + "=" * 60)

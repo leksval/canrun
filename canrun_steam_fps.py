@@ -808,12 +808,20 @@ _NATIVE_ESTIMATE_SOURCES = {
     SOURCE_REQUIREMENTS_MINIMUM,
     SOURCE_REQUIREMENTS_UNSPECIFIED,
 }
-# NVIDIA's stated multipliers, not a review average.
-# Frame generation inserts one frame per rendered frame (2×).
-# Multi frame generation is 4× in compatible games and up to 6× in select games.
+# NVIDIA's labels are the ceiling: frame generation is up to 2×, multi frame
+# generation up to 4×, and up to 6× in select games.
 # https://www.nvidia.com/en-us/geforce/news/dlss-4-5-dynamic-multi-frame-generation-6x-mode-released/
-_FRAME_GEN_EXTRA = 1
-_MULTI_FRAME_GEN_EXTRA = (3, 5)
+# Generating frames costs GPU time, so the measured gain is below the label:
+# about 0.8 of the base rate per generated frame (Tom's Hardware, Alan Wake 2:
+# 2× gave 1.84× to 1.87×, 3× 2.66× to 2.71×, 4× 3.44× to 3.49×). 6× is that
+# rate extended, not a measurement.
+_FRAME_GEN_EXTRA = 0.8
+_MULTI_FRAME_GEN_EXTRA = {"3x": 1.65, "4x": 2.45, "6x": 4.0}
+_FRAME_GEN_NOTE = "usually 1.8x"
+_MULTI_FRAME_GEN_NOTES = {
+    "4x": "usually 2.7-3.5x",
+    "6x": "usually 3.5-5x",
+}
 # Path tracing replaces raster lighting. Games that ship it (Cyberpunk
 # Overdrive, Alan Wake 2, Black Myth) typically cost about 2× to 3× the
 # raster rate with upscaling off. NVIDIA does not publish one multiplier.
@@ -861,15 +869,25 @@ def graphics_feature_lines(
     supports_rtx: bool = False,
     game_name: str | None = None,
     refresh_hz: int = 0,
+    rtx_features: dict | None = None,
 ) -> list[str]:
     """Side notes for DLSS and path tracing. The main FPS figure stays native.
 
     Steam player samples, and estimates scaled from them, already mix
-    settings, so they get no note. The DLSS extras are NVIDIA's multipliers:
-    frame generation is 2×, multi frame generation is 4× to 6×, and Dynamic
-    mode aims at this screen's refresh. Path tracing is a typical 2× to 3×
+    settings, so they get no note. The DLSS extras use measured gains below
+    NVIDIA's ceilings: frame generation is up to 2× (usually about 1.8×),
+    multi frame generation up to 4× or 6×, and Dynamic mode aims at this
+    screen's refresh. Path tracing is a typical 2× to 3×
     cost on an RTX card, not a measurement of this game.
+
+    rtx_features is this game's row in NVIDIA's RTX games list. With it, only
+    the features the game ships are shown; None keeps the generic notes.
     """
+    if rtx_features is not None:
+        return _listed_feature_lines(
+            fps_source, expected_fps, fps_min, fps_max, resolution, gpu_name,
+            supports_dlss, supports_rtx, refresh_hz, rtx_features,
+        )
     del vram_gb, game_name
     if fps_source not in _NATIVE_ESTIMATE_SOURCES or not supports_dlss:
         return []
@@ -882,29 +900,94 @@ def graphics_feature_lines(
         return []
 
     version = dlss_label(gpu_name)
-    modes = "Quality, Balanced, Performance"
-    if _normalize_resolution(resolution) == "4K":
-        modes += ", Ultra Performance"
-    lines = [f"{version}: {modes}."]
+    lines = [f"{version}: {_dlss_modes(resolution, dlaa=False)}"]
     generation = nvidia_rtx_generation(gpu_name)
     if generation == "40":
-        extra = _about_fps(native * _FRAME_GEN_EXTRA)
-        if extra >= 5:
-            lines.append(f"{version} frame gen: around {extra} FPS more (2×).")
+        lines.extend(_frame_gen_lines(native, ""))
     elif generation == "50":
-        low = _about_fps(native * _MULTI_FRAME_GEN_EXTRA[0])
-        high = _about_fps(native * _MULTI_FRAME_GEN_EXTRA[1])
-        if high >= 5:
-            if low >= high:
-                lines.append(f"{version} multi frame gen: around {high} FPS more (4× to 6×).")
-            else:
-                lines.append(f"{version} multi frame gen: around {low} to {high} FPS more (4× to 6×).")
+        lines.extend(_frame_gen_lines(native, "6x"))
         if refresh_hz and native < refresh_hz:
-            lines.append(f"{version} Dynamic mode aims at this {int(refresh_hz)} Hz screen.")
+            lines.append(f"Dynamic mode: targets this {int(refresh_hz)} Hz screen")
     if supports_rtx:
         path_line = _path_tracing_line(native)
         if path_line:
             lines.append(path_line)
+    return lines
+
+
+def _dlss_modes(resolution: str | None, dlaa: bool) -> str:
+    """DLSS modes in one short line. Ultra Performance is offered at 4K."""
+    lowest = "Ultra Performance" if _normalize_resolution(resolution) == "4K" else "Performance"
+    return ("DLAA, " if dlaa else "") + f"Quality to {lowest}"
+
+
+def _frame_gen_lines(native: float, top: str) -> list[str]:
+    """Measured frame generation gain. top is "" for 2×, "4x" or "6x" for multi frame generation."""
+    if not top:
+        extra = _about_fps(native * _FRAME_GEN_EXTRA)
+        return [f"Frame gen 2x: +{extra} FPS ({_FRAME_GEN_NOTE})"] if extra >= 5 else []
+    low_mode = "3x" if top == "4x" else "4x"
+    low = _about_fps(native * _MULTI_FRAME_GEN_EXTRA[low_mode])
+    high = _about_fps(native * _MULTI_FRAME_GEN_EXTRA[top])
+    if high < 5:
+        return []
+    amount = f"{high}" if low >= high else f"{low}-{high}"
+    return [f"Frame gen {top}: +{amount} FPS ({_MULTI_FRAME_GEN_NOTES[top]})"]
+
+
+def _native_for_notes(fps_source: str, expected_fps: int, fps_min: int, fps_max: int) -> float:
+    """The native FPS the side notes scale from, or 0 when this source gets no notes."""
+    if fps_source not in _NATIVE_ESTIMATE_SOURCES:
+        return 0.0
+    native = float(expected_fps or 0)
+    if native <= 0 and fps_min and fps_max:
+        native = (float(fps_min) + float(fps_max)) / 2
+    if native <= 0 or (fps_source != SOURCE_SIMILAR and native >= _REQUIREMENTS_FPS_CAP):
+        return 0.0
+    return native
+
+
+def _listed_feature_lines(
+    fps_source: str,
+    expected_fps: int,
+    fps_min: int,
+    fps_max: int,
+    resolution: str | None,
+    gpu_name: str,
+    supports_dlss: bool,
+    supports_rtx: bool,
+    refresh_hz: int,
+    features: dict,
+) -> list[str]:
+    """DLSS, frame generation and ray tracing notes for what this game ships and this GPU runs."""
+    if not features.get("listed") or not supports_dlss:
+        return []
+    native = _native_for_notes(fps_source, expected_fps, fps_min, fps_max)
+    if native <= 0:
+        return []
+    version = dlss_label(gpu_name)
+    generation = nvidia_rtx_generation(gpu_name)
+    lines = []
+    dlaa = bool(features.get("dlaa"))
+    if features.get("super_resolution"):
+        lines.append(f"{version}: {_dlss_modes(resolution, dlaa)}")
+    elif dlaa:
+        lines.append(f"{version}: DLAA")
+    multi = str(features.get("multi_frame_generation") or "").upper()
+    if generation == "50" and multi:
+        top = "6x" if "6X" in multi else "4x"
+        lines.extend(_frame_gen_lines(native, top))
+        if top == "6x" and refresh_hz and native < refresh_hz:
+            lines.append(f"Dynamic mode: targets this {int(refresh_hz)} Hz screen")
+    elif generation in {"40", "50"} and features.get("frame_generation"):
+        lines.extend(_frame_gen_lines(native, ""))
+    ray_tracing = str(features.get("ray_tracing") or "").lower()
+    if supports_rtx and ray_tracing == "path tracing":
+        path_line = _path_tracing_line(native)
+        if path_line:
+            lines.append(path_line)
+    elif supports_rtx and ray_tracing:
+        lines.append("Ray tracing: supported in this game")
     return lines
 
 
@@ -915,11 +998,8 @@ def _path_tracing_line(native: float) -> str:
     if less_high < 5:
         return ""
     if less_low >= less_high:
-        return f"Path tracing: around {less_high} FPS less (typically about 2× to 3× heavier)."
-    return (
-        f"Path tracing: around {less_low} to {less_high} FPS less "
-        "(typically about 2× to 3× heavier)."
-    )
+        return f"Path tracing: -{less_high} FPS (2-3x heavier)"
+    return f"Path tracing: -{less_low} to -{less_high} FPS (2-3x heavier)"
 
 
 def _game_tokens(name: str) -> list[str]:
