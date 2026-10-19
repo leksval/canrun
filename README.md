@@ -1,3 +1,5 @@
+
+
 ---
 title: CanRun – tells you if your PC can run any game with an advanced **S-A-B-C-D-F tier system
 emoji: 🎮
@@ -67,9 +69,9 @@ Estimate only. Your FPS may vary.
 
 The range is about 20% either side of CanRun's estimate. On desktop GeForce cards, in games with review data, the real FPS landed inside it about 4 times out of 5 (see [Real-World Accuracy](#real-world-accuracy-on-independent-benchmarks)).
 
-## Demo
+## Sample output
+<img width="928" height="1452" alt="canrun_arcraiders_demo_screenshot" src="https://github.com/user-attachments/assets/449e80ad-1cae-468e-b037-e9bf2622f752" />
 
-![R3](https://github.com/user-attachments/assets/79a68ba5-a4d9-493c-bea5-d455edadf627)
 
 ## ✨ Key Features
 
