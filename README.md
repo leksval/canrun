@@ -69,8 +69,13 @@ Estimate only. Your FPS may vary.
 
 The range is about 20% either side of CanRun's estimate. On desktop GeForce cards, in games with review data, the real FPS landed inside it about 4 times out of 5 (see [Real-World Accuracy](#real-world-accuracy-on-independent-benchmarks)).
 
-## Sample output
-<img width="928" height="1452" alt="canrun_arcraiders_demo_screenshot" src="https://github.com/user-attachments/assets/449e80ad-1cae-468e-b037-e9bf2622f752" />
+## Demo
+
+https://github.com/user-attachments/assets/e011090b-a49a-4fdf-82b4-00e6075949dd
+
+
+
+
 
 
 ## ✨ Key Features
