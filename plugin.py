@@ -618,7 +618,7 @@ def cli_mode():
 class CanRunPlugin(Plugin):
     """Protocol V2 plugin. Command work runs off the reader thread so pings still get answers."""
 
-    def __init__(self, name: str, version: str = "12.3.0", description: str = ""):
+    def __init__(self, name: str, version: str = "13.4.0", description: str = ""):
         import signal
         previous_int = signal.getsignal(signal.SIGINT)
         previous_term = signal.getsignal(signal.SIGTERM)
@@ -750,8 +750,8 @@ def _manifest_identity() -> tuple[str, str, str]:
     with open(path, encoding="utf-8") as handle:
         data = json.load(handle)
     return (
-        str(data.get("name") or "canrun-12.3.0"),
-        str(data.get("version") or "12.3.0"),
+        str(data.get("name") or "canrun-13.4.0"),
+        str(data.get("version") or "13.4.0"),
         str(data.get("description") or ""),
     )
 

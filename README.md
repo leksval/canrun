@@ -19,7 +19,7 @@ tags:
 ---
 <table> <tr> <td width="110" valign="middle"> <img width="100" height="100" alt="canrun_logo" src="https://github.com/user-attachments/assets/239082bd-d5ca-427b-b235-5326299f3104" /> </td> <td valign="middle"> <h1 style="display:inline-block; vertical-align:middle; margin:0; padding:0;">  CanRun - System Spec Game Compatibility Checker </h1> </td> </tr> </table>
   
-  [![Version](https://img.shields.io/badge/version-12.3.0-blue.svg)](https://github.com/canrun/canrun)
+  [![Version](https://img.shields.io/badge/version-13.4.0-blue.svg)](https://github.com/canrun/canrun)
   [![Python](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/downloads/)
   [![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
   [![G-Assist](https://img.shields.io/badge/G--Assist-Official%20Protocol%20Verified-brightgreen.svg)](https://www.nvidia.com/en-us/geforce/technologies/g-assist/)
@@ -32,7 +32,7 @@ tags:
 
 **CanRun** is an RTX/GTX-exclusive G-Assist plugin that instantly tells you if your PC can run any game with an advanced **S-A-B-C-D-F tier system** and enhanced Steam integration.
 
-AVAILABLE on official Nvidia g-assist mod marketplace:  [mod.io/canrun](https://mod.io/g/g-assist/m/canrun2#description). CanRun is trending and top rated on the [G-Assist hub](https://mod.io/g/g-assist). The next marketplace upload is **version 12.3.0**.
+AVAILABLE on official Nvidia g-assist mod marketplace:  [mod.io/canrun](https://mod.io/g/g-assist/m/canrun2#description). CanRun is trending and top rated on the [G-Assist hub](https://mod.io/g/g-assist). The next marketplace upload is **version 13.4.0**.
 
 [![CanRun trending on the NVIDIA G-Assist hub](docs/g-assist-trending.jpg)](https://mod.io/g/g-assist/m/canrun2#description)
 
@@ -93,9 +93,67 @@ The range is about 20% either side of CanRun's estimate. On desktop GeForce card
 - **🏃 Protocol V2 Plugin**: `plugin.py` on G-Assist SDK 3.1.0. Commands keep answering pings while a Steam lookup runs
 
 
+## How a check works
+
+From "canrun ARC Raiders?" to the answer in G-Assist:
+
+```mermaid
+flowchart TD
+    q["You: 'canrun ARC Raiders?' (Alt+G)"] --> ga["G-Assist picks the CanRun plugin<br/>and sends the game name"]
+    ga --> parse["plugin.py reads the question<br/>(device words like 'on Steam Deck' are noted and removed)"]
+    parse --> cache{"Same game checked<br/>in the last 15 min?"}
+    cache -->|yes| fmt
+    cache -->|no| hw["Read the PC<br/>GPU, VRAM, CPU, RAM,<br/>screen in real pixels + refresh rate,<br/>laptop GPU power limit"]
+    hw --> game["Find the game<br/>Steam store search, then Steam Community search"]
+    game --> req{"Steam store answers?"}
+    req -->|yes| specs["Minimum + recommended requirements,<br/>release year, genre"]
+    req -->|no| pcgw["PCGamingWiki page<br/>(same Steam app ID only)"]
+    pcgw -->|fails too| busy["'Steam is busy, try again shortly'"]
+    pcgw --> specs
+    specs --> fps
+    subgraph fps["FPS estimate (first match wins)"]
+        m{"In measured review table?<br/>33 games: TechPowerUp, ComputerBase"} -->|yes| mc["Curve through real review results<br/>at this GPU's speed rating<br/>±20%, ±25% at 4K"]
+        m -->|no| t{"One of the 79 benchmarked or<br/>hand-calibrated table curves?"}
+        t -->|yes| tc["That curve at this GPU's speed rating"]
+        t -->|no| g{"GPU has a speed rating?"}
+        g -->|no| unk["FPS: Unknown"]
+        g -->|yes| model["Model v1.0 on Steam requirements<br/>(ridge regression + 100 boosted trees)<br/>× engine factor, CPU check, cap 240"]
+    end
+    fps --> extras["Add-ons (never change the FPS number)<br/>DLSS / DLAA / frame gen / path tracing from NVIDIA's RTX list<br/>frame gen gain about +0.8× base per generated frame<br/>faster-screen line if FPS > refresh rate"]
+    extras --> tier["Score tier S-F from weighted hardware score<br/>GPU 60%, CPU 25%, RAM 15%"]
+    tier --> dev{"Asked about Steam Deck,<br/>Machine, Frame, SteamOS?"}
+    dev -->|yes| valve["Valve ratings + SteamFPS figures"]
+    dev -->|no| save
+    valve --> save["Save result for 15 min"]
+    save --> fmt["Build the answer<br/>Game, YOUR SYSTEM, ---, REQUIREMENTS, ---,<br/>VERDICT, PERFORMANCE, notice, OPTIMIZE"]
+    fmt --> safe["Safety pass: ASCII + emoji only, 1400 characters max"]
+    safe --> out["G-Assist shows the answer"]
+```
+
+1. **Question.** G-Assist sends the game name. Starting with "canrun" routes the question straight to the plugin. Words such as "on Steam Deck" switch on the Steam device section and are removed before the game search.
+2. **Saved result.** A game checked in the last 15 minutes is answered from the saved result.
+3. **The PC.** GPU (through NVML when available), VRAM, CPU and RAM. The screen is read in real pixels, so a 4K screen at 125% Windows scaling is 3840x2160 and the estimate is for 4K. On laptops the GPU power limit is read too, and a low limit adds a warning.
+4. **The game.** Steam store search, then Steam Community search. The store page gives the minimum and recommended requirements, release year and genre. When Steam refuses, the game's PCGamingWiki page is used if it lists the same Steam app ID.
+5. **FPS estimate.** Native resolution, ray tracing off. The first source with data wins:
+   - **Review table:** 33 games with measured FPS from TechPowerUp and ComputerBase. The curve through those cards is read at this GPU's PassMark score, fitted on this GPU vendor's cards when the game has at least 4 of them. ARC Raiders comes from here: 79-132 FPS on an RTX 4090 at 4K, around ComputerBase's 102.8.
+   - **The 79 trusted table curves:** 21 anchored to published benchmarks and 58 calibrated by hand. The 1,618 curves generated from the store-spec rule are skipped.
+   - **The model:** model v1.0 estimates from the Steam requirements plus this GPU, VRAM and CPU, multiplied by the engine factor (Unreal Engine 5 ×0.77, RE Engine ×1.11), capped at 240.
+   - **Unknown:** shown when the GPU has no PassMark score.
+6. **Add-ons.** NVIDIA's RTX games list (downloaded weekly) decides which DLSS, DLAA, frame generation and path tracing lines appear. Frame generation shows the measured gain, for example "+85 FPS (usually 1.8x)" for 2×. FPS above the screen's refresh rate adds a "Faster screen" line. The FPS number stays the same.
+7. **Score and verdict.** The S to F tier is a weighted hardware score (GPU 60%, CPU 25%, RAM 15%), separate from the FPS. The verdict is ✅🏃 CAN RUN or ❌ CANNOT RUN against the game's requirements.
+8. **Steam devices (on request).** Valve's Steam Deck, Machine, Frame and SteamOS ratings, plus SteamFPS figures when SteamFPS has the game.
+9. **Answer.** Your system, a divider, the requirements, a divider, then verdict, performance, "Estimate only. Your FPS may vary." and tips. A final pass keeps only ASCII and emoji, because G-Assist drops answers with other symbols, and caps the answer at 1,400 characters.
+
+Hardware details stay on the PC. CanRun only downloads public data: the Steam store, PCGamingWiki, NVIDIA's RTX list and SteamFPS. Steam player FPS is not used, because Steam's frame-rate endpoint is closed to outside keys.
+
+
 ## Recent changes
 
-**12.3.0** is the current release. Release notes live with the [G-Assist Hub release](https://mod.io/g/g-assist/m/canrun2#description). The FPS estimate is the same as in 12.2.0, so the accuracy figures below still apply. In short:
+**13.4.0** is the current release. Release notes live with the [G-Assist Hub release](https://mod.io/g/g-assist/m/canrun2#description). The FPS model is the same as in 12.2.0. In short:
+
+- The display size is read in real pixels. With Windows display scaling, 12.2 read a 4K screen at 125% as 3072x1728 and estimated FPS for 1440p; it is now 3840x2160 and the estimate is for 4K.
+- ARC Raiders joins the measured review table, from [ComputerBase's 2026 GPU suite](https://www.computerbase.de/artikel/grafikkarten/nvidia-geforce-amd-radeon-benchmark-test-2026.97097/seite-3) (Epic preset, native, ray tracing off, 15 cards at 1440p and 10 at 4K). Its RTX 4090 result at 4K, 102.8 FPS, matches about 105 FPS measured on the developer's PC.
+- The 1,618 benchmark-table curves generated from the store-spec rule are no longer shown as a similar PC's FPS. Those games get the model's estimate directly. On OpenML the median error moves from 30.0% to 30.2% and the mean from 44.7% to 43.3%; TechSpot is unchanged at 13.3%.
 
 - DLSS, frame generation, ray tracing and path tracing notes follow [NVIDIA's RTX games list](https://www.nvidia.com/en-us/geforce/news/nvidia-rtx-games-engines-apps/) (1,000+ games, public JSON, no key). A note appears only when the game ships that feature and the GPU can run it: frame generation on RTX 40 and 50, multi frame generation on RTX 50 at 3× to 4× for games NVIDIA lists with 4×, and 4× to 6× for games listed with 6×, path tracing only for games NVIDIA lists with it. Frame generation gains use measured results in place of the 2×/3×/4× labels: each generated frame adds about 0.8 of the base frame rate, so 2× gives about 1.8× (up to 2× when the CPU is the limit), 3× about 2.7× and 4× about 3.5× ([Tom's Hardware, Alan Wake 2 on RTX 4090, 5080 and 5090](https://www.tomshardware.com/pc-components/gpus/nvidia-dlss4-mfg-and-full-ray-tracing-tested-on-rtx-5090-and-rtx-5080)). 6× uses the same rate and is an estimate. On an RTX 4090 in ARC Raiders, DLAA went from about 90 FPS to about 160 FPS with 2× frame generation (1.78×). Games missing from the list get no DLSS notes. The list is downloaded on the user's PC and kept for a week; if it cannot be read, the earlier general notes are shown.
 - The Steam device section appears when the question names a Steam Deck, Steam Machine, Steam Frame or SteamOS ("canrun ARC Raiders on Steam Deck?"). Other answers end with the score and verdict.
@@ -143,7 +201,7 @@ cd canrun
 pack_g_assist_zip.bat
 ```
 
-The zip is `dist/canrun-<version>.zip` (currently `dist/canrun-12.3.0.zip`). Upload that file to mod.io.
+The zip is `dist/canrun-<version>.zip` (currently `dist/canrun-13.4.0.zip`). Upload that file to mod.io.
 
 To build the standalone `dist/g-assist-plugin-canrun.exe` instead, use the project venv, which has the GPU detection packages:
 
@@ -349,7 +407,7 @@ python app.py
 
 ## 🧠 ML Pipeline
 
-CanRun v12.3 ships the **v9.0 Two-Stage Log-Space Physics Ridge Prior + Monotonic Residual GBDT + Empirical Bayes Shrinkage** architecture (`data/ml_fps_model_unified.json`). At runtime, the compiled model is evaluated in **100% pure Python** (`canrun_model_loader.py` and `canrun_steam_fps.py`) with zero `scikit-learn`, `xgboost`, or `pickle` runtime dependencies.
+CanRun v13.4 ships the **v9.0 Two-Stage Log-Space Physics Ridge Prior + Monotonic Residual GBDT + Empirical Bayes Shrinkage** architecture (`data/ml_fps_model_unified.json`). At runtime, the compiled model is evaluated in **100% pure Python** (`canrun_model_loader.py` and `canrun_steam_fps.py`) with zero `scikit-learn`, `xgboost`, or `pickle` runtime dependencies.
 
 ### **Why We Changed the Model (Legacy v8.0 vs. New v9.0 / v1.0 Production Release) & By How Much It Improved**
 
@@ -575,7 +633,7 @@ Every statistical and machine-learning technique in the v9.0 pipeline was select
 - **Why JSON beats `.pkl`/`joblib`, `.onnx`, and `.safetensors` for G-Assist:**
   - **Zero Binary Runtime Dependencies:** Shipping `.pkl`/`joblib` requires bundling `scikit-learn`, `scipy`, and `numpy` (~150+ MB) into the G-Assist plugin `libs/` folder and breaks across Python minor versions. Shipping `.onnx` requires `onnxruntime` (~45 MB native C++ DLLs). By compiling the `StandardScaler`, `Ridge` weights, and `HistGradientBoostingRegressor` decision trees into `data/ml_fps_model_unified.json`, `canrun_model_loader.py` executes inference using **only Python's built-in `json` and `math` modules**.
   - **Security & Auditability (mod.io / NVIDIA G-Assist Compliance):** Python `pickle`/`.joblib` files can execute arbitrary code on load (`__reduce__`) and are flagged by security scanners. JSON is 100% declarative, human-inspectable, and safe.
-  - **Sub-Millisecond Inference & Tiny Zip Footprint:** The 100 GBDT trees + Ridge weights take about **`920 KB`** in JSON (and with the `127,245`-entry lookup table the model file compresses to **`~660 KB`** inside `dist/canrun-12.3.0.zip`). A prediction takes about **`0.06 ms`**, and the published `inference.py` gives the same features and predictions as the plugin runtime.
+  - **Sub-Millisecond Inference & Tiny Zip Footprint:** The 100 GBDT trees + Ridge weights take about **`920 KB`** in JSON (and with the `127,245`-entry lookup table the model file compresses to **`~660 KB`** inside `dist/canrun-13.4.0.zip`). A prediction takes about **`0.06 ms`**, and the published `inference.py` gives the same features and predictions as the plugin runtime.
   - **Measured time per step** (Ryzen 7 7800X3D, Python 3.13, October 2026): the model call is 0.06 ms median (0.12 ms p99), and loading `model.json` takes 6.5 ms. The app's store-spec step takes 0.11 ms warm. The benchmark-curve step takes about 88 ms, because it reloads the 8 MB `training_benchmarks.json` on every call. A full check is 2.6 s for the first game in a process and about 1 s after that, of which about 0.9 s is waiting on 19 Steam requests. From the command line (`plugin.py canrun "<game>" --json`) it takes 3.2 to 4.0 s including Python start-up. The model is under 0.01% of the wait.
   - **Known slow spots, not fixed yet:** `load_benchmark_table()` in `canrun_steam_fps.py` has no cache, so the curve step re-reads the table on every call. Caching it like the model would bring that step under 1 ms. A repeat check of a cached game still makes about 19 Steam requests, most from `page()` in `canrun_game_fetcher.py`. Caching those would bring a repeat check to roughly 0.2 s and lower the chance of a G-Assist plugin timeout.
 
@@ -620,7 +678,7 @@ The tables above are cross-validation inside CanRun's own benchmark suite. To me
 | TechPowerUp 2025, the 7 games without a benchmark curve (store-spec path only) | 266 | 18.9% | **18.7%** | 19.8% |
 | [OpenML 42737 "fps-in-video-games"](https://www.openml.org/d/42737) (user reports, 2019–2020 hardware, 14 games) | 11,842 | 38.8% | **30.0%** | 36.7% |
 
-- **Measured curves (`data/measured_benchmarks.json`):** 32 games from TechPowerUp, all at the highest preset, native resolution and ray tracing off, at 1080p, 1440p and 4K. 25 come from the June 2026 review suite (Ryzen 7 9800X3D, 21 cards each). 17 have their own per-game performance review with 30 to 43 cards, down to the RTX 3050, 3060, 4060 and 5060. Those 17 use the per-game review, because one curve should not mix two test scenes; 7 of them (DOOM: The Dark Ages, Silent Hill f, Mafia: The Old Country, Dying Light: The Beast, The Outer Worlds 2, 007 First Light, Pragmata) are new. The end-to-end and OpenML rows were scored with the earlier 25-game table. The numbers were transcribed from the review charts. The mod.io zip (since 12.2.0) ships this table; the public Space and the git repository do not. The curve step checks this table before the generated benchmark table, and fits each curve on the user's GPU vendor only when that vendor has at least 4 points, because AMD cards get more FPS per PassMark point. `scripts/ds_pipeline/real_benchmarks.py` builds the table and runs the leave-one-card-out, extrapolation and calibration checks.
+- **Measured curves (`data/measured_benchmarks.json`):** 33 games. 32 come from TechPowerUp, all at the highest preset, native resolution and ray tracing off, at 1080p, 1440p and 4K. ARC Raiders comes from ComputerBase's 2026 GPU suite (Epic preset, native, ray tracing off, 15 cards at 1440p and 10 at 4K). 25 come from the June 2026 review suite (Ryzen 7 9800X3D, 21 cards each). 17 have their own per-game performance review with 30 to 43 cards, down to the RTX 3050, 3060, 4060 and 5060. Those 17 use the per-game review, because one curve should not mix two test scenes; 7 of them (DOOM: The Dark Ages, Silent Hill f, Mafia: The Old Country, Dying Light: The Beast, The Outer Worlds 2, 007 First Light, Pragmata) are new. The end-to-end and OpenML rows were scored with the earlier 25-game table. The numbers were transcribed from the review charts. The mod.io zip (since 12.2.0) ships this table; the public Space and the git repository do not. The curve step checks this table before the generated benchmark table, and fits each curve on the user's GPU vendor only when that vendor has at least 4 points, because AMD cards get more FPS per PassMark point. `scripts/ds_pipeline/real_benchmarks.py` builds the table and runs the leave-one-card-out, extrapolation and calibration checks.
 - **What a user sees:** CanRun shows a range, about 20% either side of its estimate (20% at 1080p, 22 to 25% at 1440p and 4K). For a game with a measured curve, an NVIDIA card and the game's highest preset, the typical miss against a second reviewer is about 10%: half the estimates are within 10% and 84% within 22%. On a laptop it is about 15%, because the same GPU varies with each laptop's power limit.
 - **How often the real FPS is inside the shown range:**
 
@@ -636,10 +694,10 @@ The tables above are cross-validation inside CanRun's own benchmark suite. To me
 - **Noise floor:** In OpenML, a single user report differs from the median of identical hardware by 12.5%, so no predictor can get much below that on this set.
 - **Not scored:** God of War Ragnarök and Ratchet & Clank: Rift Apart (39 cases) were not found from the typed title. AMD cards are rejected by the G-Assist plugin by design.
 
-**The estimate beats the model alone.** The model is the last step. The first step that has data gives the number shown. On OpenML that drops median error from 38.8% (model alone) to 30.0%. On TechSpot the measured curves drop it from 36.7% to 13.3%, and from 33.6% to 10.0% on NVIDIA cards. The 9.3% end-to-end figure is this full estimate. None of these scores use Steam player FPS data, because Steam's frame-rate endpoint returns HTTP 401 to outside keys.
+**The estimate beats the model alone.** The model is the last step. The first step that has data gives the number shown. On OpenML that drops median error from 38.8% (model alone) to 30.2%. On TechSpot the measured curves drop it from 36.7% to 13.3%, and from 33.6% to 10.0% on NVIDIA cards. The 9.3% end-to-end figure is this full estimate. None of these scores use Steam player FPS data, because Steam's frame-rate endpoint returns HTTP 401 to outside keys.
 
 1. **Match the whole title.** A typed name matches a benchmark curve on whole words only, and a sequel never falls back to the original. This took end-to-end error from 35.1% to 15.2% with no model change. A saved list of recent Windows games and current bestsellers is checked before the store search, so "Dawn Walker" still lands on "The Blood of Dawnwalker".
-2. **That game's curve.** If the game has review measurements, the estimate is read off the measured curve at the user's PassMark score, fitted on the user's GPU vendor. In the end-to-end test this path scored 6.9% on 176 points. Otherwise the benchmark table is used. Of its 1,697 curves, 21 are anchored to published benchmarks and 58 are set by hand. The other 1,618 follow the same store-spec rule as the training targets, so they add little over the model. Most OpenML games (Counter-Strike 2, GTA V, PUBG, Apex Legends, Dota 2, Rust, Rainbow Six Siege) are among those 79 curves, which is why this step gives the largest gain there.
+2. **That game's curve.** If the game has review measurements, the estimate is read off the measured curve at the user's PassMark score, fitted on the user's GPU vendor. In the end-to-end test this path scored 6.9% on 176 points. Otherwise the benchmark table is used, but only its 79 curves with outside information: 21 anchored to published benchmarks and 58 set by hand. Its other 1,618 curves follow the same store-spec rule as the training targets (`"curve_source": "store_specs"`), so the app skips them and those games go straight to the model. Most OpenML games (Counter-Strike 2, GTA V, PUBG, Apex Legends, Dota 2, Rust, Rainbow Six Siege) are among those 79 curves, which is why this step gives the largest gain there.
 3. **The model, if the game has no curve.** Live Steam store minimum and recommended specs go into the model, capped at 240 FPS. This path scored 20.3% on 110 end-to-end points, and 8.2% on 22 points whose store page lists only a minimum GPU.
 4. **The card's PassMark score.** Current GeForce G3D averages, including RTX 50 and 40 Super. A name with a memory size, such as "RTX 5060 Ti 16GB", falls back to the base card.
 
@@ -737,7 +795,7 @@ Every source below works without a key. CanRun sends only the game title or Stea
 | Valve `IStoreBrowseService/GetItems` | Steam Deck, Steam Machine, Steam Frame and SteamOS ratings, and whether a VR headset is needed | Every check; shown when the question names a device |
 | [SteamFPS](https://steamfps.com/api) | Steam Deck and Steam Machine FPS figures (CC BY 4.0) | Every check, cached for a day |
 | [NVIDIA RTX games list](https://www.nvidia.com/en-us/geforce/news/nvidia-rtx-games-engines-apps/) | The DLSS upscaling, frame generation, multi frame generation, ray tracing and path tracing support of 1,000+ games | Downloaded about once a week and kept on the PC |
-| Shipped in the zip | `measured_benchmarks.json` (32 games from TechPowerUp reviews), `training_benchmarks.json`, `ml_fps_model_unified.json`, `game_engines.json` (7,916 games from Wikidata), `gpu_hierarchy.json`, `cpu_benchmarks.json` | Always local |
+| Shipped in the zip | `measured_benchmarks.json` (33 games from TechPowerUp and ComputerBase reviews), `training_benchmarks.json`, `ml_fps_model_unified.json`, `game_engines.json` (7,916 games from Wikidata), `gpu_hierarchy.json`, `cpu_benchmarks.json` | Always local |
 
 A finished check is cached for 15 minutes; `--force-refresh` skips the cache.
 
@@ -748,8 +806,8 @@ The first match wins. Later steps run only when the earlier one has nothing to u
 ```mermaid
 flowchart TD
     start["Game check"] --> measured{"Game in the measured review table?"}
-    measured -->|yes| m["Curve from TechPowerUp reviews<br/>fitted on this GPU vendor's cards when it has 4+<br/>range: ±20%, ±25% at 4K"]
-    measured -->|no| curve{"Game and resolution in the benchmark table?"}
+    measured -->|yes| m["Curve from TechPowerUp and ComputerBase reviews<br/>fitted on this GPU vendor's cards when it has 4+<br/>range: ±20%, ±25% at 4K"]
+    measured -->|no| curve{"Game and resolution among the 79 benchmarked or hand-set table curves?"}
     curve -->|yes| c["log fps = a + b × log PassMark<br/>range: ±20%, ±25% at 4K"]
     curve -->|no| known{"This PC's GPU has a PassMark score?"}
     known -->|no| unknown["FPS: Unknown"]
@@ -759,9 +817,9 @@ flowchart TD
 
 Why the steps are in this order:
 
-1. **Measured review table.** `measured_benchmarks.json`: 32 games from TechPowerUp reviews at the highest preset, native, ray tracing off, at 1080p, 1440p and 4K, with 21 to 43 cards per game. The curve is read at this GPU's PassMark score and fitted on this GPU vendor's cards when the game has at least 4 of them, because mixed AMD and NVIDIA curves read about 8% high for NVIDIA. On TechSpot's separate tests of four of these games the full estimate is 13.3% off (10.0% on NVIDIA cards); on Notebookcheck's laptop results it is 14.9% off.
+1. **Measured review table.** `measured_benchmarks.json`: 33 games from TechPowerUp and ComputerBase reviews at the highest preset, native, ray tracing off, with 10 to 43 cards per game. 32 TechPowerUp games cover 1080p, 1440p and 4K; ARC Raiders from ComputerBase covers 1440p and 4K. The curve is read at this GPU's PassMark score and fitted on this GPU vendor's cards when the game has at least 4 of them, because mixed AMD and NVIDIA curves read about 8% high for NVIDIA. On TechSpot's separate tests of four of these games the full estimate is 13.3% off (10.0% on NVIDIA cards); on Notebookcheck's laptop results it is 14.9% off.
 
-2. **Benchmark table.** `training_benchmarks.json`, one curve per game and resolution: `log(fps) = a + b × log(passmark)`. This is the native, ray-tracing-off number. 21 games are anchored to published benchmarks and 58 are set by hand. The other 1,618 curves come from the store-spec rule, so for those games this step is close to what the model would say. Leave-one-out on that table covered about 90% of held-out rows at ±20% (±25% at 4K).
+2. **Benchmark table.** `training_benchmarks.json`, one curve per game and resolution: `log(fps) = a + b × log(passmark)`. This is the native, ray-tracing-off number. 21 games are anchored to published benchmarks and 58 are set by hand. The other 1,618 curves come from the store-spec rule and are marked `"curve_source": "store_specs"`; the app skips them, because they repeat the model's own inputs and would be shown as a similar PC's FPS. Leave-one-out on that table covered about 90% of held-out rows at ±20% (±25% at 4K).
 
 3. **Store requirements.** Used when the game has no curve and this GPU has a PassMark score. The estimate is the two-stage model's prediction from the store specs (recommended GPU, CPU and RAM, release year, genre, and this GPU's VRAM), multiplied by the game's engine factor from `game_engines.json`, and capped at 240. Engines with fewer than 3 measured games keep a factor of 1. If the model is not loaded, or the page names no GPU, a recommended GPU is taken as 60 FPS at 1080p, a minimum GPU as 30, and an unnamed spec as a GTX 1050 Ti at 60. The range is ±20% at 1080p, ±22% at 1440p, and ±25% at 4K. This path is 18.7% off on the TechPowerUp games that have no CanRun curve, and 23.1% when each measured game is held out in turn.
 

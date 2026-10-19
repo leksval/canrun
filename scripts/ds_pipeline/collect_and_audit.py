@@ -1351,6 +1351,7 @@ def audit_and_repair_benchmarks(
             games[game_name] = {
                 "description": f"{spec['genre']} benchmark suite",
                 "genre": spec["genre"],
+                "curve_source": "catalog" if spec is CATALOG_GAMES_SPEC_AND_CURVES.get(game_name) else "store_specs",
                 "gpus": synthesized,
             }
             gate4_sparse_expansions.append(f"{game_name}: {prev_count} -> {len(synthesized)} GPUs (1080p, 1440p, 4K)")

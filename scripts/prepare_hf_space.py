@@ -95,7 +95,7 @@ def _remote_files(repo_id: str) -> list[str]:
 
 def upload(stage_dir: Path, repo_id: str, files: list[str]) -> None:
     stale = [f for f in _remote_files(repo_id) if f not in files and f != ".gitattributes"]
-    cmd = ["hf", "upload", repo_id, ".", ".", "--type", "space", "--commit-message", "CanRun v12.3.0 demo"]
+    cmd = ["hf", "upload", repo_id, ".", ".", "--type", "space", "--commit-message", "CanRun v13.4.0 demo"]
     for path in stale:
         cmd += ["--delete", path]
     # Run from the stage dir: on Windows the hf CLI expands glob arguments against the cwd.

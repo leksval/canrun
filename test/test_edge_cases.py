@@ -867,7 +867,7 @@ def test_optimization_cached_fps_resolution_stays_fast():
 
 
 def _plugin_with_capture():
-    plugin = CanRunPlugin("canrun", version="12.3.0")
+    plugin = CanRunPlugin("canrun", version="13.4.0")
     sent = []
 
     class Protocol:
@@ -900,6 +900,21 @@ def test_measured_table_is_checked_before_the_benchmark_table(monkeypatch):
     measured = {("Test Game", "1080p"): [("RTX 4070", 19000.0, 90.0)]}
     generated = {("Test Game", "1080p"): [("RTX 4070", 19000.0, 50.0)], ("Other Game", "1080p"): [("RTX 4070", 19000.0, 40.0)]}
     monkeypatch.setattr(fps, "load_measured_table", lambda: measured)
-    monkeypatch.setattr(fps, "load_benchmark_table", lambda: generated)
+    monkeypatch.setattr(fps, "load_reviewed_benchmark_table", lambda: generated)
     assert fps._benchmark_points("Test Game", "1080p")[0][2] == 90.0
     assert fps._benchmark_points("Other Game", "1080p")[0][2] == 40.0
+
+
+def test_store_spec_benchmark_curves_are_not_used(monkeypatch, tmp_path):
+    import json
+
+    import canrun_steam_fps as fps
+
+    row = {"RTX 4070": {"passmark": 19000, "1080p": 50}, "RTX 4090": {"passmark": 38000, "1080p": 100}}
+    (tmp_path / "training_benchmarks.json").write_text(json.dumps({"games": {
+        "Store Spec Game": {"description": "Action benchmark suite", "curve_source": "store_specs", "gpus": row},
+        "Catalog Game": {"description": "Action benchmark suite", "gpus": row},
+    }}), encoding="utf-8")
+    monkeypatch.setattr(fps, "_data_file", lambda name: tmp_path / name)
+    assert fps._benchmark_points("Store Spec Game", "1080p") == []
+    assert len(fps._benchmark_points("Catalog Game", "1080p")) == 2

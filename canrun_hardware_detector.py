@@ -203,6 +203,26 @@ def laptop_power_note(gpu_model: str, power_limit_w: int) -> str:
     return f"Power limit {power_limit_w} W of {max_w} W: expect lower FPS"
 
 
+# Per-monitor DPI aware v2. Without it Windows reports the size divided by display
+# scaling, e.g. a 4K screen at 125% reads as 3072x1728.
+_DPI_AWARE_PER_MONITOR_V2 = -4
+
+
+def physical_screen_size(user32) -> tuple[int, int]:
+    """Primary screen size in real pixels, regardless of Windows display scaling."""
+    set_context = getattr(user32, "SetThreadDpiAwarenessContext", None)
+    previous = None
+    if set_context is not None:
+        set_context.restype = ctypes.c_void_p
+        set_context.argtypes = [ctypes.c_void_p]
+        previous = set_context(ctypes.c_void_p(_DPI_AWARE_PER_MONITOR_V2))
+    try:
+        return user32.GetSystemMetrics(0), user32.GetSystemMetrics(1)
+    finally:
+        if previous:
+            set_context(ctypes.c_void_p(previous))
+
+
 class CanRunHardwareDetector:
     """Hardware detector for RTX/GTX gaming systems."""
 
@@ -647,7 +667,7 @@ class CanRunHardwareDetector:
         try:
             if IS_WINDOWS and CTYPES_AVAILABLE:
                 user32 = ctypes.windll.user32
-                screensize = user32.GetSystemMetrics(0), user32.GetSystemMetrics(1)
+                screensize = physical_screen_size(user32)
                 display_info['resolution'] = f"{screensize[0]}x{screensize[1]}"
 
                 try:
@@ -886,8 +906,7 @@ class CanRunHardwareDetector:
         try:
             if IS_WINDOWS and CTYPES_AVAILABLE:
                 user32 = ctypes.windll.user32
-                width = user32.GetSystemMetrics(0)
-                height = user32.GetSystemMetrics(1)
+                width, height = physical_screen_size(user32)
 
                 display_info.update({
                     'width': width,

@@ -60,6 +60,7 @@ STEAM_APP_IDS = {
     "the-outer-worlds-2": "1449110",
     "007-first-light": "3768760",
     "pragmata": "3357650",
+    "arc-raiders": "1808500",
 }
 
 _STRIP_TAGS = re.compile(r"<[^>]+>")
@@ -111,7 +112,7 @@ def card_name(label: str) -> tuple[str, float | None]:
 def load_points() -> list[dict]:
     """Every (game, resolution, card, measured FPS) from the transcribed reviews."""
     points = []
-    for path in sorted(REAL_DIR.glob("tpu_*.json")):
+    for path in sorted([*REAL_DIR.glob("tpu_*.json"), *REAL_DIR.glob("computerbase_*.json")]):
         review = json.loads(path.read_text(encoding="utf-8"))
         for slug, game in review["games"].items():
             for res, cards in game["fps"].items():

@@ -712,6 +712,32 @@ def load_benchmark_table() -> dict[tuple, list[tuple]]:
     return _table_from_file(_data_file("training_benchmarks.json"))
 
 
+# Curves collect_and_audit.py derives from the store-spec rule alone. They repeat what the
+# model says from the same specs, and would be shown as a similar PC's FPS.
+_STORE_SPEC_CURVE = "store_specs"
+
+
+def load_reviewed_benchmark_table() -> dict[tuple, list[tuple]]:
+    """Benchmark-table rows for benchmarked and hand-calibrated games, without store-spec curves."""
+    path = _data_file("training_benchmarks.json")
+    store_spec_games = _store_spec_games(*_file_stamp(path))
+    return {key: rows for key, rows in _table_from_file(path).items() if key[0] not in store_spec_games}
+
+
+@lru_cache(maxsize=2)
+def _store_spec_games(path_text: str, _stamp: int) -> frozenset[str]:
+    try:
+        games = json.loads(Path(path_text).read_text(encoding="utf-8")).get("games", {})
+    except (OSError, json.JSONDecodeError, AttributeError):
+        return frozenset()
+    if not isinstance(games, dict):
+        return frozenset()
+    return frozenset(
+        str(name) for name, info in games.items()
+        if isinstance(info, dict) and info.get("curve_source") == _STORE_SPEC_CURVE
+    )
+
+
 def load_measured_table() -> dict[tuple, list[tuple]]:
     """Review measurements keyed by (game, resolution). Checked before the benchmark table."""
     return _table_from_file(_data_file("measured_benchmarks.json"))
@@ -1087,7 +1113,7 @@ def _benchmark_points(game_name: str | None, resolution: str | None, table: dict
         measured = _benchmark_points(game_name, resolution, load_measured_table())
         if measured:
             return measured
-        table = load_benchmark_table()
+        table = load_reviewed_benchmark_table()
     games = sorted({game for game, _ in table})
     matched = match_benchmark_game(game_name, games)
     if not matched:
